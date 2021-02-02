@@ -321,96 +321,96 @@ class SamplesSequence(Sequence):
 
         return self._samples[idx]
 
-    def filter_by_query(self, query: str):
-        filtered_samples = []
-        for sample in self._samples:
-            if dq.match(sample, query):
-                filtered_samples.append(sample)
-        return SamplesSequence(samples=filtered_samples)
+    # def filter_by_query(self, query: str):
+    #     filtered_samples = []
+    #     for sample in self._samples:
+    #         if dq.match(sample, query):
+    #             filtered_samples.append(sample)
+    #     return SamplesSequence(samples=filtered_samples)
 
-    def downsample(self, factor: int):
-        return SamplesSequence(samples=self._samples[::factor])
+    # def downsample(self, factor: int):
+    #     return SamplesSequence(samples=self._samples[::factor])
 
-    def fraction(self, percentage: float):
-        new_size = int(len(self) * min(max(percentage, 0), 1.0))
-        return SamplesSequence(samples=self._samples[:new_size])
+    # def fraction(self, percentage: float):
+    #     new_size = int(len(self) * min(max(percentage, 0), 1.0))
+    #     return SamplesSequence(samples=self._samples[:new_size])
 
-    def splits(self, percentages: Sequence = [0.8, 0.1, 0.1]):
-        """Splits sequence in N objects based on a percentage list
+    # def splits(self, percentages: Sequence = [0.8, 0.1, 0.1]):
+    #     """Splits sequence in N objects based on a percentage list
 
-        :param percentages: percentages list, defaults to [0.8, 0.1, 0.1]
-        :type percentages: list, optional
-        :return: list of PandasDatabase
-        :rtype: list
-        """
-        assert np.array(percentages).sum() <= 1.0, "Percentages sum must be <= 1.0"
-        sizes = []
-        for p in percentages:
-            sizes.append(int(len(self) * p))
+    #     :param percentages: percentages list, defaults to [0.8, 0.1, 0.1]
+    #     :type percentages: list, optional
+    #     :return: list of PandasDatabase
+    #     :rtype: list
+    #     """
+    #     assert np.array(percentages).sum() <= 1.0, "Percentages sum must be <= 1.0"
+    #     sizes = []
+    #     for p in percentages:
+    #         sizes.append(int(len(self) * p))
 
-        sizes[-1] += len(self) - np.array(sizes).sum()
+    #     sizes[-1] += len(self) - np.array(sizes).sum()
 
-        chunks = []
-        current_index = 0
-        for s in sizes:
-            _samples = self._samples[current_index:current_index + s]
-            chunks.append(SamplesSequence(samples=_samples))
-            current_index += s
-        return tuple(chunks)
+    #     chunks = []
+    #     current_index = 0
+    #     for s in sizes:
+    #         _samples = self._samples[current_index:current_index + s]
+    #         chunks.append(SamplesSequence(samples=_samples))
+    #         current_index += s
+    #     return tuple(chunks)
 
-    def splits_as_dict(self, percentages_dictionary: dict = {'train': 0.9, 'test': 0.1}):
-        """Splits PandasDatabase in N objects based on a percentage dictionary name/percentage
+    # def splits_as_dict(self, percentages_dictionary: dict = {'train': 0.9, 'test': 0.1}):
+    #     """Splits PandasDatabase in N objects based on a percentage dictionary name/percentage
 
-        :param percentages_dictionary: percentages dictionary, defaults to {'train': 0.9, 'test': 0.1}
-        :type percentages_dictionary: dict, optional
-        :return: dict of name/PandasDatabase pairs
-        :rtype: dict
-        """
-        names = list(percentages_dictionary.keys())
-        percentages = list(percentages_dictionary.values())
-        chunks = self.splits(percentages=percentages)
-        output = {}
-        assert len(names) == len(chunks), "Len of chunks is different from percentage names number"
-        for idx in range(len(names)):
-            output[names[idx]] = chunks[idx]
-        return output
+    #     :param percentages_dictionary: percentages dictionary, defaults to {'train': 0.9, 'test': 0.1}
+    #     :type percentages_dictionary: dict, optional
+    #     :return: dict of name/PandasDatabase pairs
+    #     :rtype: dict
+    #     """
+    #     names = list(percentages_dictionary.keys())
+    #     percentages = list(percentages_dictionary.values())
+    #     chunks = self.splits(percentages=percentages)
+    #     output = {}
+    #     assert len(names) == len(chunks), "Len of chunks is different from percentage names number"
+    #     for idx in range(len(names)):
+    #         output[names[idx]] = chunks[idx]
+    #     return output
 
-    def shuffle(self, seed=-1):
-        """Produces a shuffled copy of the original sequence
+    # def shuffle(self, seed=-1):
+    #     """Produces a shuffled copy of the original sequence
 
-        :param seed: controlled random seed , defaults to -1
-        :type seed: int, optional
-        :return: Shuffled copy of the original sequence
-        :rtype: SamplesSequence
-        """
-        new_data = self._samples.copy()
-        random.seed(seed)
-        random.shuffle(new_data)
-        return SamplesSequence(samples=new_data)
+    #     :param seed: controlled random seed , defaults to -1
+    #     :type seed: int, optional
+    #     :return: Shuffled copy of the original sequence
+    #     :rtype: SamplesSequence
+    #     """
+    #     new_data = self._samples.copy()
+    #     random.seed(seed)
+    #     random.shuffle(new_data)
+    #     return SamplesSequence(samples=new_data)
 
-    def __add__(self, o: Any):
-        if isinstance(o, SamplesSequence):
-            return SamplesSequence(samples=self._samples + o._samples)
-        else:
-            raise NotImplementedError(f'Cannot apply __add__ to {type(o)}')
+    # def __add__(self, o: Any):
+    #     if isinstance(o, SamplesSequence):
+    #         return SamplesSequence(samples=self._samples + o._samples)
+    #     else:
+    #         raise NotImplementedError(f'Cannot apply __add__ to {type(o)}')
 
-    def __mod__(self, o: Any):
-        if isinstance(o, int):
-            return self.downsample(o)
-        elif isinstance(o, float):
-            return self.fraction(o)
-        elif isinstance(o, str):
-            return self.filter_by_query(o)
-        else:
-            raise NotImplementedError(f'Cannot apply __mod__ to {type(o)}')
+    # def __mod__(self, o: Any):
+    #     if isinstance(o, int):
+    #         return self.downsample(o)
+    #     elif isinstance(o, float):
+    #         return self.fraction(o)
+    #     elif isinstance(o, str):
+    #         return self.filter_by_query(o)
+    #     else:
+    #         raise NotImplementedError(f'Cannot apply __mod__ to {type(o)}')
 
-    def __truediv__(self, o: Any):
-        if isinstance(o, Tuple):
-            return self.splits(percentages=o)
-        elif isinstance(o, Dict):
-            return self.splits_as_dict(percentages_dictionary=o)
-        else:
-            raise NotImplementedError(f'Cannot apply __truediv__ to {type(o)}')
+    # def __truediv__(self, o: Any):
+    #     if isinstance(o, Tuple):
+    #         return self.splits(percentages=o)
+    #     elif isinstance(o, Dict):
+    #         return self.splits_as_dict(percentages_dictionary=o)
+    #     else:
+    #         raise NotImplementedError(f'Cannot apply __truediv__ to {type(o)}')
 
 
 # class SamplesSequenceOp(SamplesSequence, SamplesSequenceAdder):
@@ -476,6 +476,34 @@ class SequenceOp(ABC):
         cls.factory_schema().validate(d)
 
 
+class SequenceOpFactory(object):
+
+    FACTORY_MAP: Dict[str, SequenceOp] = {}
+
+    @classmethod
+    def generic_op_schema(cls) -> Schema:
+        return Schema({
+            'type': str,
+            'options': dict
+        })
+
+    @classmethod
+    def register_op(cls, op: SequenceOp):
+        cls.FACTORY_MAP[op.__name__] = op
+
+    @classmethod
+    def create(cls, cfg: dict) -> SequenceOp:
+        cls.generic_op_schema().validate(cfg)
+        _t = cls.FACTORY_MAP[cfg['type']]
+        return _t.build_from_dict(cfg)
+
+
+def op_factory(o):
+    SequenceOpFactory.register_op(o)
+    return o
+
+
+@op_factory
 class AddOp(SequenceOp):
 
     def input_port(self) -> OpPort:
@@ -508,6 +536,7 @@ class AddOp(SequenceOp):
         return AddOp()
 
 
+@op_factory
 class SubsampleOp(SequenceOp):
     def __init__(self, factor: Union[int, float]) -> None:
         super().__init__()
@@ -550,6 +579,7 @@ class SubsampleOp(SequenceOp):
         return SubsampleOp(d['options']['factor'])
 
 
+@op_factory
 class ShuffleOp(SequenceOp):
 
     def __init__(self, seed=-1) -> None:
@@ -565,7 +595,7 @@ class ShuffleOp(SequenceOp):
     def __call__(self, x: SamplesSequence) -> Any:
         super().__call__(x)
         new_data = x.samples.copy()
-        random.seed(self._seed)
+        random.seed(self._seed if self._seed >= 0 else None)
         random.shuffle(new_data)
         return SamplesSequence(samples=new_data)
 
@@ -588,6 +618,7 @@ class ShuffleOp(SequenceOp):
         return ShuffleOp(d['options']['seed'])
 
 
+@op_factory
 class SplitsOp(SequenceOp):
 
     def __init__(self, split_map: Dict[str, float]) -> None:
@@ -663,6 +694,7 @@ class SplitsOp(SequenceOp):
         return SplitsOp(d['options']['split_map'])
 
 
+@op_factory
 class Dict2ListOp(SequenceOp):
 
     def input_port(self):
@@ -692,6 +724,7 @@ class Dict2ListOp(SequenceOp):
         return Dict2ListOp()
 
 
+@op_factory
 class FilterByQueryOp(SequenceOp):
 
     def __init__(self, query: str) -> None:
@@ -730,6 +763,7 @@ class FilterByQueryOp(SequenceOp):
         return FilterByQueryOp(query=d['options']['query'])
 
 
+@op_factory
 class SplitByQueryOp(SequenceOp):
 
     def __init__(self, query: str) -> None:
@@ -773,3 +807,8 @@ class SplitByQueryOp(SequenceOp):
     def build_from_dict(cls, d: dict):
         super().build_from_dict(d)
         return SplitByQueryOp(query=d['options']['query'])
+
+
+# SequenceOpFactory.register_op(AddOp)
+# SequenceOpFactory.register_op(SubsampleOp)
+# SequenceOpFactory.register_op(FilterByQueryOp)
