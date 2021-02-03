@@ -1,8 +1,6 @@
-from albumentations.core.serialization import SerializableMeta
-from albumentations.core.six import add_metaclass
-import rich
-import albumentations as A
+
 import cv2
+import albumentations as A
 
 
 class PadIfNeededV2(A.PadIfNeeded):
@@ -75,34 +73,3 @@ class PadIfNeededV2(A.PadIfNeeded):
 
     def get_transform_init_args_names(self):
         return ("min_height", "min_width", "border_mode", "value", "mask_value", "row_align", "col_align")
-
-
-print(PadIfNeededV2.get_class_fullname())
-# A.core.serialization.SerializableMeta.__new__(PadIfNeededV2, 'PadIfNeededV2', )
-
-
-transform = A.Compose([
-    A.RandomCrop(width=450, height=450),
-    A.HorizontalFlip(p=0.5),
-    A.RandomBrightnessContrast(p=0.2),
-], bbox_params=A.BboxParams(format='coco'))
-#
-#transform = A.RGBShift()
-
-
-d = A.to_dict(transform)
-rich.print(d)
-a = {
-    'transform': {
-        '__class_fullname__': '__main__.PadIfNeededV2',
-        'min_height': 70,
-        'min_width': 70
-    }
-}
-
-
-t2 = A.from_dict(a)
-rich.print(t2)
-
-# d = PadIfNeededV2()
-# print(d)

@@ -1,0 +1,11 @@
+__version__: 0.5.1
+transform:
+  __class_fullname__: albumentations.core.composition.Compose
+  additional_targets: {}
+  bbox_params: null
+  keypoint_params: null
+  p: 1.0
+  transforms:
+  - __class_fullname__: pipelime.augmentations.transforms.PadIfNeededV2
+    min_height: 700
+    min_width: 700
