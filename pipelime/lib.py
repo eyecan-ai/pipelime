@@ -476,7 +476,7 @@ class SequenceOp(ABC):
         cls.factory_schema().validate(d)
 
 
-class SequenceOpFactory(object):
+class SequenceOpFactory(object):  # TODO: rename
 
     FACTORY_MAP: Dict[str, SequenceOp] = {}
 

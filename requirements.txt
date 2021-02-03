@@ -4,5 +4,4 @@ dictquery
 schema
 albumentations>=0.5.2
 choixe
-imghdr
 imageio
