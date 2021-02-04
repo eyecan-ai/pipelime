@@ -1,3 +1,4 @@
+import pydash
 import functools
 import hashlib
 from typing import Dict, Sequence
@@ -5,28 +6,7 @@ import pytest
 import rich
 from schema import Schema
 from pipelime.sequences.samples import PlainSample, SamplesSequence
-from pipelime.sequences.operations import OperationDict2List, OperationFilterByQuery, OperationPort, OperationShuffle, OperationSplitByQuery, OperationSplits, OperationSubsample, OperationSum, SequenceOperation, SequenceOperationFactory
-
-
-def sample_dataset(namespace: str, N: int):
-
-    samples = []
-    for i in range(N):
-        data = {
-            'idx': f'{namespace}{i}',
-            'number': i,
-            'fraction': i / 1000.,
-            'metadata': {
-                'name': f'{namespace}{i}',
-                'N': i,
-                'deep': {
-                    'super_deep': 0
-                }
-            }
-        }
-        samples.append(PlainSample(data=data))
-
-    return SamplesSequence(samples=samples)
+from pipelime.sequences.operations import OperationDict2List, OperationFilterByQuery, OperationGroupBy, OperationPort, OperationShuffle, OperationSplitByQuery, OperationSplits, OperationSubsample, OperationSum, SequenceOperation, SequenceOperationFactory
 
 
 def _plug_test(op: SequenceOperation):
@@ -53,21 +33,21 @@ def _plug_test(op: SequenceOperation):
 
 class TestOperationSum(object):
 
-    def test_sum(self):
+    def test_sum(self, plain_samples_sequence_generator):
 
         pairs = [
-            (100, 5),
-            (100, 1),
-            (10, 100),
-            (1, 100),
-            (0, 100),
-            (100, 0)
+            (32, 5),
+            (32, 1),
+            (8, 32),
+            (1, 24),
+            (0, 64),
+            (48, 0)
         ]
 
         for N, D in pairs:
             datasets = []
             for idx in range(D):
-                datasets.append(sample_dataset('d{idx}_', N))
+                datasets.append(plain_samples_sequence_generator('d{idx}_', N))
 
             op = OperationSum()
             _plug_test(op)
@@ -84,14 +64,14 @@ class TestOperationSum(object):
 
 class TestOperationSubsample(object):
 
-    def test_subsample(self):
+    def test_subsample(self, plain_samples_sequence_generator):
 
-        sizes = [100, 10, 1000, 20, 1]
+        sizes = [32, 10, 128, 16, 1]
         factors = [2, 0.1, -0.1, 10.2, 10, 20, 1.0, 1]
 
         for F in factors:
             for N in sizes:
-                dataset = sample_dataset('d0_', N)
+                dataset = plain_samples_sequence_generator('d0_', N)
 
                 op = OperationSubsample(factor=F)
                 _plug_test(op)
@@ -121,12 +101,12 @@ class TestOperationShuffle(object):
         names = [x['idx'] for x in dataset.samples]
         return hashlib.md5(bytes('_'.join(names), encoding='utf-8')).hexdigest()
 
-    def test_shuffle(self):
+    def test_shuffle(self, plain_samples_sequence_generator):
 
-        sizes = [100, 10, 1000, 20]
+        sizes = [100, 10, 128, 20]
 
         for N in sizes:
-            dataset = sample_dataset('d0_', N)
+            dataset = plain_samples_sequence_generator('d0_', N)
 
             sign = self._sign(dataset)
 
@@ -145,9 +125,9 @@ class TestOperationShuffle(object):
 
 class TestOperationSplits(object):
 
-    def test_splits(self):
+    def test_splits(self, plain_samples_sequence_generator):
 
-        N = 1000
+        N = 128
         splits_cfgs = [
             {'split_map': {'train': 0.5, 'test': 0.2, 'val': 0.3}, 'good': True},
             {'split_map': {'a': 0.4, 'b': 0.2, 'c': 0.2, 'd': 0.2}, 'good': True},
@@ -163,7 +143,7 @@ class TestOperationSplits(object):
             good = cfg['good']
             split_map = cfg['split_map']
             expected_splits = len(split_map)
-            dataset = sample_dataset('d0_', N)
+            dataset = plain_samples_sequence_generator('d0_', N)
 
             if good:
                 op = OperationSplits(split_map=split_map)
@@ -199,7 +179,7 @@ class TestOperationSplits(object):
 
 class TestOperationDict2List(object):
 
-    def test_shuffle(self):
+    def test_shuffle(self, plain_samples_sequence_generator):
 
         pairs = [
             (10, 5),
@@ -213,7 +193,7 @@ class TestOperationDict2List(object):
             datasets = []
             datasets_map = {}
             for idx in range(D):
-                d = sample_dataset('d{idx}_', N)
+                d = plain_samples_sequence_generator('d{idx}_', N)
                 datasets.append(d)
                 datasets_map[str(idx)] = d
 
@@ -231,10 +211,10 @@ class TestOperationDict2List(object):
 
 class TestOperationFilterByQuery(object):
 
-    def test_filter_by_query(self):
+    def test_filter_by_query(self, plain_samples_sequence_generator):
 
-        N = 1000
-        dataset = sample_dataset('d0_', N)
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N)
 
         queries_items = [
             {'query': '`metadata.name` CONTAINS "d0_"', 'expected': N},
@@ -257,10 +237,10 @@ class TestOperationFilterByQuery(object):
 
 class TestOperationSplitByQuery(object):
 
-    def test_split_by_query(self):
+    def test_split_by_query(self, plain_samples_sequence_generator):
 
-        N = 1000
-        dataset = sample_dataset('d0_', N)
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N)
 
         queries_items = [
             {'query': '`metadata.name` CONTAINS "d0_"', 'expected': [N, 0]},
@@ -286,3 +266,49 @@ class TestOperationSplitByQuery(object):
             sumup_exp = functools.reduce(lambda a, b: a + b, expecteds)
 
             assert sumup == sumup_exp
+
+
+class TestOperationGroupBy(object):
+
+    def test_group_by(self, plain_samples_sequence_generator):
+
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N, heavy_data=False)
+
+        fields_items = [
+            {'field': '`metadata.deep.groupby_field`', 'valid': True},
+            {'field': '`metadata.even`', 'valid': True},
+            {'field': '`odd`', 'valid': True},
+            {'field': '`z`', 'valid': False},
+        ]
+
+        for item in fields_items:
+            field = item['field']
+            valid = item['valid']
+
+            for ungrouped in [True, False]:
+                op = OperationGroupBy(field=field, ungrouped=ungrouped)
+                _plug_test(op)
+
+                out = op(dataset)
+                if valid:
+                    assert len(out) < len(dataset)
+
+                    counters = {}
+                    for sample in out:
+                        for k, v in sample.items():
+                            rich.print(k, v)
+                        for key in sample.keys():
+                            if not isinstance(sample[key], dict):
+                                if key not in counters:
+                                    counters[key] = 0
+                                counters[key] += len(sample[key])
+
+                    for k, c in counters.items():
+                        print(k, c)
+                        assert c == N
+                else:
+                    if ungrouped:
+                        assert len(out) == 1
+                    else:
+                        assert len(out) == 0

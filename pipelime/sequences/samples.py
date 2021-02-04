@@ -23,6 +23,57 @@ class Sample(MutableMapping):
         pass
 
 
+class GroupedSample(Sample):
+
+    def __init__(self, samples: Sequence[Sample]) -> None:
+        super().__init__()
+        self._samples = samples
+
+    def _merge_dicts(self, ds: Sequence[dict]):
+        d = {}
+        if len(ds) > 0:
+            for k in ds[0].keys():
+                d[k] = tuple(d[k] for d in ds)
+        return d
+
+    def __getitem__(self, key):
+        if len(self._samples) > 0:
+            d = [x[key] for x in self._samples]
+            if isinstance(d[0], dict):
+                d = self._merge_dicts(d)
+            return d
+        return None
+
+    def __setitem__(self, key, value):
+        for x in self._samples:
+            x[key] = value
+
+    def __delitem__(self, key):
+        for x in self._samples:
+            del x[key]
+
+    def __iter__(self):
+        for x in self._samples:
+            return iter(x.keys())
+        return None
+
+    def __len__(self):
+        for x in self._samples:
+            return len(x)
+        return 0
+
+    def __repr__(self) -> str:
+        return str(self._samples)
+
+    def copy(self):
+        return GroupedSample(samples=self._samples)
+
+    def metaitem(self, key: any):
+        for x in self._samples:
+            return x.metaitem(key)
+        return None
+
+
 class PlainSample(Sample):
 
     def __init__(self, data: dict = None):

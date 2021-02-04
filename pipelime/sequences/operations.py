@@ -1,8 +1,9 @@
+import pydash as py_
 import dictquery as dq
 import numpy as np
 import random
 from typing import Any, Dict, Sequence, Union
-from pipelime.sequences.samples import SamplesSequence
+from pipelime.sequences.samples import GroupedSample, SamplesSequence
 from abc import ABC, abstractmethod
 from schema import Or, Schema
 import rich
@@ -502,5 +503,82 @@ class OperationSplitByQuery(SequenceOperation):
             'type': self.op_name(),
             'options': {
                 'query': self._query
+            }
+        }
+
+
+@register_operation_factory
+class OperationGroupBy(SequenceOperation):
+
+    def __init__(self, field: str, ungrouped: bool = False) -> None:
+        """ Groups sequence elements accoring to specific field
+
+        :param query: field string (@see pydash deep path notation)
+        :type query: str
+        :param ungrouped: TRUE to propagate ungrouped samples as separate group, if field is wrong
+        and ungrouped is TRUE, a single sample will be propagated. If some samples are lacking in the selected field,
+        they will be put in this special group.
+        :type ungrouped: bool
+        """
+        self._field = field.replace('`', '')
+        self._ungrouped = ungrouped
+
+    def input_port(self):
+        return OperationPort(SamplesSequence)
+
+    def output_port(self):
+        return OperationPort(SamplesSequence)
+
+    def __call__(self, x: SamplesSequence) -> Sequence[SamplesSequence]:
+        super().__call__(x)
+
+        groups_map = {}
+        none_group = []
+        for sample in x.samples:
+            value = py_.get(sample, self._field)
+            if value is not None:
+                if value not in groups_map:
+                    groups_map[value] = []
+                groups_map[value].append(sample)
+            else:
+                none_group.append(sample)
+
+        out_samples = []
+        for k, samples in groups_map.items():
+            g = GroupedSample(samples=samples)
+            g['__groupbyvalue__'] = k
+            out_samples.append(g)
+        if len(none_group) > 0 and self._ungrouped:
+            g = GroupedSample(samples=none_group)
+            g['__groupbyvalue__'] = None
+            out_samples.append(g)
+
+        return SamplesSequence(samples=out_samples)
+
+    @classmethod
+    def op_name(cls) -> str:
+        return OperationGroupBy.__name__
+
+    @classmethod
+    def factory_schema(cls) -> Schema:
+        return Schema({
+            'type': cls.op_name(),
+            'options': {
+                'field': str,
+                'ungrouped': bool
+            }
+        })
+
+    @classmethod
+    def build_from_dict(cls, d: dict):
+        super().build_from_dict(d)
+        return OperationGroupBy(field=d['options']['field'], ungrouped=d['options']['ungrouped'])
+
+    def to_dict(self) -> dict:
+        return {
+            'type': self.op_name(),
+            'options': {
+                'field': self._field,
+                'ungrouped': self._ungrouped
             }
         }
