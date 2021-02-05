@@ -33,6 +33,9 @@ class SequenceOperation(ABC):
     """Object representing a generic pipeline operation on a sequence
     """
 
+    def __init__(self) -> None:
+        pass
+
     @abstractmethod
     def input_port(self) -> OperationPort:
         raise NotImplementedError()
@@ -147,6 +150,47 @@ class OperationSum(SequenceOperation):
     def build_from_dict(cls, d: dict):
         super().build_from_dict(d)
         return OperationSum()
+
+    def to_dict(self):
+        return {
+            'type': self.op_name(),
+            'options': {}
+        }
+
+
+@register_operation_factory
+class OperationIdentity(SequenceOperation):
+
+    def __init__(self) -> None:
+        """ No Op
+        """
+        super().__init__()
+
+    def input_port(self) -> OperationPort:
+        return OperationPort(any)
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(any)
+
+    def __call__(self, x: any) -> any:
+        super().__call__(x)
+        return x
+
+    @classmethod
+    def op_name(cls) -> str:
+        return OperationIdentity.__name__
+
+    @classmethod
+    def factory_schema(cls) -> Schema:
+        return Schema({
+            'type': cls.op_name(),
+            'options': dict
+        })
+
+    @classmethod
+    def build_from_dict(cls, d: dict):
+        super().build_from_dict(d)
+        return OperationIdentity()
 
     def to_dict(self):
         return {

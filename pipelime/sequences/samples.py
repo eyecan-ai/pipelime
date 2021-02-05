@@ -47,6 +47,10 @@ class Sample(MutableMapping):
         return self._id
 
     @abstractmethod
+    def rename(self, old_key: str, new_key: str):
+        pass
+
+    @abstractmethod
     def copy(self):
         pass
 
@@ -107,6 +111,10 @@ class GroupedSample(Sample):
     def copy(self):
         return GroupedSample(samples=self._samples)
 
+    def rename(self, old_key: str, new_key: str):
+        for x in self._samples:
+            x.rename(old_key=old_key, new_key=new_key)
+
     def metaitem(self, key: any):
         for x in self._samples:
             return x.metaitem(key)
@@ -147,6 +155,11 @@ class PlainSample(Sample):
     def copy(self):
         return PlainSample(data=self._data.copy())
 
+    def rename(self, old_key: str, new_key: str):
+        if new_key not in self._data and old_key in self._data:
+            self._data[new_key] = self._data[old_key]
+            del self._data[old_key]
+
     def metaitem(self, key: any):
         return MemoryItem()
 
@@ -179,7 +192,10 @@ class FileSystemSample(Sample):
         self._cached[key] = value
 
     def __delitem__(self, key):
-        del self._cached[key]
+        if key in self._cached:
+            del self._cached[key]
+        if key in self._filesmap:
+            del self._filesmap[key]
 
     def __iter__(self):
         return iter(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
@@ -191,6 +207,12 @@ class FileSystemSample(Sample):
         newsample = FileSystemSample(self._filesmap)
         newsample._cached = self._cached.copy()
         return newsample
+
+    def rename(self, old_key: str, new_key: str):
+        if new_key not in self._filesmap and old_key in self._filesmap:
+            self._filesmap[new_key] = self._filesmap.pop(old_key)
+            if old_key in self._cached:
+                self._cached[new_key] = self._cached.pop(old_key)
 
     def metaitem(self, key: any):
         if key in self._filesmap:

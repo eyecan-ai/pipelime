@@ -6,7 +6,7 @@ import pytest
 import rich
 from schema import Schema
 from pipelime.sequences.samples import PlainSample, SamplesSequence
-from pipelime.sequences.operations import OperationDict2List, OperationFilterByQuery, OperationGroupBy, OperationPort, OperationShuffle, OperationSplitByQuery, OperationSplits, OperationSubsample, OperationSum, SequenceOperation, SequenceOperationFactory
+from pipelime.sequences.operations import OperationDict2List, OperationFilterByQuery, OperationGroupBy, OperationIdentity, OperationPort, OperationShuffle, OperationSplitByQuery, OperationSplits, OperationSubsample, OperationSum, SequenceOperation, SequenceOperationFactory
 
 
 def _plug_test(op: SequenceOperation):
@@ -93,6 +93,23 @@ class TestOperationSubsample(object):
 
                         if F == 1.0:
                             assert len(out) == N
+
+
+class TestOperationIdentity(object):
+
+    def test_subsample(self, plain_samples_sequence_generator):
+
+        sizes = [32, 10, 128, 16, 1]
+
+        for N in sizes:
+            dataset = plain_samples_sequence_generator('d0_', N)
+
+            op = OperationIdentity()
+            _plug_test(op)
+
+            out = op(dataset)
+
+            assert out == dataset
 
 
 class TestOperationShuffle(object):
