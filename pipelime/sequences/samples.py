@@ -1,18 +1,50 @@
+import uuid
 from pipelime.filesystem.toolkit import FSToolkit
 from dataclasses import dataclass
 from collections.abc import MutableMapping
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Hashable, Sequence
 
 
 @dataclass
 class MetaItem(object):
-    source: Any
-    source_type: Any
+
+    def __init__(self) -> None:
+        pass
+
+    @abstractmethod
+    def source(self) -> any:
+        pass
+
+
+class MemoryItem(MetaItem):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def source(self) -> any:
+        return None
+
+
+class FilesystemItem(MetaItem):
+
+    def __init__(self, path: str) -> None:
+        super().__init__()
+        self._path = Path(path)
+
+    def source(self) -> any:
+        return self._path
 
 
 class Sample(MutableMapping):
+
+    def __init__(self, id: Hashable = None) -> None:
+        self._id = id if id is not None else str(uuid.uuid1())
+
+    @property
+    def id(self):
+        return self._id
 
     @abstractmethod
     def copy(self):
@@ -25,8 +57,15 @@ class Sample(MutableMapping):
 
 class GroupedSample(Sample):
 
-    def __init__(self, samples: Sequence[Sample]) -> None:
-        super().__init__()
+    def __init__(self, samples: Sequence[Sample], id: Hashable = None) -> None:
+        """ Sample representing a group of basic samples
+
+        :param samples: list of samples to group
+        :type samples: Sequence[Sample]
+        :param id: hashable value used as id, defaults to None
+        :type id: Hashable, optional
+        """
+        super().__init__(id=id)
         self._samples = samples
 
     def _merge_dicts(self, ds: Sequence[dict]):
@@ -76,8 +115,15 @@ class GroupedSample(Sample):
 
 class PlainSample(Sample):
 
-    def __init__(self, data: dict = None):
-        super().__init__()
+    def __init__(self, data: dict = None, id: Hashable = None):
+        """ Plain sample (aka a dict wrapper)
+
+        :param data: dictionary data, defaults to None
+        :type data: dict, optional
+        :param id: hashable value used as id, defaults to None
+        :type id: Hashable, optional
+        """
+        super().__init__(id=id)
         self._data = data if data is not None else {}
 
     def __getitem__(self, key):
@@ -102,23 +148,22 @@ class PlainSample(Sample):
         return PlainSample(data=self._data.copy())
 
     def metaitem(self, key: any):
-        return MetaItem(
-            source=None,
-            source_type=None
-        )
+        return MemoryItem()
 
 
 class FileSystemSample(Sample):
 
-    def __init__(self, data_map: dict, lazy: bool = True):
+    def __init__(self, data_map: dict, lazy: bool = True, id: Hashable = None):
         """ Creates a FileSystemSample based on a key/filename map
 
         :param data_map: key/filename map
         :type data_map: dict
         :param lazy: FALSE to preload data (slow), defaults to False
         :type lazy: bool, optional
+        :param id: hashable value used as id
+        :type id: Hashable, optional
         """
-        super().__init__()
+        super().__init__(id=id)
         self._filesmap = data_map
         self._cached = {}
         if not lazy:
@@ -148,10 +193,10 @@ class FileSystemSample(Sample):
         return newsample
 
     def metaitem(self, key: any):
-        return MetaItem(
-            source=Path(self._filesmap[key]),
-            source_type=Path
-        )
+        if key in self._filesmap:
+            return FilesystemItem(self._filesmap[key])
+        else:
+            return MemoryItem()
 
 
 class SamplesSequence(Sequence):
