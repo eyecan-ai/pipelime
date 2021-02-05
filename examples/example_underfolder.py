@@ -1,3 +1,4 @@
+from pipelime.augmentations.transforms import PadIfNeededV2
 import rich
 import albumentations as A
 from albumentations.augmentations.functional import scale
@@ -36,17 +37,23 @@ dataset = op(dataset)
 
 transform = A.Compose([
     # A.RandomCrop(width=450, height=450),
-    # A.HorizontalFlip(p=0.5),
-    A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.6, rotate_limit=180, border_mode=cv2.BORDER_CONSTANT, p=1.0)
+    # A.HorizontalFlip(p=0.5)
+    A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.6, rotate_limit=180, border_mode=cv2.BORDER_CONSTANT, p=1.0),
+    PadIfNeededV2(min_height=1800, min_width=1000),
     # A.RandomBrightnessContrast(p=0.2),
 ],
     keypoint_params=A.KeypointParams(format='xyas', remove_invisible=True, angle_in_degrees=False),
-    bbox_params=A.BboxParams(format='yolo')
+    # bbox_params=A.BboxParams(format='yolo')
 )
 
 stage = StageAugmentations(
     transform_cfg=A.to_dict(transform),
-    targets={'image': 'image', 'keypoints': 'keypoints'}
+    targets={
+        'image': 'image',
+        'keypoints': 'keypoints',
+        'mask': 'mask',
+        'inst': 'mask'
+    }
 )
 
 

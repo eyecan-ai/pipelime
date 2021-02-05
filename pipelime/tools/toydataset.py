@@ -47,7 +47,13 @@ class ToyDatasetGenerator(object):
     def generate_2d_object_bbox(self, size, obj):
         center = obj['center']
         w, h = size
-        return (center[0], center[1], obj['w'], obj['h'], obj['label'])
+        return (
+            center[0] - obj['w'] * 0.5,
+            center[1] - obj['h'] * 0.5,
+            center[0] + obj['w'] * 0.5,
+            center[1] + obj['h'] * 0.5,
+            obj['label']
+        )
 
     def generate_2d_object_keypoints(self, size, obj):
 
@@ -119,7 +125,7 @@ class ToyDatasetGenerator(object):
         return data
 
     @classmethod
-    def generate_fake_dataset(cls, output_folder: str, size: int, image_size: Sequence[int], zfill: int = 5):
+    def generate_toy_dataset(cls, output_folder: str, size: int, image_size: Sequence[int], zfill: int = 5):
 
         output_folder = Path(output_folder)
         output_folder.mkdir(parents=True, exist_ok=True)

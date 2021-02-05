@@ -35,3 +35,9 @@ def test_content(response):
 #     help_result = runner.invoke(cli.main, ['--help'])
 #     assert help_result.exit_code == 0
 #     assert '--help  Show this message and exit.' in help_result.output
+
+
+def test_toy_dataset_small(toy_dataset_small):
+
+    for x in ['folder', 'data_folder', 'size', 'image_size', 'zfill', 'expected_keys', 'keypoints_format']:
+        assert x in toy_dataset_small

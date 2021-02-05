@@ -43,6 +43,41 @@ class SampleStage(ABC):
         pass
 
 
+class SampleStagesFactory(object):
+
+    FACTORY_MAP: Dict[str, SampleStage] = {}
+
+    @classmethod
+    def generic_op_schema(cls) -> Schema:
+        return Schema({
+            'type': str,
+            'options': dict
+        })
+
+    @classmethod
+    def register_stage(cls, stage: SampleStage):
+        cls.FACTORY_MAP[stage.__name__] = stage
+
+    @classmethod
+    def create(cls, cfg: dict) -> SampleStage:
+        cls.generic_op_schema().validate(cfg)
+        _t = cls.FACTORY_MAP[cfg['type']]
+        return _t.build_from_dict(cfg)
+
+
+def register_stage_factory(s: SampleStage) -> SampleStage:
+    """ Register a SampleStage to the factory
+
+    :param s: stage to register
+    :type s: SampleStage
+    :return: the same stage. It is intent to be used as decorator
+    :rtype: SampleStage
+    """
+    SampleStagesFactory.register_stage(s)
+    return s
+
+
+@register_stage_factory
 class StageIdentity(SampleStage):
 
     def __init__(self):
@@ -74,6 +109,7 @@ class StageIdentity(SampleStage):
         }
 
 
+@register_stage_factory
 class StageRemap(SampleStage):
 
     def __init__(self, remap: dict, remove_missing: bool = True):
@@ -132,6 +168,7 @@ class StageRemap(SampleStage):
         }
 
 
+@register_stage_factory
 class StageAugmentations(SampleStage):
 
     def __init__(self, transform_cfg: dict, targets: dict):
@@ -172,7 +209,7 @@ class StageAugmentations(SampleStage):
             'type': cls.stage_name(),
             'options': {
                 'transform_cfg': dict,
-                'targets': bool
+                'targets': dict
             }
         })
 
