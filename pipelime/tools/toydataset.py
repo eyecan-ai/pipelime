@@ -18,10 +18,15 @@ class ToyDatasetGenerator(object):
 
     def generate_random_object_2D(self, size, max_label=5):
         size = np.array(size)
-        center = np.random.uniform(0.1 * size[0], 0.9 * size[0], (2,))
-        random_size = np.random.uniform(size / 10, size / 2, (2,))
+        center = np.random.uniform(0.25 * size[0], 0.75 * size[0], (2,))
+        random_size = np.random.uniform(size * 0.05, size * 0.24, (2,))
         top_left = np.array([center[0] - random_size[0] * 0.5, center[1] - random_size[1] * 0.5])
         bottom_right = np.array([center[0] + random_size[0] * 0.5, center[1] + random_size[1] * 0.5])
+        diag = bottom_right - top_left
+
+        kp0 = np.array([center[0], center[1] - random_size[1] * 0.5])
+        kp1 = np.array([center[0], center[1] + random_size[1] * 0.5])
+
         width = random_size[0]
         height = random_size[1]
         label = np.random.randint(0, max_label + 1)
@@ -31,6 +36,9 @@ class ToyDatasetGenerator(object):
             'size': random_size,
             'tl': top_left,
             'br': bottom_right,
+            'diag': diag,
+            'kp0': kp0,
+            'kp1': kp1,
             'w': width,
             'h': height,
             'label': label
@@ -39,25 +47,28 @@ class ToyDatasetGenerator(object):
     def generate_2d_object_bbox(self, size, obj):
         center = obj['center']
         w, h = size
-        return (obj['label'], center[0] / w, center[1] / h, obj['w'] / w, obj['h'] / h)
+        return (center[0], center[1], obj['w'], obj['h'], obj['label'])
 
     def generate_2d_object_keypoints(self, size, obj):
 
         center = obj['center']
         tl = obj['tl']
         br = obj['br']
+        diag = obj['diag']
         obj_size = obj['size']
         w, h = size
         label = obj['label']
 
-        orientation = 1 if obj_size[0] > obj_size[1] else 0
-        scale = obj_size[0] / w
+        orientation = np.arctan2(diag[1], diag[0])
+        orientation2 = np.arctan2(-diag[1], -diag[0])
 
-        kp0 = (label, center[0] / w, center[1] / h, scale, orientation, 0)
-        kp1 = (label, tl[0] / w, tl[1] / h, scale, orientation, 1)
-        kp2 = (label, br[0] / w, br[1] / h, scale, orientation, 2)
+        scale = 0.5 * np.linalg.norm(diag)
 
-        return [kp0, kp1, kp2]
+        # kp0 = (label, center[0] / w, center[1] / h, orientation, scale, 0)
+        kp1 = (tl[0], tl[1], -orientation, scale, label, 1)
+        kp2 = (br[0], br[1], -orientation2, scale, label, 2)
+
+        return [kp1, kp2]
 
     def generate_2d_objects_images(self, size, objects):
 
@@ -70,9 +81,13 @@ class ToyDatasetGenerator(object):
             coords = tuple(obj['tl']), tuple(obj['br'])
             color = tuple(np.random.randint(0, 255, (3,)))
 
-            ImageDraw.Draw(image).ellipse(coords, fill=color)
-            ImageDraw.Draw(mask).ellipse(coords, fill=label + 1)
-            ImageDraw.Draw(instances).ellipse(coords, fill=index + 1)
+            # ImageDraw.Draw(image).ellipse(coords, fill=color)
+            # ImageDraw.Draw(mask).ellipse(coords, fill=label + 1)
+            # ImageDraw.Draw(instances).ellipse(coords, fill=index + 1)
+
+            ImageDraw.Draw(image).rectangle(coords, fill=color)
+            ImageDraw.Draw(mask).rectangle(coords, fill=label + 1)
+            ImageDraw.Draw(instances).rectangle(coords, fill=index + 1)
 
         return {
             'rgb': np.array(image),
