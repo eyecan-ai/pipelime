@@ -1,7 +1,7 @@
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import PlainSample
 from schema import Schema
-from pipelime.sequences.stages import SampleStage, SampleStagesFactory, StageAugmentations, StageIdentity, StageRemap
+from pipelime.sequences.stages import SampleStage, SampleStagesFactory, StageAugmentations, StageCompose, StageIdentity, StageKeysFilter, StageRemap
 
 
 def _plug_test(stage: SampleStage):
@@ -66,6 +66,24 @@ class TestStageRemap(object):
         assert 'idx' not in out
 
 
+class TestStageKeysFilter(object):
+
+    def test_filter(self):
+
+        s = PlainSample(data={'name': 'sample', 'idx': 111, 'tail': 2.2})
+
+        negates = [True, False]
+        for negate in negates:
+            stage = StageKeysFilter(keys=['name', 'idx'], negate=negate)
+            _plug_test(stage)
+
+            out = stage(s)
+
+            assert ('name' in out) if not negate else ('name' not in out)
+            assert ('idx' in out) if not negate else ('idx' not in out)
+            assert ('tail' in out) if negate else ('tail' not in out)
+
+
 class TestStageAugmentations(object):
 
     def test_augmentations(self, toy_dataset_small):
@@ -104,3 +122,29 @@ class TestStageAugmentations(object):
 
             for key in sample.keys():
                 assert key in out
+
+
+class TestStageCompose(object):
+
+    def test_compose(self):
+
+        s = PlainSample(data={'name': 'sample', 'idx': 111, 'float': 2.3, 'tail': True})
+
+        stages = [
+            StageIdentity(),
+            StageRemap(remap={'name': 'a'}, remove_missing=False),
+            StageRemap(remap={'idx': 'b'}, remove_missing=False),
+            StageRemap(remap={'float': 'c'}, remove_missing=False),
+            StageKeysFilter(keys=['a', 'b', 'c'], negate=False),
+            StageIdentity(),
+        ]
+
+        stage = StageCompose(stages=stages)
+        _plug_test(stage)
+
+        out = stage(s)
+
+        assert 'a' in out
+        assert 'b' in out
+        assert 'c' in out
+        assert 'tail' not in out

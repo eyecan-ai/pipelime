@@ -48,10 +48,10 @@ class SampleStagesFactory(object):
     FACTORY_MAP: Dict[str, SampleStage] = {}
 
     @classmethod
-    def generic_op_schema(cls) -> Schema:
+    def generic_stage_schema(cls) -> Schema:
         return Schema({
             'type': str,
-            'options': dict
+            str: object
         })
 
     @classmethod
@@ -60,7 +60,7 @@ class SampleStagesFactory(object):
 
     @classmethod
     def create(cls, cfg: dict) -> SampleStage:
-        cls.generic_op_schema().validate(cfg)
+        cls.generic_stage_schema().validate(cfg)
         _t = cls.FACTORY_MAP[cfg['type']]
         return _t.build_from_dict(cfg)
 
@@ -75,6 +75,44 @@ def register_stage_factory(s: SampleStage) -> SampleStage:
     """
     SampleStagesFactory.register_stage(s)
     return s
+
+
+@register_stage_factory
+class StageCompose(SampleStage):
+
+    def __init__(self, stages: Sequence[SampleStage]):
+        super().__init__()
+        self._stages = stages
+
+    def __call__(self, x: Sample) -> Sample:
+        out = x
+        for s in self._stages:
+            out = s(out)
+        return out
+
+    @classmethod
+    def stage_name(cls) -> str:
+        return StageCompose.__name__
+
+    @classmethod
+    def factory_schema(cls) -> Schema:
+        return Schema({
+            'type': cls.stage_name(),
+            'stages': list
+        })
+
+    @classmethod
+    def build_from_dict(cls, d: dict):
+        super().build_from_dict(d)
+        print("C"*100, d)
+        stages = [SampleStagesFactory.create(s) for s in d['stages']]
+        return StageCompose(stages=stages)
+
+    def to_dict(self) -> dict:
+        return {
+            'type': self.stage_name(),
+            'stages': [s.to_dict() for s in self._stages]
+        }
 
 
 @register_stage_factory
@@ -164,6 +202,59 @@ class StageRemap(SampleStage):
             'options': {
                 'remap': self._remap,
                 'remove_missing': self._remove_missing
+            }
+        }
+
+
+@register_stage_factory
+class StageKeysFilter(SampleStage):
+
+    def __init__(self, keys: list, negate: bool = False):
+        """ Filter sample keys
+
+        :param keys: list of keys to preserve
+        :type keys: list
+        :param negate: TRUE to delete input keys, FALSE delete all but keys
+        :type negate: bool
+        """
+        super().__init__()
+        self._keys = keys
+        self._negate = negate
+
+    def __call__(self, x: Sample) -> Sample:
+
+        out: Sample = x.copy()
+        for k in x.keys():
+            condition = (k in self._keys) if self._negate else (k not in self._keys)
+            if condition:
+                del out[k]
+        return out
+
+    @classmethod
+    def stage_name(cls) -> str:
+        return StageKeysFilter.__name__
+
+    @classmethod
+    def factory_schema(cls) -> Schema:
+        return Schema({
+            'type': cls.stage_name(),
+            'options': {
+                'keys': list,
+                'negate': bool
+            }
+        })
+
+    @classmethod
+    def build_from_dict(cls, d: dict):
+        super().build_from_dict(d)
+        return StageKeysFilter(**d['options'])
+
+    def to_dict(self) -> dict:
+        return {
+            'type': self.stage_name(),
+            'options': {
+                'keys': self._keys,
+                'negate': self._negate
             }
         }
 
