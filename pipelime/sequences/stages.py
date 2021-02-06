@@ -104,7 +104,6 @@ class StageCompose(SampleStage):
     @classmethod
     def build_from_dict(cls, d: dict):
         super().build_from_dict(d)
-        print("C"*100, d)
         stages = [SampleStagesFactory.create(s) for s in d['stages']]
         return StageCompose(stages=stages)
 

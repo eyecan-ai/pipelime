@@ -1,3 +1,4 @@
+import yaml
 from pipelime.tools.toydataset import ToyDatasetGenerator
 import pytest
 import os
@@ -24,6 +25,14 @@ def toy_dataset_small(tmpdir):
         zfill=zfill
     )
 
+    global_meta = {
+        'name': 'toy_dataset_small',
+        'numbers': [1, 2, 3, 4, 5, 6]
+    }
+
+    global_meta_name = folder / 'global_meta.yml'
+    yaml.safe_dump(global_meta, open(global_meta_name, 'w'))
+
     return {
         'folder': folder,
         'data_folder': datafolder,
@@ -32,5 +41,6 @@ def toy_dataset_small(tmpdir):
         'zfill': zfill,
         'keypoints_format': 'xyas',
         'bboxes_format': 'pascal_voc',
-        'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'bboxes']
+        'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'bboxes'],
+        'root_keys': ['global_meta']
     }
