@@ -5,3 +5,5 @@ schema
 albumentations>=0.5.2
 choixe
 imageio
+pydash
+Pillow

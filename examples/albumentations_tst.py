@@ -18,32 +18,14 @@ transform = A.Compose([
     keypoint_params=A.KeypointParams(format='xy', label_fields=['category_id'])
 )
 
+
 #
 #transform = A.RGBShift()
 
 
-d = A.to_dict(transform)
+# d = A.to_dict(transform)
 
 
-cfg = XConfig.from_dict(d)
-rich.print(cfg.to_dict(discard_private_qualifiers=False))
-cfg.save_to('/tmp/out.yml')
-
-# cfg2 = XConfig('test_cfg.yml')
-
-# t = AugmentationsFactory.build_from_dict(cfg2)
-# rich.print(t)
-# a = {
-#     'transform': {
-#         '__class_fullname__': 'pipelime.augmentations.transforms.PadIfNeededV2',
-#         'min_height': 70,
-#         'min_width': 70
-#     }
-# }
-
-
-# t2 = A.from_dict(a)
-# rich.print(t2)
-
-# d = PadIfNeededV2()
-# print(d)
+# cfg = XConfig.from_dict(d)
+# rich.print(cfg.to_dict(discard_private_qualifiers=False))
+# cfg.save_to('/tmp/out.yml')

@@ -5,49 +5,56 @@ import numpy as np
 import imageio
 import yaml
 import json
+from collections import defaultdict
 
 
 class FSToolkit(object):
 
-    # @classmethod
-    # def tree_from_underscore_notation_files(cls, folder, skip_hidden_files=True):
-    #     """Walk through files in folder generating a tree based on Underscore notation.
-    #     Leafs of abovementioned tree are string representing filenames, inner nodes represent
-    #     keys hierarchy.
+    # Declare TREE structure
+    @classmethod
+    def tree(cls):
+        return defaultdict(cls.tree)
 
-    #     :param folder: target folder
-    #     :type folder: str
-    #     :param skip_hidden_files: TRUE to skip files starting with '.', defaults to True
-    #     :type skip_hidden_files: bool, optional
-    #     :return: dictionary representing multilevel tree
-    #     :rtype: dict
-    #     """
+    @classmethod
+    def tree_from_underscore_notation_files(cls, folder: str):
+        """Walk through files in folder generating a tree based on Underscore notation.
+        Leafs of abovementioned tree are string representing filenames, inner nodes represent
+        keys hierarchy.
 
-    #     # Declare TREE structure
-    #     def tree():
-    #         return defaultdict(tree)
+        :param folder: target folder
+        :type folder: str
+        :param skip_hidden_files: TRUE to skip files starting with '.', defaults to True
+        :type skip_hidden_files: bool, optional
+        :return: dictionary representing multilevel tree
+        :rtype: dict
+        """
 
-    #     keys_tree = tree()
-    #     folder = Path(folder)
-    #     files = list(sorted(folder.glob('*')))
-    #     for f in files:
-    #         name = f.stem
+        keys_tree = cls.tree()
+        folder = Path(folder)
+        files = list(sorted(folder.glob('*')))
+        for f in files:
+            f: Path
 
-    #         if skip_hidden_files:
-    #             if name.startswith('.'):
-    #                 continue
+            if f.is_dir():
+                continue
 
-    #         chunks = name.split('_', maxsplit=1)
-    #         if len(chunks) == 1:
-    #             chunks.append('none')
-    #         p = keys_tree
-    #         for index, chunk in enumerate(chunks):
-    #             if index < len(chunks) - 1:
-    #                 p = p[chunk]
-    #             else:
-    #                 p[chunk] = str(f)
+            name = f.stem
 
-    #     return dict(keys_tree)
+            if name.startswith('.'):
+                continue
+
+            chunks = name.split('_', maxsplit=1)
+            if len(chunks) == 1:
+                continue
+
+            p = keys_tree
+            for index, chunk in enumerate(chunks):
+                if index < len(chunks) - 1:
+                    p = p[chunk]
+                else:
+                    p[chunk] = str(f)
+
+        return dict(keys_tree)
 
     @classmethod
     def get_file_extension(cls, filename, with_dot=False):
