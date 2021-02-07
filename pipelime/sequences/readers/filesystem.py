@@ -20,6 +20,7 @@ class UnderfolderReader(BaseReader):
         self._tree = FSToolkit.tree_from_underscore_notation_files(self._datafolder)
         self._ids = list(sorted(self._tree.keys()))
         self._root_files = [x for x in Path(self._folder).glob('*') if x.is_file()]
+        self._root_files = [x for x in self._root_files if not x.name.startswith('.')]
         self._root_data = {}
         for f in self._root_files:
             self._root_data[f.stem] = str(f)  # FSToolkit.load_data(f)

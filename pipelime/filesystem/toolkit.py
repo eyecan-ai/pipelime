@@ -120,3 +120,7 @@ class FSToolkit(object):
                 data = json.load(open(filename))
 
         return data
+
+    @classmethod
+    def store_data(cls, filename: str, data: any):
+        pass
