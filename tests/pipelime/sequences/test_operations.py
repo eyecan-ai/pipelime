@@ -6,7 +6,14 @@ import pytest
 import rich
 from schema import Schema
 from pipelime.sequences.samples import PlainSample, SamplesSequence
-from pipelime.sequences.operations import OperationDict2List, OperationFilterByQuery, OperationGroupBy, OperationIdentity, OperationPort, OperationShuffle, OperationSplitByQuery, OperationSplits, OperationSubsample, OperationSum, SequenceOperation, SequenceOperationFactory
+from pipelime.sequences.operations import (
+    OperationDict2List, OperationFilterByQuery, OperationGroupBy,
+    OperationIdentity, OperationPort, OperationShuffle,
+    OperationSplitByQuery, OperationSplits, OperationSubsample,
+    OperationSum, SequenceOperation
+)
+
+from pipelime.factories import BeanFactory
 
 
 def _plug_test(op: SequenceOperation):
@@ -22,12 +29,12 @@ def _plug_test(op: SequenceOperation):
     assert op.input_port().match(op.input_port())
     assert op.output_port().match(op.output_port())
 
-    reop = op.build_from_dict(op.to_dict())
+    reop = op.from_dict(op.to_dict())
     assert isinstance(reop, SequenceOperation)
-    assert isinstance(op.factory_schema(), Schema)
+    assert isinstance(op.bean_schema(), dict)
     op.print()
 
-    factored = SequenceOperationFactory.create(op.to_dict())
+    factored = BeanFactory.create(op.serialize())
     assert isinstance(factored, SequenceOperation)
 
 

@@ -1,3 +1,4 @@
+from pipelime.factories import Bean, BeanFactory
 import pydash as py_
 import dictquery as dq
 import numpy as np
@@ -61,61 +62,9 @@ class SequenceOperation(ABC):
             'output': self.output_port()
         })
 
-    @classmethod
-    @abstractmethod
-    def op_name(cls) -> str:
-        raise NotImplementedError()
 
-    @classmethod
-    @abstractmethod
-    def factory_schema(cls) -> Schema:
-        raise NotImplementedError()
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
-
-    @abstractmethod
-    def to_dict(self) -> dict:
-        pass
-
-
-class SequenceOperationFactory(object):
-
-    FACTORY_MAP: Dict[str, SequenceOperation] = {}
-
-    @classmethod
-    def generic_op_schema(cls) -> Schema:
-        return Schema({
-            'type': str,
-            'options': dict
-        })
-
-    @classmethod
-    def register_op(cls, op: SequenceOperation):
-        cls.FACTORY_MAP[op.__name__] = op
-
-    @classmethod
-    def create(cls, cfg: dict) -> SequenceOperation:
-        cls.generic_op_schema().validate(cfg)
-        _t = cls.FACTORY_MAP[cfg['type']]
-        return _t.build_from_dict(cfg)
-
-
-def register_operation_factory(o: SequenceOperation) -> SequenceOperation:
-    """ Register a SequenceOperation to the factory
-
-    :param o: operation to register
-    :type o: SequenceOperation
-    :return: the same operation. It is intent to be used as decorator
-    :rtype: SequenceOperation
-    """
-    SequenceOperationFactory.register_op(o)
-    return o
-
-
-@register_operation_factory
-class OperationSum(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationSum(SequenceOperation, Bean):
 
     def __init__(self) -> None:
         """ Concatenatas multiple sequences
@@ -136,30 +85,19 @@ class OperationSum(SequenceOperation):
         return SamplesSequence(samples=new_samples)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationSum.__name__
+    def bean_schema(cls) -> dict:
+        return {}
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': dict
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
+    def from_dict(cls, d: dict):
         return OperationSum()
 
     def to_dict(self):
-        return {
-            'type': self.op_name(),
-            'options': {}
-        }
+        return {}
 
 
-@register_operation_factory
-class OperationIdentity(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationIdentity(SequenceOperation, Bean):
 
     def __init__(self) -> None:
         """ No Op
@@ -177,30 +115,19 @@ class OperationIdentity(SequenceOperation):
         return x
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationIdentity.__name__
+    def bean_schema(cls) -> dict:
+        return {}
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': dict
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
+    def from_dict(cls, d: dict):
         return OperationIdentity()
 
     def to_dict(self):
-        return {
-            'type': self.op_name(),
-            'options': {}
-        }
+        return {}
 
 
-@register_operation_factory
-class OperationSubsample(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationSubsample(SequenceOperation, Bean):
     def __init__(self, factor: Union[int, float]) -> None:
         """ Subsample an input sequence elements
 
@@ -229,34 +156,25 @@ class OperationSubsample(SequenceOperation):
         return SamplesSequence(samples=new_samples)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationSubsample.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'factor': Or(float, int)
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationSubsample(d['options']['factor'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'factor': self._factor
-            }
+            'factor': Or(float, int)
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationSubsample(
+            factor=d['factor']
+        )
+
+    def to_dict(self):
+        return {
+            'factor': self._factor
         }
 
 
-@register_operation_factory
-class OperationShuffle(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationShuffle(SequenceOperation, Bean):
 
     def __init__(self, seed=-1) -> None:
         """ Shuffle input sequence elements
@@ -281,34 +199,25 @@ class OperationShuffle(SequenceOperation):
         return SamplesSequence(samples=new_data)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationShuffle.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'seed': int
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationShuffle(d['options']['seed'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'seed': self._seed
-            }
+            'seed': int
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationShuffle(
+            seed=d['seed']
+        )
+
+    def to_dict(self):
+        return {
+            'seed': self._seed
         }
 
 
-@register_operation_factory
-class OperationSplits(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationSplits(SequenceOperation, Bean):
 
     def __init__(self, split_map: Dict[str, float]) -> None:
         """ Splits an input sequence in multiple sub-sequences in a key/sequence map
@@ -370,34 +279,25 @@ class OperationSplits(SequenceOperation):
         return self._splits_as_dict(x, self._split_map)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationSplits.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'split_map': {str: float}
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationSplits(d['options']['split_map'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'split_map': self._split_map
-            }
+            'split_map': {str: float}
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationSplits(
+            split_map=d['split_map']
+        )
+
+    def to_dict(self):
+        return {
+            'split_map': self._split_map
         }
 
 
-@register_operation_factory
-class OperationDict2List(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationDict2List(SequenceOperation, Bean):
 
     def __init__(self) -> None:
         """ Converts a Dict of sequences into a play list of sequences
@@ -415,30 +315,15 @@ class OperationDict2List(SequenceOperation):
         return list(x.values())
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationDict2List.__name__
+    def bean_schema(cls) -> dict:
+        return {}
 
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': dict
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationDict2List()
-
-    def to_dict(self) -> dict:
-        return {
-            'type': self.op_name(),
-            'options': {}
-        }
+    def to_dict(self):
+        return {}
 
 
-@register_operation_factory
-class OperationFilterByQuery(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationFilterByQuery(SequenceOperation, Bean):
 
     def __init__(self, query: str) -> None:
         """ Filter sequence elements based on query string. If sample contains a 'metadata' item
@@ -465,34 +350,25 @@ class OperationFilterByQuery(SequenceOperation):
         return SamplesSequence(samples=filtered_samples)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationFilterByQuery.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'query': str
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationFilterByQuery(query=d['options']['query'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'query': self._query
-            }
+            'query': str
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationFilterByQuery(
+            query=d['query']
+        )
+
+    def to_dict(self):
+        return {
+            'query': self._query
         }
 
 
-@register_operation_factory
-class OperationSplitByQuery(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationSplitByQuery(SequenceOperation, Bean):
 
     def __init__(self, query: str) -> None:
         """ Splits sequence elements in two sub-sequences based on an input query. The first list
@@ -525,34 +401,25 @@ class OperationSplitByQuery(SequenceOperation):
         )
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationSplitByQuery.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'query': str
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationSplitByQuery(query=d['options']['query'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'query': self._query
-            }
+            'query': str
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationSplitByQuery(
+            query=d['query']
+        )
+
+    def to_dict(self):
+        return {
+            'query': self._query
         }
 
 
-@register_operation_factory
-class OperationGroupBy(SequenceOperation):
+@BeanFactory.make_serializable
+class OperationGroupBy(SequenceOperation, Bean):
 
     def __init__(self, field: str, ungrouped: bool = False) -> None:
         """ Groups sequence elements accoring to specific field
@@ -600,29 +467,21 @@ class OperationGroupBy(SequenceOperation):
         return SamplesSequence(samples=out_samples)
 
     @classmethod
-    def op_name(cls) -> str:
-        return OperationGroupBy.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.op_name(),
-            'options': {
-                'field': str,
-                'ungrouped': bool
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
-        return OperationGroupBy(field=d['options']['field'], ungrouped=d['options']['ungrouped'])
-
-    def to_dict(self) -> dict:
+    def bean_schema(cls) -> dict:
         return {
-            'type': self.op_name(),
-            'options': {
-                'field': self._field,
-                'ungrouped': self._ungrouped
-            }
+            'field': str,
+            'ungrouped': bool
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationGroupBy(
+            field=d['field'],
+            ungrouped=d['ungrouped']
+        )
+
+    def to_dict(self):
+        return {
+            'field': self._field,
+            'ungrouped': self._ungrouped
         }

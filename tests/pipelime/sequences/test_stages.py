@@ -1,7 +1,11 @@
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import PlainSample
 from schema import Schema
-from pipelime.sequences.stages import SampleStage, SampleStagesFactory, StageAugmentations, StageCompose, StageIdentity, StageKeysFilter, StageRemap
+from pipelime.sequences.stages import (
+    SampleStage, StageAugmentations,
+    StageCompose, StageIdentity, StageKeysFilter, StageRemap
+)
+from pipelime.factories import BeanFactory
 
 
 def _plug_test(stage: SampleStage):
@@ -13,11 +17,11 @@ def _plug_test(stage: SampleStage):
 
     assert isinstance(stage, SampleStage)
 
-    restage = stage.build_from_dict(stage.to_dict())
+    restage = stage.from_dict(stage.to_dict())
     assert isinstance(restage, SampleStage)
-    assert isinstance(restage.factory_schema(), Schema)
+    assert isinstance(restage.bean_schema(), dict)
 
-    factored = SampleStagesFactory.create(stage.to_dict())
+    factored = BeanFactory.create(stage.serialize())
     assert isinstance(factored, SampleStage)
 
 

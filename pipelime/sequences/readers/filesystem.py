@@ -1,9 +1,9 @@
 from pathlib import Path
-from pipelime.factories import Bean, BeanFactory, GenericFactory
+from pipelime.factories import Bean, BeanFactory
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import FileSystemSample
 from pipelime.filesystem.toolkit import FSToolkit
-from schema import Optional, Schema
+from schema import Optional
 
 
 @BeanFactory.make_serializable

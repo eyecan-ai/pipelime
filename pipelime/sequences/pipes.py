@@ -3,12 +3,12 @@
 from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 import tempfile
 from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
-from pipelime.factories import Factorizable, GenericFactory
+from pipelime.factories import Bean, BeanFactory, Factorizable
 import networkx as nx
 from schema import Or, Schema
 from abc import abstractmethod
 from typing import Hashable, Sequence, Union
-from pipelime.sequences.operations import SequenceOperation, SequenceOperationFactory
+from pipelime.sequences.operations import SequenceOperation
 from pipelime.sequences.samples import SamplesSequence
 
 
@@ -27,7 +27,7 @@ class PlaceholderDataNode(object):
         return self.name == o.name
 
 
-class PipeNode(Factorizable):
+class PipeNode(object):
 
     def __init__(
             self,
@@ -70,8 +70,8 @@ class PipeNode(Factorizable):
         return str(self.id)
 
 
-@GenericFactory.register
-class OperationNode(PipeNode):
+@BeanFactory.make_serializable
+class OperationNode(PipeNode, Bean):
 
     def __init__(
             self,
@@ -92,43 +92,32 @@ class OperationNode(PipeNode):
         return self._operation
 
     @classmethod
-    def factory_name(cls) -> str:
-        return OperationNode.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'input_data': Or(str, list, dict),
+            'output_data': Or(str, list, dict),
+            'operation': dict
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.factory_name(),
-            'options': {
-                'input_data': Or(str, list, dict),
-                'output_data': Or(str, list, dict),
-                'operation': dict
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
+    def from_dict(cls, d: dict):
         return OperationNode(
             id=IdGeneratorUUID.generate(),
-            input_data=d['options']['input_data'],
-            output_data=d['options']['output_data'],
-            operation=SequenceOperationFactory.create(d['options']['operation'])
+            input_data=d['input_data'],
+            output_data=d['output_data'],
+            operation=BeanFactory.create(d['operation'])
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
-            'type': self.factory_name(),
-            'options': {
-                'input_data': self._input_data,
-                'output_data': self._output_data,
-                'operation': self.operation.to_dict()
-            }
+            'input_data': self._input_data,
+            'output_data': self._output_data,
+            'operation': self.operation.to_dict()
         }
 
 
-@GenericFactory.register
-class SourceNode(PipeNode):
+@BeanFactory.make_serializable
+class SourceNode(PipeNode, Bean):
 
     def __init__(
             self,
@@ -145,41 +134,30 @@ class SourceNode(PipeNode):
         return self._sequence
 
     @classmethod
-    def factory_name(cls) -> str:
-        return SourceNode.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'output_data': Or(None, str, list, dict),
+            'sequence': dict
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.factory_name(),
-            'options': {
-                'output_data': Or(None, str, list, dict),
-                'sequence': dict
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
+    def from_dict(cls, d: dict):
         return SourceNode(
             id=IdGeneratorUUID.generate(),
-            output_data=d['options']['output_data'],
-            sequence=GenericFactory.create(d['options']['sequence'])
+            output_data=d['output_data'],
+            sequence=BeanFactory.create(d['sequence'])
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
-            'type': self.factory_name(),
-            'options': {
-                'input_data': self._input_data,
-                'output_data': self._output_data,
-                'sequence': self.sequence.to_dict()
-            }
+            'input_data': self._input_data,
+            'output_data': self._output_data,
+            'sequence': self.sequence.to_dict()
         }
 
 
-@GenericFactory.register
-class NodeGraph(Factorizable):
+@BeanFactory.make_serializable
+class NodeGraph(Bean):
 
     def __init__(self, nodes: Sequence[PipeNode]):
         self._nodes = nodes
@@ -196,26 +174,19 @@ class NodeGraph(Factorizable):
         self._sorted_graph = nx.topological_sort(self._graph)
 
     @classmethod
-    def factory_name(cls) -> str:
-        return NodeGraph.__name__
-
-    @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.factory_name(),
+    def bean_schema(cls) -> dict:
+        return {
             'nodes': list
-        })
+        }
 
     @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
-        nodes = [GenericFactory.create(c) for c in d['nodes']]
+    def from_dict(cls, d: dict):
+        nodes = [BeanFactory.create(c) for c in d['nodes']]
         return NodeGraph(nodes=nodes)
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
-            'type': self.factory_name(),
-            'nodes': [x.to_dict() for x in self._nodes]
+            'nodes': [x.serialize() for x in self._nodes]
         }
 
     def draw_to_file(self, filename: str = None):
