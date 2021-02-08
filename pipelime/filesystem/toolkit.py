@@ -1,5 +1,7 @@
 from pathlib import Path
 import imghdr
+import pickle
+from pipelime.tools.bytes import DataCoding
 from typing import Union
 import numpy as np
 import imageio
@@ -69,11 +71,11 @@ class FSToolkit(object):
         return ext in ['yml', 'json', 'toml', 'tml']
 
     @classmethod
-    def is_file_image(cls, filename: str) -> bool:
+    def is_image_file(cls, filename: str) -> bool:
         return imghdr.what(filename) is not None
 
     @classmethod
-    def is_file_numpy_array(cls, filename: str) -> bool:
+    def is_numpy_array_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
         if ext in ['txt', 'data']:
             try:
@@ -90,6 +92,11 @@ class FSToolkit(object):
         return False
 
     @classmethod
+    def is_picke_file(cls, filename: str):
+        ext = cls.get_file_extension(filename)
+        return ext == 'pkl'
+
+    @classmethod
     def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
         """ Load data from file based on its extension
 
@@ -102,10 +109,10 @@ class FSToolkit(object):
         extension = cls.get_file_extension(filename)
         data = None
 
-        if cls.is_file_image(filename):
+        if cls.is_image_file(filename):
             data = np.array(imageio.imread(filename))
 
-        if cls.is_file_numpy_array(filename):
+        elif cls.is_numpy_array_file(filename):
             if extension in ['txt']:
                 data = np.loadtxt(filename)
             elif extension in ['npy', 'npz']:
@@ -113,14 +120,34 @@ class FSToolkit(object):
             if data is not None:
                 data = np.atleast_2d(data)
 
-        if cls.is_metadata_file(filename):
+        elif cls.is_metadata_file(filename):
             if extension in ['yml']:
                 data = yaml.safe_load(open(filename, 'r'))
             elif extension in ['json']:
                 data = json.load(open(filename))
-
+        elif cls.is_picke_file(filename):
+            data = pickle.load(open(filename, 'rb'))
+        else:
+            raise NotImplementedError(f'Unknown file extension: {filename}')
         return data
 
     @classmethod
     def store_data(cls, filename: str, data: any):
-        pass
+
+        extension = cls.get_file_extension(filename)
+
+        if DataCoding.is_image_extension(extension):
+            imageio.imwrite(filename, data)
+        elif DataCoding.is_text_extension(extension):
+            np.savetxt(filename, data)
+        elif DataCoding.is_numpy_extension(extension):
+            np.save(filename, data)
+        elif DataCoding.is_metadata_extension(extension):
+            if extension in ['yml']:
+                yaml.safe_dump(data, open(filename, 'w'))
+            elif extension in ['json']:
+                json.dump(data, open(filename, 'w'))
+        elif DataCoding.is_pickle_extension(extension):
+            pickle.dump(data, open(filename, 'wb'))
+        else:
+            raise NotImplementedError(f'Unknown file extension: {filename}')

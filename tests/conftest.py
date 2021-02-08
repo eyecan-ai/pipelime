@@ -44,3 +44,13 @@ def toy_dataset_small(tmpdir):
         'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'bboxes'],
         'root_keys': ['global_meta']
     }
+
+
+@pytest.fixture(scope='session')
+def filesystem_datasets(data_folder):
+    return {
+        'minimnist_underfolder': {
+            'folder': Path(data_folder) / 'datasets' / 'underfolder_minimnist',
+            'type': 'Undefolder'
+        }
+    }

@@ -1,4 +1,6 @@
 
+import types
+from functools import update_wrapper, wraps
 import typing
 from abc import ABC, abstractmethod
 from schema import Schema
@@ -67,7 +69,35 @@ class BeanFactory(object):
             return bt.hydrate(d, validate=validate)
         raise RuntimeError(f'Non serializable data: {d}')
 
+    # @staticmethod
+    # def make_serializable(x: type):
+    #     BeanFactory.register_bean(x)
+    #     return x
+
+    # @staticmethod
+    # def make_serializable(f):
+    #     BeanFactory.register_bean(f)
+
+    #     def _decorator():
+    #         return f()
+    #     _decorator.__doc__ = f.__doc__
+    #     return _decorator
+
+    # @staticmethod
+    # def make_serializable(x: type):
+    #     BeanFactory.register_bean(x)
+
+    #     @wraps(x)
+    #     class wrapper(object): *args, **kwargs):
+    #         return x
+    #         # _x = x(*args, **kwargs)
+    #         # return _x
+    #     return wrapper
+
     @staticmethod
     def make_serializable(x: type):
         BeanFactory.register_bean(x)
-        return x
+        @wraps(x, updated=())
+        class D(x):
+            decorated = 1
+        return D

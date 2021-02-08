@@ -1,6 +1,6 @@
 
 
-from pipelime.factories import BeanFactory, GenericFactory
+from pipelime.factories import BeanFactory
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
 from pipelime.sequences.readers.filesystem import UnderfolderReader

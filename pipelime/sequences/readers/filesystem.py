@@ -6,8 +6,7 @@ from pipelime.filesystem.toolkit import FSToolkit
 from schema import Optional
 
 
-@BeanFactory.make_serializable
-class UnderfolderReader(BaseReader, Bean):
+class UnderfolderReader(BaseReader):
     DATA_SUBFOLDER = 'data'
 
     def __init__(self, folder: str, copy_root_files: bool = True) -> None:
@@ -55,3 +54,6 @@ class UnderfolderReader(BaseReader, Bean):
             'folder': str(self._folder),
             'copy_root_files': self._copy_root_files
         }
+
+
+BeanFactory.register_bean(UnderfolderReader)

@@ -1,10 +1,9 @@
-from pipelime.factories import Factorizable
-from pipelime.sequences.samples import FileSystemSample, SamplesSequence
+from pipelime.factories import Bean
+from pipelime.sequences.samples import SamplesSequence
 from abc import abstractmethod
-from schema import Schema
 
 
-class BaseWriter(Factorizable):
+class BaseWriter(Bean):
 
     @abstractmethod
     def __call__(self, x: SamplesSequence) -> None:

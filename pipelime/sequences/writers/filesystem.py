@@ -1,15 +1,16 @@
-from pathlib import Path
-from pipelime.sequences.writers.base import BaseWriter
-from pipelime.factories import GenericFactory
-from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.samples import FileSystemSample, Sample, SamplesSequence
+from rich.progress import track
 from pipelime.filesystem.toolkit import FSToolkit
-from schema import Optional, Schema
+import re
+from pathlib import Path
+from pipelime.factories import Bean, BeanFactory
+from pipelime.sequences.writers.base import BaseWriter
+from pipelime.sequences.samples import Sample, SamplesSequence
+from schema import Optional, Or
 
 
-@GenericFactory.register
 class UnderfolderWriter(BaseWriter):
     DATA_SUBFOLDER = 'data'
+    DEFAULT_EXTENSION = 'pkl'
 
     def __init__(
         self,
@@ -33,43 +34,57 @@ class UnderfolderWriter(BaseWriter):
             return str(sample.id)
 
     def _build_item_extension(self, key: str):
-        if key in self._extensions_map:
-            return self._extensions_map[key]
-        else:
-            return 'pkl'
+        extension = UnderfolderWriter.DEFAULT_EXTENSION
+        for r, ext in self._extensions_map.items():
+            if re.match(r, key) is not None:
+                extension = ext
+                break
+        return extension
+
+    def _is_root_key(self, key: str):
+        for r in self._root_files_keys:
+            if re.match(r, key) is not None:
+                return True
+        return False
 
     def __call__(self, x: SamplesSequence) -> None:
-
-        for sample in x:
+        for sample in track(x):
             basename = self._build_sample_basename(sample)
             for key in sample.keys():
-                itemname = f'{basename}_{key}.{self._build_item_extension(key)}'
-                print("writing", basename, itemname)
+                if self._is_root_key(key):
+                    itemname = f'{key}.{self._build_item_extension(key)}'
+                    output_file = Path(self._folder) / itemname
+                    FSToolkit.store_data(output_file, sample[key])
+                else:
+                    itemname = f'{basename}_{key}.{self._build_item_extension(key)}'
+                    output_file = Path(self._datafolder) / itemname
+                    FSToolkit.store_data(output_file, sample[key])
 
     @classmethod
-    def factory_name(cls) -> str:
-        return UnderfolderWriter.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'folder': str,
+            Optional('root_files_keys'): Or(None, list),
+            Optional('extensions_map'): Or(None, dict),
+            Optional('zfill'): int,
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.factory_name(),
-            'options': {
-                'folder': str,
-                Optional('root_files_keys'): dict
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
-        return UnderfolderWriter(**d['options'])
+    def from_dict(cls, d: dict):
+        return UnderfolderWriter(
+            folder=d.get('folder'),
+            root_files_keys=d.get('root_files_keys', None),
+            extensions_map=d.get('extensions_map', None),
+            zfill=d.get('zfill', 5),
+        )
 
     def to_dict(self) -> dict:
         return {
-            'type': self.factory_name(),
-            'options': {
-                'folder': str(self._folder),
-                'root_files_keys': self._root_files_keys
-            }
+            'folder': str(self._folder),
+            'root_files_keys': self._root_files_keys,
+            'extensions_map': self._extensions_map,
+            'zfill': self._zfill
         }
+
+
+BeanFactory.register_bean(UnderfolderWriter)

@@ -20,6 +20,27 @@ class DataCoding(object):
     NUMPY_CODECS = ['npy']
     TEXT_CODECS = ['txt']
     METADATA_CODECS = ['json', 'yml', 'yaml']
+    PICKLE_CODECS = ['pkl']
+
+    @classmethod
+    def is_image_extension(cls, extension: str):
+        return extension in DataCoding.IMAGE_CODECS
+
+    @classmethod
+    def is_text_extension(cls, extension: str):
+        return extension in DataCoding.TEXT_CODECS
+
+    @classmethod
+    def is_numpy_extension(cls, extension: str):
+        return extension in DataCoding.NUMPY_CODECS
+
+    @classmethod
+    def is_metadata_extension(cls, extension: str):
+        return extension in DataCoding.METADATA_CODECS
+
+    @classmethod
+    def is_pickle_extension(cls, extension: str):
+        return extension in DataCoding.PICKLE_CODECS
 
     @classmethod
     def bytes_to_data(cls, data: bytes, data_encoding: str) -> np.ndarray:

@@ -1,12 +1,13 @@
 
 
-from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
+from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.writers.base import BaseWriter
+from pipelime.tools.idgenerators import IdGeneratorUUID
 import tempfile
-from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
-from pipelime.factories import Bean, BeanFactory, Factorizable
+from networkx.drawing.nx_agraph import to_agraph
+from pipelime.factories import Bean, BeanFactory
 import networkx as nx
-from schema import Or, Schema
-from abc import abstractmethod
+from schema import Or
 from typing import Hashable, Sequence, Union
 from pipelime.sequences.operations import SequenceOperation
 from pipelime.sequences.samples import SamplesSequence
@@ -84,9 +85,6 @@ class OperationNode(PipeNode, Bean):
         super().__init__(id=id, input_data=input_data, output_data=output_data)
         self._operation = operation
 
-    # def __repr__(self) -> str:
-    #     return str(self.operation.to_dict())
-
     @property
     def operation(self):
         return self._operation
@@ -112,47 +110,85 @@ class OperationNode(PipeNode, Bean):
         return {
             'input_data': self._input_data,
             'output_data': self._output_data,
-            'operation': self.operation.to_dict()
+            'operation': self.operation.serialize()
         }
 
 
 @BeanFactory.make_serializable
-class SourceNode(PipeNode, Bean):
+class ReaderNode(PipeNode, Bean):
 
     def __init__(
             self,
             id: Hashable,
             output_data: str,
-            sequence: SamplesSequence
+            reader: BaseReader
     ) -> None:
 
         super().__init__(id=id, input_data=None, output_data=output_data)
-        self._sequence = sequence
+        self._reader = reader
 
     @property
-    def sequence(self):
-        return self._sequence
+    def reader(self):
+        return self._reader
 
     @classmethod
     def bean_schema(cls) -> dict:
         return {
             'output_data': Or(None, str, list, dict),
-            'sequence': dict
+            'reader': dict
         }
 
     @classmethod
     def from_dict(cls, d: dict):
-        return SourceNode(
+        return ReaderNode(
             id=IdGeneratorUUID.generate(),
             output_data=d['output_data'],
-            sequence=BeanFactory.create(d['sequence'])
+            reader=BeanFactory.create(d['reader'])
+        )
+
+    def to_dict(self):
+        return {
+            'output_data': self._output_data,
+            'reader': self.reader.serialize()
+        }
+
+
+@BeanFactory.make_serializable
+class WriterNode(PipeNode, Bean):
+
+    def __init__(
+            self,
+            id: Hashable,
+            input_data: str,
+            writer: BaseWriter
+    ) -> None:
+
+        super().__init__(id=id, output_data=None, input_data=input_data)
+        self._writer = writer
+
+    @property
+    def writer(self):
+        return self._writer
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'input_data': Or(None, str, list, dict),
+            'writer': dict
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return WriterNode(
+            id=IdGeneratorUUID.generate(),
+            input_data=d['input_data'],
+            writer=BeanFactory.create(d['writer'])
         )
 
     def to_dict(self):
         return {
             'input_data': self._input_data,
-            'output_data': self._output_data,
-            'sequence': self.sequence.to_dict()
+            'writer': self.writer.serialize()
         }
 
 
@@ -173,6 +209,53 @@ class NodeGraph(Bean):
         self._data_cache = {}
         self._sorted_graph = nx.topological_sort(self._graph)
 
+    def clear(self):
+        self._data_cache.clear()
+
+    def execute(self):
+        self.clear()
+        for node in self._sorted_graph:
+            if isinstance(node, ReaderNode):
+                for data in node.output_data(as_list=True):
+                    self._data_cache[data] = node.reader
+
+            if isinstance(node, OperationNode):
+                data = self._cache_to_node(node, self._data_cache)
+                out_data = node.operation(data)
+                self._node_to_cache(out_data, node, self._data_cache)
+
+            if isinstance(node, WriterNode):
+                data = self._cache_to_node(node, self._data_cache)
+                node.writer(data)
+
+    def _cache_to_node(self, node: PipeNode, cache: dict) -> Union[SamplesSequence, list, dict]:
+        v = node.input_data(as_list=False)
+        if v is None:
+            return None
+        elif isinstance(v, str):
+            return cache[v]
+        elif isinstance(v, list):
+            return [cache[x] for x in v]
+        elif isinstance(v, dict):
+            return {k: cache[v] for k, v in v.items()}
+        else:
+            raise NotImplementedError(f'{type(v)}')
+
+    def _node_to_cache(self, data: Union[SamplesSequence, list, dict], node: PipeNode, cache: dict):
+        v = node.output_data(as_list=False)
+        if v is None:
+            pass
+        elif isinstance(v, str):
+            cache[v] = data
+        elif isinstance(v, list):
+            for idx, name in enumerate(v):
+                cache[name] = data[idx]
+        elif isinstance(v, dict):
+            for k, name in v.items():
+                cache[name] = data[k]
+        else:
+            raise NotImplementedError(f'{type(v)}')
+
     @classmethod
     def bean_schema(cls) -> dict:
         return {
@@ -191,7 +274,6 @@ class NodeGraph(Bean):
 
     def draw_to_file(self, filename: str = None):
         A = to_agraph(self._graph)
-        shapes = ['circle', 'box']
         for i, node in enumerate(A.iternodes()):
             print(i, node)
             if node in self._nodes_map:
@@ -199,12 +281,17 @@ class NodeGraph(Bean):
                 if isinstance(ref, OperationNode):
                     node.attr['label'] = self._nodes_map[node].operation.__class__.__name__
                     node.attr['style'] = 'filled'
-                    node.attr['fillcolor'] = 'turquoise'
+                    node.attr['fillcolor'] = '#ffd54f'
                     node.attr['shape'] = 'box'
-                elif isinstance(ref, SourceNode):
-                    node.attr['label'] = self._nodes_map[node].sequence.__class__.__name__
+                elif isinstance(ref, ReaderNode):
+                    node.attr['label'] = self._nodes_map[node].reader.__class__.__name__
                     node.attr['style'] = 'filled'
-                    node.attr['fillcolor'] = '#ff33aa'
+                    node.attr['fillcolor'] = '#009688'
+                    node.attr['shape'] = 'box'
+                elif isinstance(ref, WriterNode):
+                    node.attr['label'] = self._nodes_map[node].writer.__class__.__name__
+                    node.attr['style'] = 'filled'
+                    node.attr['fillcolor'] = '#9c27b0'
                     node.attr['shape'] = 'box'
 
             else:

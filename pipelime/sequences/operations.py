@@ -1,3 +1,4 @@
+from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
 import dictquery as dq
@@ -124,6 +125,46 @@ class OperationIdentity(SequenceOperation, Bean):
 
     def to_dict(self):
         return {}
+
+
+@BeanFactory.make_serializable
+class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
+
+    def __init__(self, generator_type: str = 'UUID') -> None:
+        """ Reset indices of sample
+        """
+        super().__init__()
+        self._generator_type = generator_type
+        self._generator = IdGeneratorUUID if self._generator_type == 'UUID' else IdGeneratorInteger
+
+    def input_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def __call__(self, x: SamplesSequence) -> SamplesSequence:
+        super().__call__(x)
+        for idx in range(len(x)):
+            x[idx].id = self._generator.generate()
+        return x
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'generator_type': str
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationResetIndices(
+            generator_type=d['generator_type']
+        )
+
+    def to_dict(self):
+        return {
+            'generator_type': self._generator_type
+        }
 
 
 @BeanFactory.make_serializable

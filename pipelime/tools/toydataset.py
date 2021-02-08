@@ -57,11 +57,11 @@ class ToyDatasetGenerator(object):
 
     def generate_2d_object_keypoints(self, size, obj):
 
-        center = obj['center']
+        # center = obj['center']
         tl = obj['tl']
         br = obj['br']
         diag = obj['diag']
-        obj_size = obj['size']
+        # obj_size = obj['size']
         w, h = size
         label = obj['label']
 

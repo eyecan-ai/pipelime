@@ -2,7 +2,6 @@ import albumentations as A
 from abc import ABC, abstractmethod
 from typing import Dict, Hashable, Sequence, Union
 from pipelime.factories import Bean, BeanFactory
-from schema import Schema
 from pipelime.sequences.samples import Sample
 
 
