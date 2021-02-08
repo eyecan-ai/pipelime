@@ -1,6 +1,6 @@
 
 
-from pipelime.factories import GenericFactory
+from pipelime.factories import BeanFactory, GenericFactory
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
 from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -16,11 +16,11 @@ def _plug_test(reader: BaseReader):
 
     assert isinstance(reader, BaseReader)
 
-    rereader = reader.build_from_dict(reader.to_dict())
+    print(reader.serialize())
+    rereader = reader.hydrate(reader.serialize())
     assert isinstance(rereader, BaseReader)
-    assert isinstance(rereader.factory_schema(), Schema)
 
-    factored = GenericFactory.create(reader.to_dict())
+    factored = BeanFactory.create(reader.serialize())
     assert isinstance(factored, BaseReader)
 
 

@@ -1,13 +1,13 @@
 from pathlib import Path
-from pipelime.factories import GenericFactory
+from pipelime.factories import Bean, BeanFactory, GenericFactory
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import FileSystemSample
 from pipelime.filesystem.toolkit import FSToolkit
 from schema import Optional, Schema
 
 
-@GenericFactory.register
-class UnderfolderReader(BaseReader):
+@BeanFactory.make_serializable
+class UnderfolderReader(BaseReader, Bean):
     DATA_SUBFOLDER = 'data'
 
     def __init__(self, folder: str, copy_root_files: bool = True) -> None:
@@ -37,29 +37,21 @@ class UnderfolderReader(BaseReader):
         super().__init__(samples=samples)
 
     @classmethod
-    def factory_name(cls) -> str:
-        return UnderfolderReader.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'folder': str,
+            Optional('copy_root_files'): bool
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.factory_name(),
-            'options': {
-                'folder': str,
-                Optional('copy_root_files'): bool
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
-        return UnderfolderReader(**d['options'])
+    def from_dict(cls, d: dict):
+        return UnderfolderReader(
+            folder=d.get('folder'),
+            copy_root_files=d.get('copy_root_files', True)
+        )
 
     def to_dict(self) -> dict:
         return {
-            'type': self.factory_name(),
-            'options': {
-                'folder': str(self._folder),
-                'copy_root_files': self._copy_root_files
-            }
+            'folder': str(self._folder),
+            'copy_root_files': self._copy_root_files
         }
