@@ -1,8 +1,7 @@
 
-import types
-from functools import update_wrapper, wraps
+from functools import wraps
 import typing
-from abc import ABC, abstractmethod
+from abc import ABC
 from schema import Schema
 
 
@@ -15,9 +14,8 @@ class Bean(ABC):
         return cls.__name__
 
     @classmethod
-    @abstractmethod
     def bean_schema(cls) -> dict:
-        pass
+        return {}
 
     @classmethod
     def full_bean_schema(cls) -> Schema:
@@ -30,9 +28,8 @@ class Bean(ABC):
     def from_dict(cls, d: dict):
         return cls(**d)
 
-    @abstractmethod
     def to_dict(self) -> dict:
-        pass
+        return {}
 
     def serialize(self, validate: bool = True) -> dict:
         out = {

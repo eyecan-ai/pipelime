@@ -1,188 +1,100 @@
 
 
-import rich
-from pipelime.lib import AddOp, PlainSample, SamplesSequence, SequenceOpFactory
-from choixe.configurations import XConfig
+import os
+from pipelime.sequences.writers.filesystem import UnderfolderWriter
+from pipelime.sequences.operations import OperationFilterByQuery, OperationOrderBy, OperationResetIndices, OperationSubsample, OperationSum
+from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
+from pipelime.sequences.pipes import NodeGraph, OperationNode, ReaderNode, WriterNode
 
-pipe = {
-    'input': {
-        'GOOD': None,
-        'BAD': None
-    },
-    'modules': [
-        {
-            'input': 'BAD',
-            'output': {
-                'a': 'BAD_0',
-                'b': 'BAD_1'
-            },
-            'op': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
+
+folder_a = '/home/daniele/Desktop/experiments/2021-02-10.TMLightsExperiments/datasets/tap_00'
+folder_b = '/home/daniele/Desktop/experiments/2021-02-10.TMLightsExperiments/datasets/tap_01'
+
+idg = IdGeneratorUUID()
+subsampling = 1.0
+nodes = [
+
+    ReaderNode(
+        id=idg.generate(),
+        output_data='A',
+        reader=UnderfolderReader(
+            folder=folder_a
+        )
+    ),
+
+    ReaderNode(
+        id=idg.generate(),
+        output_data='B',
+        reader=UnderfolderReader(
+            folder=folder_b
+        )
+    ),
+    OperationNode(
+        id=idg.generate(),
+        input_data='A',
+        output_data='A_',
+        operation=OperationSubsample(
+            factor=subsampling
+        )
+    ),
+    OperationNode(
+        id=idg.generate(),
+        input_data='B',
+        output_data='B_',
+        operation=OperationSubsample(
+            factor=subsampling
+        )
+    ),
+    OperationNode(
+        id=idg.generate(),
+        input_data=['A_', 'B_'],
+        output_data='X',
+        operation=OperationSum()
+    ),
+
+    OperationNode(
+        id=idg.generate(),
+        input_data='X',
+        output_data='X_filtered',
+        operation=OperationFilterByQuery(
+            query='`metadata.counter` >= 0'
+        )
+    ),
+    OperationNode(
+        id=idg.generate(),
+        input_data='X_filtered',
+        output_data='X_ordered',
+        operation=OperationOrderBy(
+            order_keys=['counter']
+        )
+    ),
+    OperationNode(
+        id=idg.generate(),
+        input_data='X_ordered',
+        output_data='X_reset',
+        operation=OperationResetIndices(
+            generator=IdGeneratorInteger()
+        )
+    ),
+    WriterNode(
+        id=idg.generate(),
+        input_data='X_reset',
+        writer=UnderfolderWriter(
+            folder='/tmp/zzizzino',
+            root_files_keys=['camera', 'charuco'],
+            extensions_map={
+                '.*image.*': 'jpg',
+                '.*pose.*': 'txt',
+                '.*camera.*|.*charuco.*|.*metadata.*': 'yml',
             }
-        },
-        {
-            'input': 'GOOD',
-            'output': {
-                'a': 'GOOD_0',
-                'b': 'GOOD_1'
-            },
-            'op': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
-            }
-        },
-        {
-            'input': ['BAD_0', 'GOOD_0'],
-            'output': 'train',
-            'op': {
-                'type': 'AddOp',
-                'options': {}
-            }
-        },
-        {
-            'input': ['BAD_1', 'GOOD_1'],
-            'output': 'testval',
-            'op': {
-                'type': 'AddOp',
-                'options': {}
-            }
-        },
-        {
-            'input': 'testval',
-            'output': 'testval',
-            'op': {
-                'type': 'ShuffleOp',
-                'options': {
-                    'seed': -1
-                }
-            }
-        },
-        {
-            'input': 'testval',
-            'output': {
-                'a': 'test',
-                'b': 'val'
-            },
-            'op': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
-            }
-        },
-        # {
-        #     'input': 's',
-        #     'output': 's',
-        #     'op': {
-        #         'type': 'SubsampleOp',
-        #         'options': {
-        #             'factor': 0.5
-        #         }
-        #     }
-        # },
-        # {
-        #     'input': 's',
-        #     'output': {
-        #         'a': 'train',
-        #         'b': 'val',
-        #         'c': 'test',
-        #     },
-        #     'op': {
-        #         'type': 'SplitsOp',
-        #         'options': {
-        #             'split_map': {
-        #                 'a': 0.8,
-        #                 'b': 0.1,
-        #                 'c': 0.1
-        #             }
-        #         }
-        #     }
-        # }
-    ]
-}
+        )
+    )
+]
 
-cfg = XConfig.from_dict(pipe)
-cfg.save_to('/tmp/cfgs/gino.yml')
-
-pipe = XConfig(filename='/tmp/cfgs/gino.yml')
-rich.print(SequenceOpFactory.FACTORY_MAP)
-
-N = 500
-samples_a = [PlainSample(data={'idx': idx, 'metadata': {'idx': idx, 'name': str(idx), 'label': 0}}) for idx in range(N)]
-samples_b = [PlainSample(data={'idx': idx, 'metadata': {'idx': idx, 'name': str(idx), 'label': 1}}) for idx in range(N)]
-
-dataset_a = SamplesSequence(samples=samples_a)
-dataset_b = SamplesSequence(samples=samples_b)
+graph = NodeGraph(nodes=nodes)
 
 
-pipe['input']['GOOD'] = dataset_a
-pipe['input']['BAD'] = dataset_b
-
-data_map = {}
-
-
-def check_input(i):
-    if isinstance(i, str):
-        assert i in data_map, f'Input "{i}" not present'
-    elif isinstance(i, list):
-        [check_input(x) for x in i]
-    elif isinstance(i, dict):
-        [check_input(x) for x, _ in i.items()]
-
-
-def parse_input(i):
-    if isinstance(i, str):
-        return data_map[i]
-    elif isinstance(i, list):
-        return [parse_input(x) for x in i]
-    elif isinstance(i, dict):
-        return {k: parse_input(x) for k, x in i.items()}
-
-
-def push_output(o, data):
-    if isinstance(o, str):
-        data_map[o] = data
-    elif isinstance(o, list):
-        for idx, name in enumerate(o):
-            data_map[name] = data[idx]
-    elif isinstance(o, dict):
-        for k, name in o.items():
-            data_map[name] = data[k]
-
-
-for name, d in pipe['input'].items():
-    data_map[name] = d
-
-for m in pipe['modules']:
-    i = m['input']
-    o = m['output']
-    op = SequenceOpFactory.create(m['op'])
-
-    try:
-        check_input(i)
-        i = parse_input(i)
-
-        out = op(i)
-        push_output(o, out)
-    except Exception as e:
-        print(f"Error on module: {m}. {e}")
-        break
-
-for k, v in data_map.items():
-    print(k, len(v))
-    for s in v:
-        print(s)
+graph.draw_to_file('/tmp/graph.png')
+os.system('eog /tmp/graph.png')
+graph.execute()

@@ -1,6 +1,7 @@
 
 from abc import ABC, abstractmethod
 from itertools import count
+from pipelime.factories import Bean, BeanFactory
 import uuid
 
 
@@ -12,7 +13,8 @@ class IdGenerator(ABC):
         pass
 
 
-class IdGeneratorInteger(IdGenerator):
+@BeanFactory.make_serializable
+class IdGeneratorInteger(IdGenerator, Bean):
     COUNTER = count()
 
     @classmethod
@@ -20,7 +22,8 @@ class IdGeneratorInteger(IdGenerator):
         return next(cls.COUNTER)
 
 
-class IdGeneratorUUID(IdGenerator):
+@BeanFactory.make_serializable
+class IdGeneratorUUID(IdGenerator, Bean):
 
     @classmethod
     def generate(cls):

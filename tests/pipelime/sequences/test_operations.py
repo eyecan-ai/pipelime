@@ -1,14 +1,14 @@
 import pydash
+from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 import functools
 import hashlib
 from typing import Dict, Sequence
 import pytest
 import rich
-from schema import Schema
-from pipelime.sequences.samples import PlainSample, SamplesSequence
+from pipelime.sequences.samples import SamplesSequence
 from pipelime.sequences.operations import (
     OperationDict2List, OperationFilterByQuery, OperationGroupBy,
-    OperationIdentity, OperationPort, OperationShuffle,
+    OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
     OperationSplitByQuery, OperationSplits, OperationSubsample,
     OperationSum, SequenceOperation
 )
@@ -143,6 +143,75 @@ class TestOperationShuffle(object):
             assert sign != out_sign, 'for a series of unfortunate events did the two hashes collide?'
 
             rich.print(sign, "!=", out_sign)
+
+            assert len(dataset) == len(out)
+
+
+class TestOperationResetIndices(object):
+
+    def test_reset(self, plain_samples_sequence_generator):
+
+        generators = [
+            IdGeneratorUUID(),
+            IdGeneratorInteger()
+        ]
+        N = 32
+        for generator in generators:
+            dataset = plain_samples_sequence_generator('d0_', N)
+            dataset_clone = plain_samples_sequence_generator('d0_', N)
+
+            op = OperationResetIndices(generator=generator)
+            _plug_test(op)
+            out = op(dataset)
+
+            for idx in range(len(dataset)):
+                assert dataset[idx].id != dataset_clone[idx].id
+
+            assert len(dataset) == len(out)
+
+
+class TestOperationOrderBy(object):
+
+    def _sign(self, dataset: SamplesSequence):
+        names = [x['idx'] for x in dataset.samples]
+        return hashlib.md5(bytes('_'.join(names), encoding='utf-8')).hexdigest()
+
+    def test_orderby(self, plain_samples_sequence_generator):
+
+        N = 32
+        dataset = plain_samples_sequence_generator('d0_', N)
+
+        order_items = [
+            {'keys': ['reverse_number'], 'different': True},
+            {'keys': ['+reverse_number'], 'different': True},
+            {'keys': ['-reverse_number'], 'different': False},
+            {'keys': ['-reverse_number', 'metadata.deep.groupby_field'], 'different': False},
+            {'keys': ['metadata.deep.groupby_field', '-reverse_number'], 'different': False},
+            {'keys': ['metadata.deep.groupby_field', 'reverse_number'], 'different': True},
+            {'keys': ['-metadata.deep.groupby_field'], 'different': True},
+        ]
+
+        for order_item in order_items:
+            order_keys = order_item['keys']
+            should_be_different = order_item['different']
+
+            op = OperationOrderBy(order_keys=order_keys)
+            _plug_test(op)
+            out = op(dataset)
+
+            if should_be_different:
+                assert self._sign(out) != self._sign(dataset)
+            else:
+                assert self._sign(out) == self._sign(dataset)
+
+            # for idx in range(len(dataset)):
+            #     print("Sample", idx)
+            #     print(pydash.get(dataset[idx], 'metadata.deep.groupby_field'), dataset[idx]['reverse_number'])
+            #     print(pydash.get(out[idx], 'metadata.deep.groupby_field'), out[idx]['reverse_number'])
+            #     if should_be_different:
+            #         assert dataset[idx].id != out[idx].id
+            #     else:
+            #         assert dataset[idx].id == out[idx].id
 
             assert len(dataset) == len(out)
 

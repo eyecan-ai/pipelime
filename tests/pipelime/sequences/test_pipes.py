@@ -7,86 +7,86 @@ from pipelime.sequences.pipes import NodeGraph, ReaderNode, OperationNode, Write
 import pytest
 
 
-@pytest.fixture
-def simple_graph():
-    return {
-        '__type__': 'NodeGraph',
-        'options': {
-            'nodes': [
-                {
-                    '__type__': 'ReaderNode',
-                    'options': {
-                        'output_data': 'A',
-                        'reader': {
-                            '__type__': 'UnderfolderReader',
-                            'options': {
-                                'folder': '/Users/daniele/Downloads/lego_dataset/lego_00',
-                            }
-                        }
-                    }
-                },
-                {
-                    '__type__': 'ReaderNode',
-                    'options': {
-                        'output_data': 'B',
-                        'reader': {
-                            '__type__': 'UnderfolderReader',
-                            'options': {
-                                'folder': '/Users/daniele/Downloads/lego_dataset/lego_01'
-                            }
-                        }
-                    }
-                },
-                {
-                    '__type__': 'OperationNode',
-                    'options': {
-                        'input_data': 'A',
-                        'output_data': 'A_filtered',
-                        'operation': {
-                            '__type__': 'OperationFilterByQuery',
-                            'options': {
-                                'query': '`metadata.tag` == "image"'
-                            }
-                        }
-                    }
-                },
-                {
-                    '__type__': 'OperationNode',
-                    'options': {
-                        'input_data': ['A_filtered', 'B'],
-                        'output_data': 'C',
-                        'operation': {
-                            '__type__': 'OperationSum',
-                            'options': {}
-                        }
-                    }
-                },
-                {
-                    '__type__': 'OperationNode',
-                    'options': {
-                        'input_data': 'C',
-                        'output_data': 'D',
-                        'operation': {
-                            '__type__': 'OperationSplits',
-                            'options': {
-                                'split_map': {
-                                    'train': 0.45,
-                                    'val': 0.45,
-                                    'test': 0.1
-                                }
-                            }
-                        }
-                    }
-                },
+# @pytest.fixture
+# def simple_graph():
+#     return {
+#         '__type__': 'NodeGraph',
+#         'options': {
+#             'nodes': [
+#                 {
+#                     '__type__': 'ReaderNode',
+#                     'options': {
+#                         'output_data': 'A',
+#                         'reader': {
+#                             '__type__': 'UnderfolderReader',
+#                             'options': {
+#                                 'folder': '/Users/daniele/Downloads/lego_dataset/lego_00',
+#                             }
+#                         }
+#                     }
+#                 },
+#                 {
+#                     '__type__': 'ReaderNode',
+#                     'options': {
+#                         'output_data': 'B',
+#                         'reader': {
+#                             '__type__': 'UnderfolderReader',
+#                             'options': {
+#                                 'folder': '/Users/daniele/Downloads/lego_dataset/lego_01'
+#                             }
+#                         }
+#                     }
+#                 },
+#                 {
+#                     '__type__': 'OperationNode',
+#                     'options': {
+#                         'input_data': 'A',
+#                         'output_data': 'A_filtered',
+#                         'operation': {
+#                             '__type__': 'OperationFilterByQuery',
+#                             'options': {
+#                                 'query': '`metadata.tag` == "image"'
+#                             }
+#                         }
+#                     }
+#                 },
+#                 {
+#                     '__type__': 'OperationNode',
+#                     'options': {
+#                         'input_data': ['A_filtered', 'B'],
+#                         'output_data': 'C',
+#                         'operation': {
+#                             '__type__': 'OperationSum',
+#                             'options': {}
+#                         }
+#                     }
+#                 },
+#                 {
+#                     '__type__': 'OperationNode',
+#                     'options': {
+#                         'input_data': 'C',
+#                         'output_data': 'D',
+#                         'operation': {
+#                             '__type__': 'OperationSplits',
+#                             'options': {
+#                                 'split_map': {
+#                                     'train': 0.45,
+#                                     'val': 0.45,
+#                                     'test': 0.1
+#                                 }
+#                             }
+#                         }
+#                     }
+#                 },
 
-            ]
-        }
-    }
+#             ]
+#         }
+#     }
 
 
 class TestPipes(object):
 
-    def test_simple_graph(self, simple_graph, filesystem_datasets, tmp_path_factory):
+    def test_simple_graph(self, filesystem_datasets, tmp_path_factory):
 
         print(filesystem_datasets)
         dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
@@ -147,7 +147,7 @@ class TestPipes(object):
                 input_data='Y',
                 output_data='OUT',
                 operation=OperationResetIndices(
-                    generator_type='UUID'
+                    generator=IdGeneratorUUID()
                 )
             ),
             OperationNode(

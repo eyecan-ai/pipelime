@@ -1,11 +1,11 @@
-from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
+from pipelime.tools.idgenerators import IdGenerator, IdGeneratorUUID
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
 import dictquery as dq
 import numpy as np
 import random
-from typing import Any, Dict, Sequence, Union
-from pipelime.sequences.samples import GroupedSample, SamplesSequence
+from typing import Any, Dict, List, Optional, Sequence, Union
+from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
 from abc import ABC, abstractmethod
 from schema import Or, Schema
 import rich
@@ -130,12 +130,11 @@ class OperationIdentity(SequenceOperation, Bean):
 @BeanFactory.make_serializable
 class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
 
-    def __init__(self, generator_type: str = 'UUID') -> None:
+    def __init__(self, generator: Union[IdGenerator, None] = None) -> None:
         """ Reset indices of sample
         """
         super().__init__()
-        self._generator_type = generator_type
-        self._generator = IdGeneratorUUID if self._generator_type == 'UUID' else IdGeneratorInteger
+        self._generator: Optional[IdGenerator] = generator if generator is not None else IdGeneratorUUID()
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
@@ -152,18 +151,18 @@ class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
     @classmethod
     def bean_schema(cls) -> dict:
         return {
-            'generator_type': str
+            'generator': dict
         }
 
     @classmethod
     def from_dict(cls, d: dict):
         return OperationResetIndices(
-            generator_type=d['generator_type']
+            generator=BeanFactory.create(d['generator'])
         )
 
     def to_dict(self):
         return {
-            'generator_type': self._generator_type
+            'generator': self._generator.serialize()
         }
 
 
@@ -409,7 +408,7 @@ class OperationFilterByQuery(SequenceOperation, Bean):
 
 
 @BeanFactory.make_serializable
-class OperationSplitByQuery(SequenceOperation, Bean):
+class OperationSplitByQuery(SequenceOperation, Bean):  # TODO: Replace dictquery with pydash?
 
     def __init__(self, query: str) -> None:
         """ Splits sequence elements in two sub-sequences based on an input query. The first list
@@ -525,4 +524,68 @@ class OperationGroupBy(SequenceOperation, Bean):
         return {
             'field': self._field,
             'ungrouped': self._ungrouped
+        }
+
+
+@BeanFactory.make_serializable
+class OperationOrderBy(SequenceOperation, Bean):
+
+    class reversor:
+
+        def __init__(self, obj):
+            self.obj = obj
+
+        def __eq__(self, other):
+            return other.obj == self.obj
+
+        def __lt__(self, other):
+            return other.obj < self.obj
+
+    def __init__(self, order_keys: Sequence[str]) -> None:
+        """ Order sequence elements based on pydash dict key . like '`metadata.num`'.
+
+        :param order_keys: list of keys to order by
+        :type order_keys: Sequence[str]
+        """
+        self._order_keys = order_keys
+
+    def input_port(self):
+        return OperationPort(SamplesSequence)
+
+    def output_port(self):
+        return OperationPort(SamplesSequence)
+
+    def _order_pair_from_string(self, v: str):
+        if v.startswith('+') or v.startswith('-'):
+            return True if v[0] == '-' else False, v[1:]
+        else:
+            return False, v
+
+    def _order_by(self, x: Sample):
+        chunks = []
+        for orderby in self._order_keys:
+            reverse, orderby_path = self._order_pair_from_string(orderby)
+            picked_val = py_.get(x, orderby_path)
+            chunks.append(picked_val if not reverse else self.reversor(picked_val))
+        return tuple(chunks)
+
+    def __call__(self, x: SamplesSequence) -> SamplesSequence:
+        super().__call__(x)
+        return SamplesSequence(samples=sorted(x, key=self._order_by))
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'order_keys': [str]
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationOrderBy(
+            order_keys=d['order_keys']
+        )
+
+    def to_dict(self):
+        return {
+            'order_keys': self._order_keys
         }
