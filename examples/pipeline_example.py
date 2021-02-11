@@ -97,4 +97,5 @@ graph = NodeGraph(nodes=nodes)
 
 graph.draw_to_file('/tmp/graph.png')
 os.system('eog /tmp/graph.png')
-graph.execute()
+
+# graph.execute()
