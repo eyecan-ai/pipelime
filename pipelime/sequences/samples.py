@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from collections.abc import MutableMapping
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Hashable, Sequence
+from typing import Hashable, Sequence
 
 
 @dataclass
@@ -45,6 +45,10 @@ class Sample(MutableMapping):
     @property
     def id(self):
         return self._id
+
+    @id.setter
+    def id(self, v: Hashable):
+        self._id = v
 
     @abstractmethod
     def rename(self, old_key: str, new_key: str):
