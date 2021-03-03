@@ -100,7 +100,7 @@ class OperationNode(PipeNode, Bean):
     @classmethod
     def from_dict(cls, d: dict):
         return OperationNode(
-            id=IdGeneratorUUID.generate(),
+            id=IdGeneratorUUID().generate(),
             input_data=d['input_data'],
             output_data=d['output_data'],
             operation=BeanFactory.create(d['operation'])
@@ -141,7 +141,7 @@ class ReaderNode(PipeNode, Bean):
     @classmethod
     def from_dict(cls, d: dict):
         return ReaderNode(
-            id=IdGeneratorUUID.generate(),
+            id=IdGeneratorUUID().generate(),
             output_data=d['output_data'],
             reader=BeanFactory.create(d['reader'])
         )
@@ -180,7 +180,7 @@ class WriterNode(PipeNode, Bean):
     @classmethod
     def from_dict(cls, d: dict):
         return WriterNode(
-            id=IdGeneratorUUID.generate(),
+            id=IdGeneratorUUID().generate(),
             input_data=d['input_data'],
             writer=BeanFactory.create(d['writer'])
         )

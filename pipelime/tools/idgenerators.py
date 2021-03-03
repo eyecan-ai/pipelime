@@ -7,24 +7,24 @@ import uuid
 
 class IdGenerator(ABC):
 
-    @classmethod
     @abstractmethod
-    def generate(cls):
+    def generate(self):
         pass
 
 
 @BeanFactory.make_serializable
 class IdGeneratorInteger(IdGenerator, Bean):
-    COUNTER = count()
 
-    @classmethod
-    def generate(cls):
-        return next(cls.COUNTER)
+    def __init__(self) -> None:
+        super().__init__()
+        self.COUNTER = count()   
+
+    def generate(self):
+        return next(self.COUNTER)
 
 
 @BeanFactory.make_serializable
 class IdGeneratorUUID(IdGenerator, Bean):
 
-    @classmethod
-    def generate(cls):
+    def generate(self):
         return str(uuid.uuid1())

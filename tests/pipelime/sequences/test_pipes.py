@@ -95,55 +95,56 @@ class TestPipes(object):
         r = UnderfolderReader(folder=dataset_folder)
         N = len(r)
         EXPECTED = N * 3 - (2 * 3)  # '`metadatay.half` >= 1.0' query removes 2 samples per input dataset (3)
+        generator = IdGeneratorUUID()
 
         nodes = [
             ReaderNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 output_data='A',
                 reader=UnderfolderReader(folder=dataset_folder)
             ),
             ReaderNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 output_data='B',
                 reader=UnderfolderReader(folder=dataset_folder)
             ),
             ReaderNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 output_data='C',
                 reader=UnderfolderReader(folder=dataset_folder)
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data=['A', 'B', 'C'],
                 output_data='X',
                 operation=OperationSum()
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data='X',
                 output_data=['X0', 'X1'],
                 operation=OperationSplitByQuery(query='`metadatay.sample_id` <= 5')
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data='X0',
                 output_data='X0_f',
                 operation=OperationFilterByQuery(query='`metadatay.half` >= 1.0')
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data='X1',
                 output_data='X1_f',
                 operation=OperationFilterByQuery(query='`metadatay.half` >= 1.0')
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data=['X0_f', 'X1_f'],
                 output_data='Y',
                 operation=OperationSum()
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data='Y',
                 output_data='OUT',
                 operation=OperationResetIndices(
@@ -151,7 +152,7 @@ class TestPipes(object):
                 )
             ),
             OperationNode(
-                id=IdGeneratorUUID.generate(),
+                id=generator.generate(),
                 input_data='OUT',
                 output_data={
                     'a': 'D0',
@@ -169,7 +170,7 @@ class TestPipes(object):
         for k, v in out_folders.items():
             nodes.append(
                 WriterNode(
-                    id=IdGeneratorUUID.generate(),
+                    id=generator.generate(),
                     input_data=k,
                     writer=UnderfolderWriter(
                         folder=out_folders[k],
