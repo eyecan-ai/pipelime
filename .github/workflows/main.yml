@@ -19,10 +19,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up GCC
-      uses: egor-tensin/setup-gcc@v1
-      with:
-        platform: x64
+    - name: Install graphviz
+      run: sudo apt-get install graphviz libgraphviz-dev pkg-config
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
