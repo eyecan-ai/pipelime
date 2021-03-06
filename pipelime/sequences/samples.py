@@ -191,8 +191,11 @@ class FileSystemSample(Sample):
     def filesmap(self):
         return self._filesmap
 
+    def is_cached(self, key) -> bool:
+        return key in self._cached
+
     def __getitem__(self, key):
-        if key not in self._cached:
+        if not self.is_cached(key):
             self._cached[key] = FSToolkit.load_data(self._filesmap[key])
         return self._cached[key]
 

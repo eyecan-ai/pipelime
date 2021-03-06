@@ -1,5 +1,7 @@
 
 
+import uuid
+import numpy as np
 from pathlib import Path
 from pipelime.sequences.operations import OperationFilterKeys
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
@@ -56,7 +58,7 @@ class TestUnderfolder(object):
                         assert isinstance(sample.metaitem(key), FilesystemItem)
 
 
-class TestUnderfolderReaderWriter(object):
+class TestUnderfolderReaderWriterTemplating(object):
 
     def test_reader_writer(self, toy_dataset_small, tmpdir_factory):
 
@@ -134,3 +136,48 @@ class TestUnderfolderReaderWriter(object):
             zfill=reader.get_filesystem_template().idx_length
         )
         writer(filtered_reader)
+
+
+class TestUnderfolderReaderWriterConsistency(object):
+
+    def test_reader_writer_content(self, toy_dataset_small, tmpdir_factory):
+
+        # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+        # be careful comparing the content of the samples!
+        # For example, make sure they are not JPEGs because they could be compressed
+        # when being written and therefore change their numeric content.
+        # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+
+        folder = toy_dataset_small['folder']
+        keys = toy_dataset_small['expected_keys']
+        root_keys = toy_dataset_small['root_keys']
+
+        combo_items = [
+            {'copy_files': True, 'use_symlinks': False},
+            {'copy_files': False, 'use_symlinks': False},
+            {'copy_files': False, 'use_symlinks': True},
+            {'copy_files': True, 'use_symlinks': True},
+        ]
+
+        for combo in combo_items:
+
+            reader = UnderfolderReader(folder=folder, copy_root_files=True)
+            template = reader.get_filesystem_template()
+
+            print("\nCombo", combo)
+            writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
+            print(writer_folder)
+            writer = UnderfolderWriter(
+                folder=writer_folder,
+                copy_files=combo['copy_files'],
+                use_symlinks=combo['use_symlinks']
+            )
+            writer(reader)
+
+            re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+            re_template = re_reader.get_filesystem_template()
+
+            for idx in range(len(re_reader)):
+                data = reader[idx]['image']
+                re_data = re_reader[idx]['image']
+                assert np.array_equal(data, re_data)

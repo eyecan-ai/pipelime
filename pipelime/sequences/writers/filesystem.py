@@ -5,8 +5,10 @@ import re
 from pathlib import Path
 from pipelime.factories import Bean, BeanFactory
 from pipelime.sequences.writers.base import BaseWriter
-from pipelime.sequences.samples import Sample, SamplesSequence
+from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample, SamplesSequence
 from schema import Optional, Or
+import shutil
+import os
 
 
 class UnderfolderWriter(BaseWriter):
@@ -18,13 +20,35 @@ class UnderfolderWriter(BaseWriter):
         folder: str,
         root_files_keys: list = None,
         extensions_map: dict = None,
-        zfill: int = 5
+        zfill: int = 5,
+        copy_files: bool = True,
+        use_symlinks: bool = False
     ) -> None:
+        """ UnderfolderWriter for an input SamplesSequence
+
+        :param folder: destiantion folder
+        :type folder: str
+        :param root_files_keys: list of keys to write as underfolder root files (only the first element
+        encountered will be stored as root file, the others will be discarded), defaults to None
+        :type root_files_keys: list, optional
+        :param extensions_map: dictionary of regex/extension to retrieve extension for each key matching
+        the corresponding regex. Unmatched keys will be stored as PICKLE object file, defaults to None
+        :type extensions_map: dict, optional
+        :param zfill: Length of zero padding in case of integer sample indices, defaults to 5
+        :type zfill: int, optional
+        :param copy_files: TRUE to copy FileSystemSample directly if not cached before, defaults to True
+        :type copy_files: bool, optional
+        :param use_symlinks: if TRUE (and copy_files == TRUE) the copy will be replaced with a symlink, defaults to False
+        :type use_symlinks: bool, optional
+        """
         self._folder = Path(folder)
+
         self._empty_template = root_files_keys is None and extensions_map is None
         self._root_files_keys = root_files_keys if root_files_keys is not None else []
         self._extensions_map = extensions_map if extensions_map is not None else {}
         self._zfill = zfill
+        self._copy_files = copy_files
+        self._use_symlinks = use_symlinks
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         if not self._datafolder.exists():
             self._datafolder.mkdir(parents=True, exist_ok=True)
@@ -58,17 +82,37 @@ class UnderfolderWriter(BaseWriter):
                 self._root_files_keys = list(template.root_files_keys)
                 self._zfill = template.idx_length
 
+        saved_root_keys = set()
         for sample in track(x):
             basename = self._build_sample_basename(sample)
+
             for key in sample.keys():
-                if self._is_root_key(key):
+                if self._is_root_key(key) and key not in saved_root_keys:
+                    saved_root_keys.add(key)
                     itemname = f'{key}.{self._build_item_extension(key)}'
                     output_file = Path(self._folder) / itemname
-                    FSToolkit.store_data(output_file, sample[key])
+                    self._write_sample_item(output_file, sample, key)
                 else:
                     itemname = f'{basename}_{key}.{self._build_item_extension(key)}'
                     output_file = Path(self._datafolder) / itemname
-                    FSToolkit.store_data(output_file, sample[key])
+
+                    self._write_sample_item(output_file, sample, key)
+
+    def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
+
+        if self._copy_files:
+            if isinstance(sample, FileSystemSample):
+                item = sample.metaitem(key)
+                if not sample.is_cached(key) and isinstance(item, FilesystemItem):
+                    path = item.source()
+                    if not self._use_symlinks:
+                        shutil.copy(path, output_file)
+                    else:
+                        os.symlink(path, output_file)
+                    return
+
+        # Default action
+        FSToolkit.store_data(output_file, sample[key])
 
     @classmethod
     def bean_schema(cls) -> dict:

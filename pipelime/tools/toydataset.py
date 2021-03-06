@@ -149,7 +149,7 @@ class ToyDatasetGenerator(object):
 
             # Naming
             name = str(idx).zfill(zfill)
-            image_name = f'{name}_image.jpg'
+            image_name = f'{name}_image.png'
             mask_name = f'{name}_mask.png'
             instances_name = f'{name}_inst.png'
             metadata_name = f'{name}_metadata.yml'
