@@ -17,7 +17,7 @@ class IdGeneratorInteger(IdGenerator, Bean):
 
     def __init__(self) -> None:
         super().__init__()
-        self.COUNTER = count()   
+        self.COUNTER = count()
 
     def generate(self):
         return next(self.COUNTER)

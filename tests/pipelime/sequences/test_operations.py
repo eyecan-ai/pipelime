@@ -7,7 +7,7 @@ import pytest
 import rich
 from pipelime.sequences.samples import SamplesSequence
 from pipelime.sequences.operations import (
-    OperationDict2List, OperationFilterByQuery, OperationGroupBy,
+    OperationDict2List, OperationFilterByQuery, OperationFilterKeys, OperationGroupBy,
     OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
     OperationSplitByQuery, OperationSplits, OperationSubsample,
     OperationSum, SequenceOperation
@@ -359,6 +359,38 @@ class TestOperationSplitByQuery(object):
             sumup_exp = functools.reduce(lambda a, b: a + b, expecteds)
 
             assert sumup == sumup_exp
+
+
+class TestOperationFilterKeys(object):
+
+    def test_filter_keys(self, plain_samples_sequence_generator):
+
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N)
+
+        keys_to_filter = [
+            {'keys': ['idx'], 'negate': False},
+            {'keys': ['idx'], 'negate': True},
+            {'keys': ['number', 'data0'], 'negate': False},
+            {'keys': ['number', 'data0'], 'negate': True},
+            {'keys': [], 'negate': False},
+        ]
+
+        for item in keys_to_filter:
+            keys = item['keys']
+            negate = item['negate']
+            op = OperationFilterKeys(keys=keys, negate=negate)
+            _plug_test(op)
+            out = op(dataset)
+
+            assert len(out) == len(dataset)
+
+            for sample in out:
+                for key in keys:
+                    if not negate:
+                        assert key in sample
+                    else:
+                        assert key not in sample
 
 
 class TestOperationGroupBy(object):

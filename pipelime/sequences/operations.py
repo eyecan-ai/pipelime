@@ -1,3 +1,4 @@
+from pipelime.sequences.stages import StageKeysFilter
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorUUID
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
@@ -497,11 +498,11 @@ class OperationGroupBy(SequenceOperation, Bean):
         out_samples = []
         for k, samples in groups_map.items():
             g = GroupedSample(samples=samples)
-            g['__groupbyvalue__'] = k
+            # g['__groupbyvalue__'] = k
             out_samples.append(g)
         if len(none_group) > 0 and self._ungrouped:
             g = GroupedSample(samples=none_group)
-            g['__groupbyvalue__'] = None
+            # g['__groupbyvalue__'] = None
             out_samples.append(g)
 
         return SamplesSequence(samples=out_samples)
@@ -588,4 +589,46 @@ class OperationOrderBy(SequenceOperation, Bean):
     def to_dict(self):
         return {
             'order_keys': self._order_keys
+        }
+
+
+@BeanFactory.make_serializable
+class OperationFilterKeys(SequenceOperation, Bean):
+
+    def __init__(self, keys: list, negate: bool = False) -> None:
+        """ Filter sequence elements by keys
+
+        :param keys: list of keys to preserve
+        :type keys: list
+        :param negate: TRUE to delete input keys, FALSE delete all but keys
+        :type negate: bool
+        """
+        self._keys = keys
+        self._negate = negate
+        self._stage = StageKeysFilter(keys=keys, negate=negate)
+
+    def input_port(self):
+        return OperationPort(SamplesSequence)
+
+    def output_port(self):
+        return OperationPort(SamplesSequence)
+
+    def __call__(self, x: SamplesSequence) -> SamplesSequence:
+        super().__call__(x)
+        filtered_samples = []
+        for sample in x.samples:
+            filtered_samples.append(self._stage(sample))
+        return SamplesSequence(samples=filtered_samples)
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'keys': list,
+            'negate': bool
+        }
+
+    def to_dict(self):
+        return {
+            'keys': self._keys,
+            'negate': self._negate
         }
