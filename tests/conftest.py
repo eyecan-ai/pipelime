@@ -13,7 +13,7 @@ def data_folder():
 
 @pytest.fixture(scope='function')
 def toy_dataset_small(tmpdir):
-    folder = Path(tmpdir)
+    folder = Path(tmpdir.mkdir("toy_dataset"))
     datafolder = folder / 'data'
     size = 32
     image_size = 256
@@ -41,7 +41,7 @@ def toy_dataset_small(tmpdir):
         'zfill': zfill,
         'keypoints_format': 'xyas',
         'bboxes_format': 'pascal_voc',
-        'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'bboxes'],
+        'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'metadata', 'bboxes'],
         'root_keys': ['global_meta']
     }
 

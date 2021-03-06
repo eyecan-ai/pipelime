@@ -1,3 +1,4 @@
+from pipelime.sequences.readers.filesystem import UnderfolderReader
 from rich.progress import track
 from pipelime.filesystem.toolkit import FSToolkit
 import re
@@ -20,6 +21,7 @@ class UnderfolderWriter(BaseWriter):
         zfill: int = 5
     ) -> None:
         self._folder = Path(folder)
+        self._empty_template = root_files_keys is None and extensions_map is None
         self._root_files_keys = root_files_keys if root_files_keys is not None else []
         self._extensions_map = extensions_map if extensions_map is not None else {}
         self._zfill = zfill
@@ -48,6 +50,14 @@ class UnderfolderWriter(BaseWriter):
         return False
 
     def __call__(self, x: SamplesSequence) -> None:
+
+        if isinstance(x, UnderfolderReader) and self._empty_template:
+            template = x.get_filesystem_template()
+            if template is not None:
+                self._extensions_map = template.extensions_map
+                self._root_files_keys = list(template.root_files_keys)
+                self._zfill = template.idx_length
+
         for sample in track(x):
             basename = self._build_sample_basename(sample)
             for key in sample.keys():
