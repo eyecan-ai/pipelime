@@ -498,11 +498,11 @@ class OperationGroupBy(SequenceOperation, Bean):
         out_samples = []
         for k, samples in groups_map.items():
             g = GroupedSample(samples=samples)
-            g['__groupbyvalue__'] = k
+            # g['__groupbyvalue__'] = k
             out_samples.append(g)
         if len(none_group) > 0 and self._ungrouped:
             g = GroupedSample(samples=none_group)
-            g['__groupbyvalue__'] = None
+            # g['__groupbyvalue__'] = None
             out_samples.append(g)
 
         return SamplesSequence(samples=out_samples)
