@@ -64,7 +64,10 @@ class Sample(MutableMapping):
         pass
 
     def validate(self, schema: Schema, deep: bool = True):
-        schema.validate(dict(self))
+        if deep:
+            schema.validate(dict(self))
+        else:
+            schema.validate({x: None for x in self.keys()})
 
 
 class GroupedSample(Sample):
@@ -239,7 +242,7 @@ class FileSystemSample(Sample):
         if deep:
             schema.validate(dict(self))
         else:
-            schema.validate(self._filesmap)
+            schema.validate({x: None for x in self._filesmap.keys()})
 
 
 class SamplesSequence(Sequence):

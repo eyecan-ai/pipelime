@@ -17,15 +17,21 @@ class SchemaLoader(object):
 
     @classmethod
     def _load_module(cls, path: str):
-        import importlib.util
         import uuid
-        spec = importlib.util.spec_from_file_location(str(uuid.uuid1()), path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        # import importlib.util
+        # spec = importlib.util.spec_from_file_location(str(uuid.uuid1()), path)
+        # mod = importlib.util.module_from_spec(spec)
+        # spec.loader.exec_module(mod)
+
+        import types
+        import importlib.machinery
+        loader = importlib.machinery.SourceFileLoader(str(uuid.uuid1()), path)
+        mod = types.ModuleType(loader.name)
+        loader.exec_module(mod)
         return mod
 
 
-s = SchemaLoader().load(filename='_schema.py')
+s = SchemaLoader().load(filename='_schema.schema')
 
 
 folder = '/Users/daniele/Downloads/lego_dataset/lego_00'

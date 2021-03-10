@@ -1,4 +1,5 @@
-from schema import And
+from typing import Any
+from schema import And, Optional
 import numpy as np
 
 # schema = {
@@ -15,5 +16,5 @@ import numpy as np
 schema = {
     'image': object,
     'metadata': object,
-    any: object
+    Optional(str): Optional(object)
 }
