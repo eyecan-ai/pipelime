@@ -1,3 +1,4 @@
+from schema import Schema
 import uuid
 from pipelime.filesystem.toolkit import FSToolkit
 from dataclasses import dataclass
@@ -61,6 +62,9 @@ class Sample(MutableMapping):
     @abstractmethod
     def metaitem(self, key: any) -> MetaItem:
         pass
+
+    def validate(self, schema: Schema, deep: bool = True):
+        schema.validate(dict(self))
 
 
 class GroupedSample(Sample):
@@ -230,6 +234,12 @@ class FileSystemSample(Sample):
             return FilesystemItem(self._filesmap[key])
         else:
             return MemoryItem()
+
+    def validate(self, schema: Schema, deep: bool = True):
+        if deep:
+            schema.validate(dict(self))
+        else:
+            schema.validate(self._filesmap)
 
 
 class SamplesSequence(Sequence):
