@@ -87,11 +87,12 @@ class UnderfolderWriter(BaseWriter):
             basename = self._build_sample_basename(sample)
 
             for key in sample.keys():
-                if self._is_root_key(key) and key not in saved_root_keys:
-                    saved_root_keys.add(key)
-                    itemname = f'{key}.{self._build_item_extension(key)}'
-                    output_file = Path(self._folder) / itemname
-                    self._write_sample_item(output_file, sample, key)
+                if self._is_root_key(key):
+                    if key not in saved_root_keys:
+                        saved_root_keys.add(key)
+                        itemname = f'{key}.{self._build_item_extension(key)}'
+                        output_file = Path(self._folder) / itemname
+                        self._write_sample_item(output_file, sample, key)
                 else:
                     itemname = f'{basename}_{key}.{self._build_item_extension(key)}'
                     output_file = Path(self._datafolder) / itemname
