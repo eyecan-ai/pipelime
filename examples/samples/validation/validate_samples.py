@@ -17,17 +17,15 @@ for i in range(N):
 sequence = SamplesSequence(samples=samples)
 
 # validate sample (should be used to check keys only)
-# deep=False will load a keys only dict
 rich.print("Simple validation:")
 schema = SchemaLoader.load('simple_schema.schema')
 for idx, sample in enumerate(sequence):
-    sample.validate(schema, deep=False)
+    schema.validate(sample)
     rich.print("\tValidating", idx, 'OK')
 
 # validate sample in depth
-# deep=True will load sample content in lazy samples
 rich.print("In-depth validation:")
 schema = SchemaLoader.load('deep_schema.schema')
 for idx, sample in enumerate(sequence):
-    sample.validate(schema, deep=True)
+    schema.validate(sample)
     rich.print("\tValidating", idx, 'OK')

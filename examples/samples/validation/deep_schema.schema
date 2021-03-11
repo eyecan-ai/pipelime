@@ -1,6 +1,7 @@
 from schema import And
 import numpy as np
 
+deep = True
 schema = {
     'counter': int,
     'name': str,

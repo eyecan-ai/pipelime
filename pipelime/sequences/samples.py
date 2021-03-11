@@ -1,4 +1,3 @@
-from schema import Schema
 import uuid
 from pipelime.filesystem.toolkit import FSToolkit
 from dataclasses import dataclass
@@ -63,18 +62,9 @@ class Sample(MutableMapping):
     def metaitem(self, key: any) -> MetaItem:
         pass
 
-    def validate(self, schema: Schema, deep: bool = True):
-        """ Validates the current sample based on external Schema
-
-        :param schema: Schema used for validation
-        :type schema: Schema
-        :param deep: TRUE to perform validation in deep, FALSE to validate only key-level, defaults to True
-        :type deep: bool, optional
-        """
-        if deep:
-            schema.validate(dict(self))
-        else:
-            schema.validate({x: None for x in self.keys()})
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self.keys()}
 
 
 class GroupedSample(Sample):
@@ -245,19 +235,9 @@ class FileSystemSample(Sample):
         else:
             return MemoryItem()
 
-    def validate(self, schema: Schema, deep: bool = True):
-        """ Validates the current sample based on external Schema
-
-        :param schema: Schema used for validation
-        :type schema: Schema
-        :param deep: TRUE to perform validation in deep, FALSE to validate only key-level, defaults to True
-        :type deep: bool, optional
-        """
-
-        if deep:
-            schema.validate(dict(self))
-        else:
-            schema.validate({x: None for x in self._filesmap.keys()})
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self._filesmap.keys()}
 
 
 class SamplesSequence(Sequence):

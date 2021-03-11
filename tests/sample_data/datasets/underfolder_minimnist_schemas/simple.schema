@@ -2,7 +2,8 @@ from schema import Optional
 
 deep = False
 schema = {
-    'counter': object,
-    'name': object,
+    'cfg': object,
+    'numbers': object,
+    'image': object,
     Optional(str): object
 }
