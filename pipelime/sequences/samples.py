@@ -64,6 +64,13 @@ class Sample(MutableMapping):
         pass
 
     def validate(self, schema: Schema, deep: bool = True):
+        """ Validates the current sample based on external Schema
+
+        :param schema: Schema used for validation
+        :type schema: Schema
+        :param deep: TRUE to perform validation in deep, FALSE to validate only key-level, defaults to True
+        :type deep: bool, optional
+        """
         if deep:
             schema.validate(dict(self))
         else:
@@ -239,6 +246,14 @@ class FileSystemSample(Sample):
             return MemoryItem()
 
     def validate(self, schema: Schema, deep: bool = True):
+        """ Validates the current sample based on external Schema
+
+        :param schema: Schema used for validation
+        :type schema: Schema
+        :param deep: TRUE to perform validation in deep, FALSE to validate only key-level, defaults to True
+        :type deep: bool, optional
+        """
+
         if deep:
             schema.validate(dict(self))
         else:

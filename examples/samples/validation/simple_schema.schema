@@ -1,0 +1,7 @@
+from schema import Optional
+
+schema = {
+    'counter': object,
+    'name': object,
+    Optional(str): object
+}
