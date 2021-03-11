@@ -2,7 +2,7 @@ import tempfile
 import subprocess
 import click
 from choixe.configurations import XConfig
-# from esurface.cli.datasets.pipeline_cwl.tools.xinquirer import XInquirer
+from choixe.inquirer import XInquirer
 
 
 @click.command("run", help="Runs a cwl workflow")
@@ -16,24 +16,23 @@ def run(
     parallel,
     debug
 ):
-    # # reads and prompts the XConfig
-    # cfg = XConfig(filename=yml_file)
-    # cfg = XInquirer.prompt(cfg)
-    # compiled_cfg_file = f'{tempfile.NamedTemporaryFile().name}.yml'
-    # cfg.save_to(compiled_cfg_file)
+    # reads and prompts the XConfig
+    cfg = XConfig(filename=yml_file)
+    cfg = XInquirer.prompt(cfg)
+    compiled_cfg_file = f'{tempfile.NamedTemporaryFile().name}.yml'
+    cfg.save_to(compiled_cfg_file)
     
-    # # prepares the cwl-runner
-    # cmd = ['cwl-runner']
-    # if parallel:
-    #     cmd.append('--parallel')
-    # if debug:
-    #     cmd.append('--debug')
-    # cmd.append(cwl_file)
-    # cmd.append(compiled_cfg_file)
+    # prepares the cwl-runner
+    cmd = ['cwl-runner']
+    if parallel:
+        cmd.append('--parallel')
+    if debug:
+        cmd.append('--debug')
+    cmd.append(cwl_file)
+    cmd.append(compiled_cfg_file)
 
-    # # runs workflow
-    # subprocess.run(cmd)
-    pass
+    # runs workflow
+    subprocess.run(cmd)
 
 
 if __name__ == "__main__":
