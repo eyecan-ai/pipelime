@@ -1,6 +1,6 @@
 from pathlib import Path
 import click
-from pipelime.workflow.tools.click2cwl import Click2Cwl
+from pipelime.workflow.tools.cwl_template import CwlTemplate
 
 
 @click.command("click2cwl", help="Converts a click script to a cwl file")
@@ -16,11 +16,10 @@ def click2cwl(
 ):
     script = Path(script).absolute().resolve()
     commands = commands.split('.')
-    cmd = Click2Cwl.load_click(script)
-    assert cmd is not None, "the script doesn't contain any click.Command"
-    cwl_script = Click2Cwl.convert_click_to_cwl(cmd, commands, forwards)
-    output_file = Path(output_folder) / f'{script.stem}.cwl'
-    Click2Cwl.save_cwl(cwl_script, output_file)
+    cwl_template = CwlTemplate(script=script, alias=commands, forwards=list(forwards))
+    output_folder = Path(output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    cwl_template.save_to(output_folder / f'{script.stem}.cwl')
 
 
 if __name__ == "__main__":
