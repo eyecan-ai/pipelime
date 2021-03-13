@@ -1,7 +1,7 @@
 from pathlib import Path
 import click
 import yaml
-from pipelime.workflow.tools.cwl_template import CwlTemplate
+from pipelime.workflow.cwl import CwlTemplate
 
 
 class TestClick2Cwl(object):
@@ -64,7 +64,7 @@ class TestClick2Cwl(object):
             'doc': 'help opt01',
             'type': [
                 'int'
-                ],
+            ],
             'inputBinding': {'prefix': '--opt01'}
         }
         assert 'opt01' in cwl_template.template['inputs'].keys()
@@ -75,7 +75,7 @@ class TestClick2Cwl(object):
             'type': [
                 'null',
                 'int'
-                ],
+            ],
             'default': 10,
             'inputBinding': {'prefix': '--opt01not'}
         }
@@ -85,9 +85,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt02',
             'type': [{
-                    'type': 'array',
-                    'items': 'int'
-                }],
+                'type': 'array',
+                'items': 'int'
+            }],
             'inputBinding': {'prefix': '--opt02'}
         }
         assert 'opt02' in cwl_template.template['inputs'].keys()
@@ -96,10 +96,10 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt03',
             'type': [{
-                    'type': 'array',
-                    'items': 'int',
-                    'inputBinding': {'prefix': '--opt03'}
-                }]
+                'type': 'array',
+                'items': 'int',
+                'inputBinding': {'prefix': '--opt03'}
+            }]
         }
         assert 'opt03' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt03'] == expected_cwl
@@ -107,13 +107,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt04',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'int'
-                    },
-                    'inputBinding': {'prefix': '--opt04'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt04'}
+            }]
         }
         assert 'opt04' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt04'] == expected_cwl
@@ -123,7 +123,7 @@ class TestClick2Cwl(object):
             'doc': 'help opt11',
             'type': [
                 'float'
-                ],
+            ],
             'inputBinding': {'prefix': '--opt11'}
         }
         assert 'opt11' in cwl_template.template['inputs'].keys()
@@ -132,9 +132,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt12',
             'type': [{
-                    'type': 'array',
-                    'items': 'float'
-                }],
+                'type': 'array',
+                'items': 'float'
+            }],
             'inputBinding': {'prefix': '--opt12'}
         }
         assert 'opt12' in cwl_template.template['inputs'].keys()
@@ -143,10 +143,10 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt13',
             'type': [{
-                    'type': 'array',
-                    'items': 'float',
-                    'inputBinding': {'prefix': '--opt13'}
-                }]
+                'type': 'array',
+                'items': 'float',
+                'inputBinding': {'prefix': '--opt13'}
+            }]
         }
         assert 'opt13' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt13'] == expected_cwl
@@ -154,13 +154,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt14',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'float'
-                    },
-                    'inputBinding': {'prefix': '--opt14'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt14'}
+            }]
         }
         assert 'opt14' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt14'] == expected_cwl
@@ -170,7 +170,7 @@ class TestClick2Cwl(object):
             'doc': 'help opt21',
             'type': [
                 'string'
-                ],
+            ],
             'inputBinding': {'prefix': '--opt21'}
         }
         assert 'opt21' in cwl_template.template['inputs'].keys()
@@ -179,9 +179,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt22',
             'type': [{
-                    'type': 'array',
-                    'items': 'string'
-                }],
+                'type': 'array',
+                'items': 'string'
+            }],
             'inputBinding': {'prefix': '--opt22'}
         }
         assert 'opt22' in cwl_template.template['inputs'].keys()
@@ -190,10 +190,10 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt23',
             'type': [{
-                    'type': 'array',
-                    'items': 'string',
-                    'inputBinding': {'prefix': '--opt23'}
-                }]
+                'type': 'array',
+                'items': 'string',
+                'inputBinding': {'prefix': '--opt23'}
+            }]
         }
         assert 'opt23' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt23'] == expected_cwl
@@ -201,13 +201,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt24',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'string'
-                    },
-                    'inputBinding': {'prefix': '--opt24'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt24'}
+            }]
         }
         assert 'opt24' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt24'] == expected_cwl
@@ -217,7 +217,7 @@ class TestClick2Cwl(object):
             'doc': 'help opt31',
             'type': [
                 'boolean'
-                ],
+            ],
             'inputBinding': {'prefix': '--opt31'}
         }
         assert 'opt31' in cwl_template.template['inputs'].keys()
@@ -226,10 +226,10 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt33',
             'type': [{
-                    'type': 'array',
-                    'items': 'boolean',
-                    'inputBinding': {'prefix': '--opt33'}
-                }]
+                'type': 'array',
+                'items': 'boolean',
+                'inputBinding': {'prefix': '--opt33'}
+            }]
         }
         assert 'opt33' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt33'] == expected_cwl
@@ -239,7 +239,7 @@ class TestClick2Cwl(object):
             'doc': 'help opt41',
             'type': [
                 'string'
-                ],
+            ],
             'inputBinding': {'prefix': '--opt41'}
         }
         assert 'opt41' in cwl_template.template['inputs'].keys()
@@ -248,9 +248,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt42',
             'type': [{
-                    'type': 'array',
-                    'items': 'string'
-                }],
+                'type': 'array',
+                'items': 'string'
+            }],
             'inputBinding': {'prefix': '--opt42'}
         }
         assert 'opt42' in cwl_template.template['inputs'].keys()
@@ -259,10 +259,10 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt43',
             'type': [{
-                    'type': 'array',
-                    'items': 'string',
-                    'inputBinding': {'prefix': '--opt43'}
-                }]
+                'type': 'array',
+                'items': 'string',
+                'inputBinding': {'prefix': '--opt43'}
+            }]
         }
         assert 'opt43' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt43'] == expected_cwl
@@ -270,13 +270,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt44',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'string'
-                    },
-                    'inputBinding': {'prefix': '--opt44'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt44'}
+            }]
         }
         assert 'opt44' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt44'] == expected_cwl
@@ -285,9 +285,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt51',
             'type': [{
-                    'type': 'array',
-                    'items': 'string'
-                }],
+                'type': 'array',
+                'items': 'string'
+            }],
             'inputBinding': {'prefix': '--opt51'}
         }
         assert 'opt51' in cwl_template.template['inputs'].keys()
@@ -296,9 +296,9 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt52',
             'type': [{
-                    'type': 'array',
-                    'items': 'string'
-                }],
+                'type': 'array',
+                'items': 'string'
+            }],
             'inputBinding': {'prefix': '--opt52'}
         }
         assert 'opt52' in cwl_template.template['inputs'].keys()
@@ -307,13 +307,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt53',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'string'
-                    },
-                    'inputBinding': {'prefix': '--opt53'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt53'}
+            }]
         }
         assert 'opt53' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt53'] == expected_cwl
@@ -321,13 +321,13 @@ class TestClick2Cwl(object):
         expected_cwl = {
             'doc': 'help opt54',
             'type': [{
-                    'type': 'array',
-                    'items': {
+                'type': 'array',
+                'items': {
                         'type': 'array',
                         'items': 'string'
-                    },
-                    'inputBinding': {'prefix': '--opt54'}
-                }]
+                },
+                'inputBinding': {'prefix': '--opt54'}
+            }]
         }
         assert 'opt54' in cwl_template.template['inputs'].keys()
         assert cwl_template.template['inputs']['opt54'] == expected_cwl

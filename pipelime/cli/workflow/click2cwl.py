@@ -1,25 +1,53 @@
-from pathlib import Path
 import click
-from pipelime.workflow.tools.cwl_template import CwlTemplate
 
 
 @click.command("click2cwl", help="Converts a click script to a cwl file")
 @click.option("--script", required=True, type=str, help="Script filename")
-@click.option("--output_folder", required=True, type=str, help="Output folder to save the cwl file with the same name of input script")
-@click.option("--commands", required=True, type=str, help="Commands associated to the cwl, commands are separated by '.' ")
-@click.option("-f", "--forward", "forwards", required=False, multiple=True, type=str, help="Script parameters to forward to cwl output")
+@click.option("--name", required=True, type=str, help="Cwl template output name")
+@click.option("--alias", required=True, type=str, help="Alias command associated to the cwl, e.g.: 'command1 subcommand leaf' with quotes.")
+@click.option("--fchoice/--no-fchoice", default=True, type=bool, help="TRUE to activate forwarde interactive choice")
+@click.option("--folder", default=None, type=str, help="Output folder to save the cwl. Leave empty to use default folder")
 def click2cwl(
     script,
-    output_folder,
-    commands,
-    forwards
+    name,
+    alias,
+    fchoice,
+    folder
 ):
-    script = Path(script).absolute().resolve()
-    commands = commands.split('.')
-    cwl_template = CwlTemplate(script=script, alias=commands, forwards=list(forwards))
-    output_folder = Path(output_folder)
-    output_folder.mkdir(parents=True, exist_ok=True)
-    cwl_template.save_to(output_folder / f'{script.stem}.cwl')
+    from pipelime.workflow.cwl import CwlNodesManager, CwlTemplate
+
+    # Create template
+    cwl_template = CwlTemplate(
+        script=script,
+        alias=alias.split(' '),
+        forwards=None
+    )
+
+    if fchoice:
+        import inquirer
+        if len(cwl_template.inputs_keys) > 0:
+
+            # prompt
+            answers = inquirer.prompt([
+                inquirer.Checkbox(
+                    'forwards',
+                    message="Which input forward onto output?",
+                    choices=cwl_template.inputs_keys,
+                ),
+            ])
+
+            # Create template
+            cwl_template = CwlTemplate(
+                script=script,
+                alias=alias.split(' '),
+                forwards=answers['forwards']
+            )
+
+    CwlNodesManager.create_node(
+        name=name,
+        cwl_template=cwl_template,
+        folder=folder if len(folder) > 0 else None
+    )
 
 
 if __name__ == "__main__":

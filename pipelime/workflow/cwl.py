@@ -1,39 +1,195 @@
+import typing
+from choixe.spooks import Spook
 import importlib.util
-from typing import Union, Sequence
+from typing import Dict, Union, Sequence
 from pathlib import Path
 import click
 from click.decorators import command
+from schema import Or
 import yaml
+from pipelime import user_data_dir
+from choixe.configurations import XConfig
 
 
-class CwlTemplate(object):
-    
-    def __init__(self, script: str = None, alias: list = None, forwards: list = None):
+class CwlNodesManager(object):
+
+    DEFAULT_CWL_EXTENSION = 'cwl'
+    DEFAULT_META_EXTENSION = 'yml'
+
+    @classmethod
+    def nodes_folder(cls) -> Path:
+        """ Default nodes folder
+
+        :return: folder
+        :rtype: Path
+        """
+
+        folder = user_data_dir() / cls.__name__
+        if not folder.exists():
+            folder.mkdir(parents=True, exist_ok=True)
+        return folder
+
+    @classmethod
+    def get_associated_meta_path(cls, p: Path) -> Path:
+        """ Gets cwl file associated metadata path
+
+        :param p: cwl file
+        :type p: Path
+        :return: metadata file
+        :rtype: Path
+        """
+
+        return p.parent / f'{p.stem}.{cls.DEFAULT_META_EXTENSION}'
+
+    @classmethod
+    def is_valid_cwl_file(cls, p: Path) -> bool:
+        """ Checks for valid cwl file
+
+        :param p: cwl file
+        :type p: Path
+        :return: TRUE if is valid cwl file
+        :rtype: bool
+        """
+
+        return p.is_file() and cls.get_associated_meta_path(p).exists()
+
+    @classmethod
+    def load_cwl_node(cls, p: Path) -> 'CwlNode':
+        """ Loads cwl node from path
+
+        :return: loaded CwlNode
+        :rtype: CwlNode
+        """
+
+        if cls.is_valid_cwl_file(p):
+            meta_p = cls.get_associated_meta_path(p)
+            cwl_template = Spook.create(d=XConfig(filename=meta_p).to_dict())
+            cwl_node = CwlNode(name=p.stem, cwl_path=str(p), cwl_template=cwl_template)
+            return cwl_node
+        return None
+
+    @classmethod
+    def available_nodes(cls, folder: Union[str, None] = None) -> Dict[str, 'CwlNode']:
+        """ Gets a map of stored CwlNodes
+
+        :return: stored nodes map [node_name: node]
+        :rtype: Dict[str, 'CwlNode']
+        """
+
+        folder = Path(folder) if folder is not None else cls.nodes_folder()
+        cwls = folder.glob(f'*.{cls.DEFAULT_CWL_EXTENSION}')
+        cwls = [x for x in cwls if cls.is_valid_cwl_file(x)]
+        nodes = [cls.load_cwl_node(x) for x in cwls]
+        nodes = {x.name: x for x in nodes}
+        return nodes
+
+    @classmethod
+    def create_node(cls, name: str, cwl_template: 'CwlTemplate', folder: Union[str, None] = None) -> 'CwlNode':
+        """ Creates a node with input name and CwlTemplate
+
+        :param name: input node name
+        :type name: str
+        :param cwl_template: input cwl template
+        :type cwl_template: CwlTemplate
+        :param folder: if None the default folder will be used, defaults to None
+        :type folder: Union[str, None], optional
+        :raises RuntimeError: if a node with same name found
+        :return: created node
+        :rtype: CwlNode
+        """
+
+        nodes = cls.available_nodes(folder=folder)
+        if name in nodes:
+            raise RuntimeError(f'Node with same name "{name}" found')
+
+        folder = Path(folder) if folder is not None else cls.nodes_folder()
+        cwl_filename = folder / f'{name}.{cls.DEFAULT_CWL_EXTENSION}'
+        meta_filename = folder / f'{name}.{cls.DEFAULT_META_EXTENSION}'
+
+        cwl_template.dumps(cwl_filename)
+        XConfig.from_dict(d=cwl_template.serialize()).save_to(meta_filename)
+
+        return CwlNode(
+            name=name,
+            cwl_path=str(cwl_filename),
+            cwl_template=cwl_template
+        )
+
+
+class CwlTemplate(Spook):
+
+    def __init__(self, script: str = None, alias: Sequence[str] = None, forwards: Sequence[str] = None):
         """ Creates a cwl template from script containing click.Command
 
         :param script: the script, defaults to None
         :type script: str, optional
         :param alias: the commands needed to call the script, defaults to None
-        :type alias: list, optional
+        :type alias: Sequence[str], optional
         :param forwards: the input parameters to forward to output, defaults to None
-        :type forwards: list, optional
+        :type forwards: Sequence[str], optional
         """
 
         self._script = script
-        self._cmd = None
-        if self._script is not None:
-            self._cmd = self._load_click_command(self._script)
         self._alias = alias
         self._forwards = forwards
+        #
+        self._cmd = None
+        if self._script is not None:
+            self._cmd = self._load_click_command(self.resolved_script)
         self._template = dict()
         if self._cmd is not None:
             self._fill()
+
+    @ classmethod
+    def spook_schema(cls) -> typing.Union[None, dict]:
+        return {
+            'script': Or(str, None),
+            'alias': Or([str], None),
+            'forwards': Or([str], None),
+        }
+
+    @ classmethod
+    def from_dict(cls, d: dict):
+        return cls(**d)
+
+    def to_dict(self) -> dict:
+        return {
+            'script': self._script,
+            'alias': self._alias,
+            'forwards': self._forwards
+        }
+
+    @property
+    def script(self):
+        return self._script
+
+    @property
+    def resolved_script(self):
+        return Path(self._script).absolute().resolve()
 
     @property
     def template(self):
         return self._template
 
-    @classmethod
+    @property
+    def alias(self):
+        return self._alias
+
+    @property
+    def forwards(self):
+        return self._forwards
+
+    @property
+    def inputs(self):
+        return self._template.get('inputs', None)
+
+    @property
+    def inputs_keys(self):
+        if self.inputs is not None:
+            return list(self.inputs.keys())
+        return []
+
+    @ classmethod
     def from_command(cls, command: click.Command, alias: list = None, forwards: list = None) -> 'CwlTemplate':
         """ Creates a cwl template directly from click.Command
 
@@ -61,7 +217,6 @@ class CwlTemplate(object):
         self._fill_inputs(self._cmd)
         if self._forwards is not None:
             self._fill_outputs(self._forwards)
-
 
     def _load_click_command(self, script: str) -> Union[click.Command, None]:
         """ Loads a click.Command from file, it assumes
@@ -98,14 +253,14 @@ class CwlTemplate(object):
         self._template['baseCommand'] = ''
         self._template['inputs'] = dict()
         self._template['outputs'] = dict()
-    
+
     def _fill_command(self, commands: list):
         """ Fills the cwl template with the commands informations
 
         :param commands: the commands needed to call the script
         :type commands: list
         """
-        
+
         self._template['baseCommand'] = commands
 
     def _fill_inputs(self, cmd: click.Command):
@@ -202,7 +357,7 @@ class CwlTemplate(object):
 
         return cwl_types
 
-    def _fill_outputs(self, forwards: list) :
+    def _fill_outputs(self, forwards: list):
         """ Fills the cwl template with outputs informations
 
         :param forwards: the input parameters to forward to output
@@ -223,23 +378,65 @@ class CwlTemplate(object):
             self._template['outputs'][output_name]['outputBinding'] = dict()
             self._template['outputs'][output_name]['outputBinding']['outputEval'] = f'$(inputs.{fw})'
 
-    def save_to(self, filename: str):
-        """ Saves the cwl to filename
+    def dumps(self, path: str):
+        """ Dumps the cwl template to target folder or file
 
-        :param filename: the output filename
-        :type filename: str
+        :param path: the output dir or complete filename
+        :type path: str
         """
 
-        # need to avoid that pyyaml inserts aliases
         class NoAliasDumper(yaml.SafeDumper):
             def ignore_aliases(self, data):
                 return True
 
-        with open(filename, 'w') as f:
+        with open(path, 'w') as f:
             yaml.dump(self._template, f, Dumper=NoAliasDumper, sort_keys=False)
         # reads and writes again to add the first line
-        with open(filename, 'r') as f:
+        with open(path, 'r') as f:
             lines = f.readlines()
         lines.insert(0, '#!/usr/bin/env cwl-runner\n')
-        with open(filename, 'w') as f:
+        with open(path, 'w') as f:
             f.writelines(lines)
+
+
+class CwlNode(Spook):
+
+    def __init__(self, name: str, cwl_path: str, cwl_template: CwlTemplate) -> None:
+        self._name = name
+        self._cwl_path = cwl_path
+        self._cwl_template = cwl_template
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def cwl_path(self):
+        return self._cwl_path
+
+    @property
+    def cwl_template(self):
+        return self._cwl_template
+
+    @ classmethod
+    def spook_schema(cls) -> typing.Union[None, dict]:
+        return {
+            'name': str,
+            'cwl_path': str,
+            'cwl_template': object
+        }
+
+    @ classmethod
+    def from_dict(cls, d: dict):
+        return CwlNode(
+            name=d['name'],
+            cwl_path=d['cwl_path'],
+            cwl_template=Spook.create(d['cwl_template'])
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            'name': self._name,
+            'cwl_path': self._cwl_path,
+            'cwl_template': self._cwl_template.serialize()
+        }
