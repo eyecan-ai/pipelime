@@ -399,7 +399,7 @@ class CwlTemplate(Spook):
             f.writelines(lines)
 
 
-class CwlNode(Spook):
+class CwlNode:
 
     def __init__(self, name: str, cwl_path: str, cwl_template: CwlTemplate) -> None:
         self._name = name
@@ -417,26 +417,3 @@ class CwlNode(Spook):
     @property
     def cwl_template(self):
         return self._cwl_template
-
-    @ classmethod
-    def spook_schema(cls) -> typing.Union[None, dict]:
-        return {
-            'name': str,
-            'cwl_path': str,
-            'cwl_template': object
-        }
-
-    @ classmethod
-    def from_dict(cls, d: dict):
-        return CwlNode(
-            name=d['name'],
-            cwl_path=d['cwl_path'],
-            cwl_template=Spook.create(d['cwl_template'])
-        )
-
-    def to_dict(self) -> dict:
-        return {
-            'name': self._name,
-            'cwl_path': self._cwl_path,
-            'cwl_template': self._cwl_template.serialize()
-        }
