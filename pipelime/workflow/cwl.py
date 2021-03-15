@@ -469,7 +469,6 @@ class CwlNode:
         return self._cwl_template
 
 
-# class CwlWorkflowTemplate(Spook):
 class CwlWorkflowTemplate(object):
 
     def __init__(self, nodes: Sequence[CwlNode]):
@@ -490,32 +489,12 @@ class CwlWorkflowTemplate(object):
     def template(self):
         return self._template
 
-    # @ classmethod
-    # def spook_schema(cls) -> typing.Union[None, dict]:
-    #     return {
-    #         'script': Or(str, None),
-    #         'alias': Or([str], None),
-    #         'forwards': Or([str], None),
-    #     }
-
-    # @ classmethod
-    # def from_dict(cls, d: dict):
-    #     return cls(**d)
-
-    # def to_dict(self) -> dict:
-    #     return {
-    #         'script': self._script,
-    #         'alias': self._alias,
-    #         'forwards': self._forwards
-    #     }
-
     def _fill(self):
         """ Fills the template
         """
 
         self._init_template()
         self._fill_steps(self._nodes)
-        self._fill_inputs()
 
     def _init_template(self):
         """ Initializes the cwl workflow template for a CommandLineTool
@@ -552,19 +531,9 @@ class CwlWorkflowTemplate(object):
             self._template['steps'][step_name] = cwl_step
             counter[step.name] += 1
 
-            # for input_name, input_opt in step.cwl_template.inputs.items():
-            #     self._template['inputs'][f'{step_name}_{input_name}'] = input_opt['type']
-
-    def _fill_inputs(self):
-        """[summary]
-
-        :param steps: [description]
-        :type steps: Sequence[CwlNode]
-        """
-
-        for name, step in self._template['steps'].items():
-            for input_param in step['in'].keys():
-                self._template['inputs'][f'{name}_{input_param}'] = ''
+            # fill worfkflow inputs based on step inputs
+            for input_name, input_opt in step.cwl_template.inputs.items():
+                self._template['inputs'][f'{step_name}_{input_name}'] = input_opt['type']
 
     def dumps(self, path: str):
         """ Dumps the cwl workflow template to target file

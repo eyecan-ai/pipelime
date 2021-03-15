@@ -430,8 +430,15 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         assert 'opt02' in cwl_workflow_template.template['steps']['node01']['in'].keys()
         assert '_opt01' in cwl_workflow_template.template['steps']['node01']['out']
 
-
-        # workflow template should compile also 'inputs'!!!!
-
-# cwlworkflow is spook?
-# test in template x2 spook?
+        assert 'node00_opt01' in cwl_workflow_template.template['inputs']
+        assert 'int' in cwl_workflow_template.template['inputs']['node00_opt01']
+        assert 'node00_opt02' in cwl_workflow_template.template['inputs']
+        assert 'string' in cwl_workflow_template.template['inputs']['node00_opt02']
+        assert 'node10_opt11' in cwl_workflow_template.template['inputs']
+        assert 'int' in cwl_workflow_template.template['inputs']['node10_opt11']
+        assert 'node10_opt12' in cwl_workflow_template.template['inputs']
+        assert 'string' in cwl_workflow_template.template['inputs']['node10_opt12']
+        assert 'node01_opt01' in cwl_workflow_template.template['inputs']
+        assert 'int' in cwl_workflow_template.template['inputs']['node01_opt01']
+        assert 'node01_opt02' in cwl_workflow_template.template['inputs']
+        assert 'string' in cwl_workflow_template.template['inputs']['node01_opt02']
