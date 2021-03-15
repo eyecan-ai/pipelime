@@ -2,7 +2,7 @@ import click
 
 
 @click.command("list_nodes", help="List available nodes")
-@click.option("--folder", default=None, type=str, help="Output folder to save the cwl. Leave empty to use default folder")
+@click.option("--folder", default=None, type=str, help="Folder of the cwl. Leave empty to use default folder")
 def list_nodes(folder):
 
     import rich

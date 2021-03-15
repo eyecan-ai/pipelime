@@ -46,7 +46,8 @@ def click2cwl(
     CwlNodesManager.create_node(
         name=name,
         cwl_template=cwl_template,
-        folder=folder if len(folder) > 0 else None
+        # folder=folder if len(folder) > 0 else None
+        folder=folder
     )
 
 

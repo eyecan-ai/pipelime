@@ -1,7 +1,7 @@
 from pathlib import Path
 import click
 import yaml
-from pipelime.workflow.cwl import CwlTemplate
+from pipelime.workflow.cwl import CwlNode, CwlTemplate, CwlWorkflowTemplate
 
 
 class TestClick2Cwl(object):
@@ -356,7 +356,7 @@ class TestClick2Cwl(object):
         # assert cwl_filled == cwl_filled2
 
         output_cwl_file = Path(tmpdir_factory.mktemp('cwl')) / f'output.cwl'
-        cwl_template.save_to(output_cwl_file)
+        cwl_template.dumps(output_cwl_file)
         with open(output_cwl_file, 'r') as f:
             lines = f.readlines()
             assert lines[0] == '#!/usr/bin/env cwl-runner\n'
@@ -389,3 +389,49 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
             assert key in loaded_template.template.keys()
         assert loaded_template.template['doc'] == click_help
         assert len(loaded_template.template['inputs'].keys()) == 9
+
+    def test_cwl_workflow_template(self):
+        opt0_1 = click.Option(param_decls=['--opt01'], required=True, type=int, help='help opt01')
+        opt0_2 = click.Option(param_decls=['--opt02'], required=True, type=str, help='help opt02')
+        command0 = click.Command(name='cmd0', params=[opt0_1, opt0_2])
+        cwl_template0 = CwlTemplate.from_command(command0, forwards=['opt01'])
+        cwl_node0 = CwlNode('node0', '/path/to/cwl0', cwl_template0)
+
+        opt1_1 = click.Option(param_decls=['--opt11'], required=True, type=int, help='help opt11')
+        opt1_2 = click.Option(param_decls=['--opt12'], required=True, type=str, help='help opt12')
+        command1 = click.Command(name='cmd1', params=[opt1_1, opt1_2])
+        cwl_template1 = CwlTemplate.from_command(command1, forwards=['opt11'])
+        cwl_node1 = CwlNode('node1', '/path/to/cwl1', cwl_template1)
+
+        cwl_nodes = [cwl_node0, cwl_node1, cwl_node0]
+        cwl_workflow_template = CwlWorkflowTemplate(cwl_nodes)
+
+        cwl_keys = ['cwlVersion', 'class', 'requirements', 'inputs', 'outputs', 'steps']
+        for key in cwl_keys:
+            assert key in cwl_workflow_template.template.keys()
+
+        assert len(cwl_workflow_template.template['steps'].keys()) == 3
+
+        assert 'node00' in cwl_workflow_template.template['steps'].keys()
+        assert cwl_workflow_template.template['steps']['node00']['run'] == '/path/to/cwl0'
+        assert 'opt01' in cwl_workflow_template.template['steps']['node00']['in'].keys()
+        assert 'opt02' in cwl_workflow_template.template['steps']['node00']['in'].keys()
+        assert '_opt01' in cwl_workflow_template.template['steps']['node00']['out']
+
+        assert 'node10' in cwl_workflow_template.template['steps'].keys()
+        assert cwl_workflow_template.template['steps']['node10']['run'] == '/path/to/cwl1'
+        assert 'opt11' in cwl_workflow_template.template['steps']['node10']['in'].keys()
+        assert 'opt12' in cwl_workflow_template.template['steps']['node10']['in'].keys()
+        assert '_opt11' in cwl_workflow_template.template['steps']['node10']['out']
+
+        assert 'node01' in cwl_workflow_template.template['steps'].keys()
+        assert cwl_workflow_template.template['steps']['node01']['run'] == '/path/to/cwl0'
+        assert 'opt01' in cwl_workflow_template.template['steps']['node01']['in'].keys()
+        assert 'opt02' in cwl_workflow_template.template['steps']['node01']['in'].keys()
+        assert '_opt01' in cwl_workflow_template.template['steps']['node01']['out']
+
+
+        # workflow template should compile also 'inputs'!!!!
+
+# cwlworkflow is spook?
+# test in template x2 spook?

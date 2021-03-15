@@ -1,10 +1,11 @@
+from pipelime.cli.workflow.workflow import workflow
 import typing
+import os
 from choixe.spooks import Spook
 import importlib.util
 from typing import Dict, Union, Sequence
 from pathlib import Path
 import click
-from click.decorators import command
 from schema import Or
 import yaml
 from pipelime import user_data_dir
@@ -115,6 +116,42 @@ class CwlNodesManager(object):
             cwl_template=cwl_template
         )
 
+    @classmethod
+    def delete_node(cls, name: str, folder: Union[str, None] = None):
+        """ Deletes a node given the name
+
+        :param name: node to delete name
+        :type name: str
+        :param folder: if None the default folder will be used, defaults to None
+        :type folder: Union[str, None], optional
+        :raises RuntimeError: if a node with this name not found
+        """
+
+        nodes = cls.available_nodes(folder=folder)
+        if name not in nodes:
+            raise RuntimeError(f'Node with name "{name}" not found')
+
+        folder = Path(folder) if folder is not None else cls.nodes_folder()
+        cwl_filename = folder / f'{name}.{cls.DEFAULT_CWL_EXTENSION}'
+        meta_filename = folder / f'{name}.{cls.DEFAULT_META_EXTENSION}'
+
+        os.remove(cwl_filename)
+        os.remove(meta_filename)
+
+    @classmethod
+    def initialize_workflow(cls, names: Sequence[str], folder: Union[str, None] = None) -> 'CwlWorkflowTemplate':
+
+        nodes = cls.available_nodes(folder)
+        workflow_nodes = []
+        for name in names:
+            if name not in nodes:
+                raise RuntimeError(f'Node with name "{name}" not found')
+            workflow_nodes.append([v for k, v in nodes.items() if k == name][0])
+
+        workflow_template = CwlWorkflowTemplate(workflow_nodes)
+
+        return workflow_template
+
 
 class CwlTemplate(Spook):
 
@@ -129,10 +166,12 @@ class CwlTemplate(Spook):
         :type forwards: Sequence[str], optional
         """
 
+        super().__init__()
+
         self._script = script
         self._alias = alias
         self._forwards = forwards
-        #
+
         self._cmd = None
         if self._script is not None:
             self._cmd = self._load_click_command(self.resolved_script)
@@ -189,7 +228,17 @@ class CwlTemplate(Spook):
             return list(self.inputs.keys())
         return []
 
-    @ classmethod
+    @property
+    def outputs(self):
+        return self._template.get('outputs', None)
+
+    @property
+    def outputs_keys(self):
+        if self.outputs is not None:
+            return list(self.outputs.keys())
+        return []
+
+    @classmethod
     def from_command(cls, command: click.Command, alias: list = None, forwards: list = None) -> 'CwlTemplate':
         """ Creates a cwl template directly from click.Command
 
@@ -211,6 +260,7 @@ class CwlTemplate(Spook):
     def _fill(self):
         """ Fills the template
         """
+
         self._init_template()
         if self._alias is not None:
             self._fill_command(self._alias)
@@ -244,7 +294,7 @@ class CwlTemplate(Spook):
         return cmd
 
     def _init_template(self):
-        """ Initialize the cwl template for a CommandLineTool
+        """ Initializes the cwl template for a CommandLineTool
         """
 
         self._template['cwlVersion'] = 'v1.0'
@@ -266,7 +316,7 @@ class CwlTemplate(Spook):
     def _fill_inputs(self, cmd: click.Command):
         """ Fills the cwl template with input informations
 
-        :param cmd: [description]
+        :param cmd: the click command
         :type cmd: click.Command
         """
 
@@ -379,9 +429,9 @@ class CwlTemplate(Spook):
             self._template['outputs'][output_name]['outputBinding']['outputEval'] = f'$(inputs.{fw})'
 
     def dumps(self, path: str):
-        """ Dumps the cwl template to target folder or file
+        """ Dumps the cwl template to target file
 
-        :param path: the output dir or complete filename
+        :param path: the output complete filename
         :type path: str
         """
 
@@ -417,3 +467,121 @@ class CwlNode:
     @property
     def cwl_template(self):
         return self._cwl_template
+
+
+# class CwlWorkflowTemplate(Spook):
+class CwlWorkflowTemplate(object):
+
+    def __init__(self, nodes: Sequence[CwlNode]):
+        """ Creates a cwl workflow template from list of CwlNode
+
+        :param nodes: steps of the workflow
+        :type nodes: Sequence[CwlNode]
+        """
+
+        # super().__init__()
+
+        self._nodes = nodes
+        self._template = dict()
+
+        self._fill()
+
+    @property
+    def template(self):
+        return self._template
+
+    # @ classmethod
+    # def spook_schema(cls) -> typing.Union[None, dict]:
+    #     return {
+    #         'script': Or(str, None),
+    #         'alias': Or([str], None),
+    #         'forwards': Or([str], None),
+    #     }
+
+    # @ classmethod
+    # def from_dict(cls, d: dict):
+    #     return cls(**d)
+
+    # def to_dict(self) -> dict:
+    #     return {
+    #         'script': self._script,
+    #         'alias': self._alias,
+    #         'forwards': self._forwards
+    #     }
+
+    def _fill(self):
+        """ Fills the template
+        """
+
+        self._init_template()
+        self._fill_steps(self._nodes)
+        self._fill_inputs()
+
+    def _init_template(self):
+        """ Initializes the cwl workflow template for a CommandLineTool
+        """
+
+        self._template['cwlVersion'] = 'v1.0'
+        self._template['class'] = 'Workflow'
+        self._template['requirements'] = {
+            'StepInputExpressionRequirement': dict(),
+            'InlineJavascriptRequirement': dict(),
+            'MultipleInputFeatureRequirement': dict(),
+            'ScatterFeatureRequirement': dict()
+        }
+        self._template['inputs'] = dict()
+        self._template['outputs'] = list()
+        self._template['steps'] = dict()
+
+    def _fill_steps(self, steps: Sequence[CwlNode]):
+        """ Fills the cwl workflow template with steps informations
+
+        :param steps: the steos of the workflow
+        :type steps: Sequence[CwlNode]
+        """
+
+        # avoids name conflicts when a node is used more than one time
+        counter = {x.name: 0 for x in steps}
+
+        for step in steps:
+            cwl_step = dict()
+            cwl_step['run'] = step.cwl_path
+            cwl_step['in'] = {k: '' for k in step.cwl_template.inputs_keys}
+            cwl_step['out'] = step.cwl_template.outputs_keys
+            step_name = f'{step.name}{counter[step.name]}'
+            self._template['steps'][step_name] = cwl_step
+            counter[step.name] += 1
+
+            # for input_name, input_opt in step.cwl_template.inputs.items():
+            #     self._template['inputs'][f'{step_name}_{input_name}'] = input_opt['type']
+
+    def _fill_inputs(self):
+        """[summary]
+
+        :param steps: [description]
+        :type steps: Sequence[CwlNode]
+        """
+
+        for name, step in self._template['steps'].items():
+            for input_param in step['in'].keys():
+                self._template['inputs'][f'{name}_{input_param}'] = ''
+
+    def dumps(self, path: str):
+        """ Dumps the cwl workflow template to target file
+
+        :param path: the output complete filename
+        :type path: str
+        """
+
+        class NoAliasDumper(yaml.SafeDumper):
+            def ignore_aliases(self, data):
+                return True
+
+        with open(path, 'w') as f:
+            yaml.dump(self._template, f, Dumper=NoAliasDumper, sort_keys=False)
+        # reads and writes again to add the first line
+        with open(path, 'r') as f:
+            lines = f.readlines()
+        lines.insert(0, '#!/usr/bin/env cwl-runner\n')
+        with open(path, 'w') as f:
+            f.writelines(lines)
