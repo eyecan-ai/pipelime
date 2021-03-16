@@ -1,10 +1,10 @@
 import click
 
 
-@click.command("init_workflow", help="List available nodes")
+@click.command("init", help="List available nodes")
 @click.option("--output_filename", required=True, type=str, help="Output filename of the cwl workflow file")
 @click.option("--folder", default=None, type=str, help="Folder of the cwl. Leave empty to use default folder")
-def init_workflow(output_filename, folder):
+def init(output_filename, folder):
 
     import inquirer
     from pipelime.workflow.cwl import CwlNodesManager
@@ -28,4 +28,4 @@ def init_workflow(output_filename, folder):
 
 
 if __name__ == "__main__":
-    init_workflow()
+    init()
