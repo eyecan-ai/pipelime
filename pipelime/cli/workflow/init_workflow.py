@@ -17,7 +17,7 @@ def init_workflow(output_filename, folder):
     available_nodes.append('END WORKFLOW')
     while True:
         answer = inquirer.prompt([
-            inquirer.List('nodes', message='Choose a nodes', choices=available_nodes)
+            inquirer.List('nodes', message='Choose a node', choices=available_nodes)
         ])
         if answer['nodes'] == 'END WORKFLOW':
             break

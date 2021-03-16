@@ -1,7 +1,7 @@
 import click
 
 
-@click.command("delete_nodes", help="Delete nodes nodes")
+@click.command("delete_nodes", help="Delete nodes")
 @click.option("--folder", default=None, type=str, help="Folder of the cwl. Leave empty to use default folder")
 def delete_nodes(folder):
 
