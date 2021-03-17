@@ -1,4 +1,3 @@
-from pipelime.cli.workflow.workflow import workflow
 import typing
 import os
 from choixe.spooks import Spook
@@ -85,6 +84,27 @@ class CwlNodesManager(object):
         return nodes
 
     @classmethod
+    def get_node_by_name(cls, name: str, folder: Union[str, None] = None) -> Union['CwlNode', None]:
+        """ Gets a node with the given name
+
+        :param name: node name
+        :type name: str
+        :param folder: if None the default folder will be used, defaults to None
+        :type folder: Union[str, None], optional
+        :return: the node with given name if exists, else None
+        :rtype: Union['CwlNode', None]
+        """
+
+        nodes = cls.available_nodes(folder)
+        node = [v for k, v in nodes.items() if k == name]
+        if len(node) == 1:
+            node = node[0]
+        else:
+            node = None
+
+        return node
+
+    @classmethod
     def create_node(cls, name: str, cwl_template: 'CwlTemplate', folder: Union[str, None] = None) -> 'CwlNode':
         """ Creates a node with input name and CwlTemplate
 
@@ -140,17 +160,46 @@ class CwlNodesManager(object):
 
     @classmethod
     def initialize_workflow(cls, names: Sequence[str], folder: Union[str, None] = None) -> 'CwlWorkflowTemplate':
+        """ Initializes a cwl worflow given a list of node names
+
+        :param names: names of the nodes to create the cwl workflow
+        :type names: Sequence[str]
+        :param folder: if None the default folder will be used, defaults to None
+        :type folder: Union[str, None], optional
+        :raises RuntimeError: if a node with one of these names not found
+        :return: the cwl workflow
+        :rtype: CwlWorkflowTemplate
+        """
 
         nodes = cls.available_nodes(folder)
         workflow_nodes = []
         for name in names:
             if name not in nodes:
                 raise RuntimeError(f'Node with name "{name}" not found')
-            workflow_nodes.append([v for k, v in nodes.items() if k == name][0])
+            workflow_nodes.append(cls.get_node_by_name(name, folder=folder))
 
         workflow_template = CwlWorkflowTemplate(workflow_nodes)
 
         return workflow_template
+
+    @classmethod
+    def fill_workflow(cls, workflow: 'CwlWorkflowTemplate', folder: Union[str, None] = None) -> 'CwlWorkflowTemplate':
+        """ Fills a cwl workflow adding the cwl path for each step
+
+        :param workflow: thw cwl workflow to be filled
+        :type workflow: CwlWorkflowTemplate
+        :param folder: if None the default folder will be used, defaults to None
+        :type folder: Union[str, None], optional
+        :return: the cwl workflow
+        :rtype: CwlWorkflowTemplate
+        """
+
+        for _, opts in workflow.template['steps'].items():
+            node_name = opts['run']
+            node = cls.get_node_by_name(node_name, folder=folder)
+            opts['run'] = node.cwl_path
+
+        return workflow
 
 
 class CwlTemplate(Spook):
@@ -480,23 +529,39 @@ class CwlNode:
 
 class CwlWorkflowTemplate(object):
 
-    def __init__(self, nodes: Sequence[CwlNode]):
+    def __init__(self, nodes: Sequence[CwlNode] = None):
         """ Creates a cwl workflow template from list of CwlNode
 
         :param nodes: steps of the workflow
         :type nodes: Sequence[CwlNode]
         """
 
-        # super().__init__()
-
         self._nodes = nodes
         self._template = dict()
 
-        self._fill()
+        if self._nodes is not None:
+            self._fill()
 
     @property
     def template(self):
         return self._template
+
+    @classmethod
+    def from_file(cls, filename: str) -> 'CwlWorkflowTemplate':
+        """ Creates a cwl workflow template from a file
+
+        :param filename: the file template
+        :type filename: str
+        :return: a cwl workflow template
+        :rtype: CwlWorkflowTemplate
+        """
+
+        with open(filename, 'r') as f:
+            template = yaml.safe_load(f)
+
+        workflow_template = CwlWorkflowTemplate()
+        workflow_template._template = template
+        return workflow_template
 
     def _fill(self):
         """ Fills the template
@@ -533,7 +598,7 @@ class CwlWorkflowTemplate(object):
 
         for step in steps:
             cwl_step = dict()
-            cwl_step['run'] = step.cwl_path
+            cwl_step['run'] = step.name
             cwl_step['in'] = {k: '' for k in step.cwl_template.inputs_keys}
             cwl_step['out'] = step.cwl_template.outputs_keys
             step_name = f'{step.name}{counter[step.name]}'
