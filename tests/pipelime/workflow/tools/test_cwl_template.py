@@ -1,7 +1,9 @@
 from pathlib import Path
+from re import template
+from pipelime.cli.workflow.workflow import workflow
 import click
 import yaml
-from pipelime.workflow.cwl import CwlNode, CwlTemplate, CwlWorkflowTemplate
+from pipelime.workflow.cwl import CwlNode, CwlNodesManager, CwlTemplate, CwlWorkflowTemplate
 
 
 class TestClick2Cwl(object):
@@ -390,7 +392,7 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         assert loaded_template.template['doc'] == click_help
         assert len(loaded_template.template['inputs'].keys()) == 9
 
-    def test_cwl_workflow_template(self):
+    def test_cwl_workflow_template(self, tmpdir_factory):
         opt0_1 = click.Option(param_decls=['--opt01'], required=True, type=int, help='help opt01')
         opt0_2 = click.Option(param_decls=['--opt02'], required=True, type=str, help='help opt02')
         command0 = click.Command(name='cmd0', params=[opt0_1, opt0_2])
@@ -413,19 +415,19 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         assert len(cwl_workflow_template.template['steps'].keys()) == 3
 
         assert 'node00' in cwl_workflow_template.template['steps'].keys()
-        assert cwl_workflow_template.template['steps']['node00']['run'] == '/path/to/cwl0'
+        assert cwl_workflow_template.template['steps']['node00']['run'] == 'node0'
         assert 'opt01' in cwl_workflow_template.template['steps']['node00']['in'].keys()
         assert 'opt02' in cwl_workflow_template.template['steps']['node00']['in'].keys()
         assert '_opt01' in cwl_workflow_template.template['steps']['node00']['out']
 
         assert 'node10' in cwl_workflow_template.template['steps'].keys()
-        assert cwl_workflow_template.template['steps']['node10']['run'] == '/path/to/cwl1'
+        assert cwl_workflow_template.template['steps']['node10']['run'] == 'node1'
         assert 'opt11' in cwl_workflow_template.template['steps']['node10']['in'].keys()
         assert 'opt12' in cwl_workflow_template.template['steps']['node10']['in'].keys()
         assert '_opt11' in cwl_workflow_template.template['steps']['node10']['out']
 
         assert 'node01' in cwl_workflow_template.template['steps'].keys()
-        assert cwl_workflow_template.template['steps']['node01']['run'] == '/path/to/cwl0'
+        assert cwl_workflow_template.template['steps']['node01']['run'] == 'node0'
         assert 'opt01' in cwl_workflow_template.template['steps']['node01']['in'].keys()
         assert 'opt02' in cwl_workflow_template.template['steps']['node01']['in'].keys()
         assert '_opt01' in cwl_workflow_template.template['steps']['node01']['out']
@@ -442,3 +444,64 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         assert 'int' in cwl_workflow_template.template['inputs']['node01_opt01']
         assert 'node01_opt02' in cwl_workflow_template.template['inputs']
         assert 'string' in cwl_workflow_template.template['inputs']['node01_opt02']
+
+        output_template = Path(tmpdir_factory.mktemp('workflow')) / f'template.cwl'
+        cwl_workflow_template.dumps(output_template)
+        loaded_template = CwlWorkflowTemplate.from_file(output_template)
+        assert cwl_workflow_template.template == loaded_template.template
+
+    def test_cwl_nodes_manager(self, tmpdir_factory):
+        output_folder = Path(tmpdir_factory.mktemp('cwl'))
+
+        nodes = CwlNodesManager.available_nodes(folder=output_folder)
+        assert len(nodes) == 0
+        click_command = click.Command('command', params=[click.Option(param_decls=['--opt'], type=int)])
+        cwl_template = CwlTemplate.from_command(click_command)
+        CwlNodesManager.create_node('first', cwl_template, folder=output_folder)
+        nodes = CwlNodesManager.available_nodes(folder=output_folder)
+        assert len(nodes) == 1
+        node = CwlNodesManager.get_node_by_name('first', folder=output_folder)
+        assert node is not None
+        assert node.name == 'first'
+        assert CwlNodesManager.get_node_by_name('second', folder=output_folder) is None
+        CwlNodesManager.delete_node('first', folder=output_folder)
+        nodes = CwlNodesManager.available_nodes(folder=output_folder)
+        assert len(nodes) == 0
+
+        click_command1 = f"""
+import click
+@click.command('command1')
+@click.option('--opt0', required=True, type=int, help='help opt0')
+def command1(opt0):
+    pass
+        """
+        output_click_file1 = Path(tmpdir_factory.mktemp('click')) / f'command1.py'
+        with open(output_click_file1, 'w') as f:
+            f.write(click_command1)
+        cwl_template1 = CwlTemplate(script=str(output_click_file1))  #, alias=['one', 'two'], forwards=['opt0'])
+        CwlNodesManager.create_node('first', cwl_template1, folder=output_folder)
+
+        click_command2 = f"""
+import click
+@click.command('command2')
+@click.option('--opt0', required=True, type=int, help='help opt0')
+def command2(opt0):
+    pass
+        """
+        output_click_file2 = Path(tmpdir_factory.mktemp('click')) / f'command2.py'
+        with open(output_click_file2, 'w') as f:
+            f.write(click_command2)
+        cwl_template2 = CwlTemplate(script=str(output_click_file2))
+        CwlNodesManager.create_node('second', cwl_template2, folder=output_folder)
+
+        workflow_template = CwlNodesManager.initialize_workflow(['first', 'first', 'second'], folder=output_folder)
+        assert workflow_template.template['steps']['first0']['run'] == 'first'
+        assert workflow_template.template['steps']['first1']['run'] == 'first'
+        assert workflow_template.template['steps']['second0']['run'] == 'second'
+
+        first_node_path = CwlNodesManager.get_node_by_name('first', folder=output_folder).cwl_path
+        second_node_path = CwlNodesManager.get_node_by_name('second', folder=output_folder).cwl_path
+        filled_workflow_template = CwlNodesManager.fill_workflow(workflow_template, folder=output_folder)
+        assert filled_workflow_template.template['steps']['first0']['run'] == first_node_path
+        assert filled_workflow_template.template['steps']['first1']['run'] == first_node_path
+        assert filled_workflow_template.template['steps']['second0']['run'] == second_node_path

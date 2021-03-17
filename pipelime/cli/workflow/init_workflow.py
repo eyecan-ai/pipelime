@@ -1,7 +1,7 @@
 import click
 
 
-@click.command("init", help="List available nodes")
+@click.command("init", help="Initialize a workflow")
 @click.option("--output_filename", required=True, type=str, help="Output filename of the cwl workflow file")
 @click.option("--folder", default=None, type=str, help="Folder of the cwl. Leave empty to use default folder")
 def init(output_filename, folder):
