@@ -15,7 +15,10 @@ def list_nodes(folder):
     # draw tree
     t_root = Tree('🧩 [green]Nodes')
     for name, node in nodes.items():
-        t_node = Tree(f'[u]{name}[/u]')
+        if not node.is_valid:
+            t_node = Tree(f"[red][u]{name} (node NOT valid, can't load the script)[/u][/red]")
+        else:
+            t_node = Tree(f'[u]{name}[/u]')
         t_node.add(f'[blue]Path:[/blue] {node.cwl_path}')
         t_template = Tree('[blue]Template[/blue]')
         t_template.add(f'Script: {node.cwl_template.script}')

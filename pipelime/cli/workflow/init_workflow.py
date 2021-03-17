@@ -13,7 +13,7 @@ def init(output_filename, folder):
     nodes = CwlNodesManager.available_nodes(folder=folder)
 
     choosen_nodes = []
-    available_nodes = list(nodes.keys())
+    available_nodes = [k for k, v in nodes.items() if v.is_valid]
     available_nodes.append('END WORKFLOW')
     while True:
         answer = inquirer.prompt([
