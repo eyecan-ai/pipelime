@@ -1,4 +1,3 @@
-from pipelime.workflow.cwl import CwlWorkflowTemplate
 import click
 
 
@@ -9,6 +8,7 @@ import click
 def fill(workflow, output_filename, folder):
 
     from pipelime.workflow.cwl import CwlNodesManager
+    from pipelime.workflow.cwl import CwlWorkflowTemplate
 
     workflow_template = CwlWorkflowTemplate.from_file(workflow)
     workflow_template = CwlNodesManager.fill_workflow(workflow_template)
