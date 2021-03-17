@@ -124,6 +124,7 @@ class CwlNodesManager(object):
             raise RuntimeError(f'Node with same name "{name}" found')
 
         folder = Path(folder) if folder is not None else cls.nodes_folder()
+        folder.mkdir(parents=True, exist_ok=True)
         cwl_filename = folder / f'{name}.{cls.DEFAULT_CWL_EXTENSION}'
         meta_filename = folder / f'{name}.{cls.DEFAULT_META_EXTENSION}'
 
