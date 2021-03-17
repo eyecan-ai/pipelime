@@ -207,6 +207,10 @@ class CwlTemplate(Spook):
         return Path(self._script).absolute().resolve()
 
     @property
+    def command(self):
+        return self._cmd
+
+    @property
     def template(self):
         return self._template
 
@@ -278,18 +282,18 @@ class CwlTemplate(Spook):
         :return: the click command
         :rtype: Union[click.Command, None]
         """
-
-        spec = importlib.util.spec_from_file_location(script.stem, script)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        cmd = None
-        for x in dir(module):
-            x = getattr(module, x)
-            if isinstance(x, click.core.Command):
-                cmd = x
-                break
-
-        assert cmd is not None, "the script doesn't contain any click.Command"
+        try:
+            spec = importlib.util.spec_from_file_location(script.stem, script)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            cmd = None
+            for x in dir(module):
+                x = getattr(module, x)
+                if isinstance(x, click.core.Command):
+                    cmd = x
+                    break
+        except Exception:
+            cmd = None
 
         return cmd
 
@@ -455,6 +459,7 @@ class CwlNode:
         self._name = name
         self._cwl_path = cwl_path
         self._cwl_template = cwl_template
+        self._is_valid = cwl_template.command is not None
 
     @property
     def name(self):
@@ -467,6 +472,10 @@ class CwlNode:
     @property
     def cwl_template(self):
         return self._cwl_template
+
+    @property
+    def is_valid(self):
+        return self._is_valid
 
 
 class CwlWorkflowTemplate(object):
