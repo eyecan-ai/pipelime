@@ -1,0 +1,12 @@
+import numpy as np
+from schema import And, Optional
+
+deep = True
+schema = {
+    'cfg': object,
+    'numbers': object,
+    'image': np.ndarray,
+    'image_mask': And(np.ndarray, lambda x: len(x.shape) >= 2),
+    'image_maskinv': And(np.ndarray, lambda x: x.shape[0] == x.shape[1]),
+    Optional(str): object
+}

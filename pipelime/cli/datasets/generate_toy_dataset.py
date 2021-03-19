@@ -1,10 +1,5 @@
 
-import numpy as np
-import cv2
 import click
-from pathlib import Path
-import yaml
-import json
 from pipelime.tools.toydataset import ToyDatasetGenerator
 
 

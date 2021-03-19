@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from collections.abc import MutableMapping
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Hashable, Sequence
+from typing import Hashable, Sequence
 
 
 @dataclass
@@ -46,6 +46,10 @@ class Sample(MutableMapping):
     def id(self):
         return self._id
 
+    @id.setter
+    def id(self, v: Hashable):
+        self._id = v
+
     @abstractmethod
     def rename(self, old_key: str, new_key: str):
         pass
@@ -57,6 +61,10 @@ class Sample(MutableMapping):
     @abstractmethod
     def metaitem(self, key: any) -> MetaItem:
         pass
+
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self.keys()}
 
 
 class GroupedSample(Sample):
@@ -153,7 +161,7 @@ class PlainSample(Sample):
         return str(self._data)
 
     def copy(self):
-        return PlainSample(data=self._data.copy())
+        return PlainSample(data=self._data.copy(), id=self.id)
 
     def rename(self, old_key: str, new_key: str):
         if new_key not in self._data and old_key in self._data:
@@ -183,8 +191,15 @@ class FileSystemSample(Sample):
             for k in self.keys():
                 d = self[k]
 
+    @property
+    def filesmap(self):
+        return self._filesmap
+
+    def is_cached(self, key) -> bool:
+        return key in self._cached
+
     def __getitem__(self, key):
-        if key not in self._cached:
+        if not self.is_cached(key):
             self._cached[key] = FSToolkit.load_data(self._filesmap[key])
         return self._cached[key]
 
@@ -204,7 +219,7 @@ class FileSystemSample(Sample):
         return len(self._filesmap)
 
     def copy(self):
-        newsample = FileSystemSample(self._filesmap)
+        newsample = FileSystemSample(self._filesmap, id=self.id)
         newsample._cached = self._cached.copy()
         return newsample
 
@@ -219,6 +234,10 @@ class FileSystemSample(Sample):
             return FilesystemItem(self._filesmap[key])
         else:
             return MemoryItem()
+
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self._filesmap.keys()}
 
 
 class SamplesSequence(Sequence):
@@ -238,3 +257,21 @@ class SamplesSequence(Sequence):
             raise IndexError
 
         return self._samples[idx]
+
+    def is_normalized(self) -> bool:
+        """ Checks for normalization i.e. each sample has to contain same keys.
+        !!This method could be very slow if samples are lazy!!
+
+        :return: TRUE if sequence is normalized
+        :rtype: bool
+        """
+
+        keys_set = None
+        for sample in self:
+            if keys_set is None:
+                keys_set = set(sample.keys())
+            else:
+                new_keys_set = set(sample.keys())
+                if new_keys_set != keys_set:
+                    return False
+        return True

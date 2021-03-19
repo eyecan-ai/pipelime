@@ -1,8 +1,7 @@
 import albumentations as A
 from abc import ABC, abstractmethod
 from typing import Dict, Hashable, Sequence, Union
-
-from schema import Schema
+from pipelime.factories import Bean, BeanFactory
 from pipelime.sequences.samples import Sample
 
 
@@ -24,61 +23,39 @@ class SampleStage(ABC):
     ]:
         pass
 
-    @classmethod
-    @abstractmethod
-    def stage_name(cls) -> str:
-        raise NotImplementedError()
+
+@BeanFactory.make_serializable
+class StageCompose(SampleStage, Bean):
+
+    def __init__(self, stages: Sequence[SampleStage]):
+        super().__init__()
+        self._stages = stages
+
+    def __call__(self, x: Sample) -> Sample:
+        out = x
+        for s in self._stages:
+            out = s(out)
+        return out
 
     @classmethod
-    @abstractmethod
-    def factory_schema(cls) -> Schema:
-        raise NotImplementedError()
+    def bean_schema(cls) -> dict:
+        return {
+            'stages': list
+        }
 
     @classmethod
-    def build_from_dict(cls, d: dict):
-        cls.factory_schema().validate(d)
+    def from_dict(cls, d: dict):
+        stages = [BeanFactory.create(s) for s in d['stages']]
+        return StageCompose(stages=stages)
 
-    @abstractmethod
-    def to_dict(self) -> dict:
-        pass
-
-
-class SampleStagesFactory(object):
-
-    FACTORY_MAP: Dict[str, SampleStage] = {}
-
-    @classmethod
-    def generic_op_schema(cls) -> Schema:
-        return Schema({
-            'type': str,
-            'options': dict
-        })
-
-    @classmethod
-    def register_stage(cls, stage: SampleStage):
-        cls.FACTORY_MAP[stage.__name__] = stage
-
-    @classmethod
-    def create(cls, cfg: dict) -> SampleStage:
-        cls.generic_op_schema().validate(cfg)
-        _t = cls.FACTORY_MAP[cfg['type']]
-        return _t.build_from_dict(cfg)
+    def to_dict(self):
+        return {
+            'stages': [s.serialize() for s in self._stages]
+        }
 
 
-def register_stage_factory(s: SampleStage) -> SampleStage:
-    """ Register a SampleStage to the factory
-
-    :param s: stage to register
-    :type s: SampleStage
-    :return: the same stage. It is intent to be used as decorator
-    :rtype: SampleStage
-    """
-    SampleStagesFactory.register_stage(s)
-    return s
-
-
-@register_stage_factory
-class StageIdentity(SampleStage):
+@BeanFactory.make_serializable
+class StageIdentity(SampleStage, Bean):
 
     def __init__(self):
         super().__init__()
@@ -87,30 +64,19 @@ class StageIdentity(SampleStage):
         return x
 
     @classmethod
-    def stage_name(cls) -> str:
-        return StageIdentity.__name__
+    def bean_schema(cls) -> dict:
+        return {}
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.stage_name(),
-            'options': {}
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
+    def from_dict(cls, d: dict):
         return StageIdentity()
 
-    def to_dict(self) -> dict:
-        return {
-            'type': self.stage_name(),
-            'options': {}
-        }
+    def to_dict(self):
+        return {}
 
 
-@register_stage_factory
-class StageRemap(SampleStage):
+@BeanFactory.make_serializable
+class StageRemap(SampleStage, Bean):
 
     def __init__(self, remap: dict, remove_missing: bool = True):
         """ Remaps keys in sample
@@ -137,39 +103,66 @@ class StageRemap(SampleStage):
         return out
 
     @classmethod
-    def stage_name(cls) -> str:
-        return StageRemap.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'remap': dict,
+            'remove_missing': bool
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.stage_name(),
-            'options': {
-                'remap': dict,
-                'remove_missing': bool
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
+    def from_dict(cls, d: dict):
         return StageRemap(
-            remap=d['options']['remap'],
-            remove_missing=d['options']['remove_missing']
+            remap=d['remap'],
+            remove_missing=d['remove_missing']
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
-            'type': self.stage_name(),
-            'options': {
-                'remap': self._remap,
-                'remove_missing': self._remove_missing
-            }
+            'remap': self._remap,
+            'remove_missing': self._remove_missing
         }
 
 
-@register_stage_factory
-class StageAugmentations(SampleStage):
+@BeanFactory.make_serializable
+class StageKeysFilter(SampleStage, Bean):
+
+    def __init__(self, keys: list, negate: bool = False):
+        """ Filter sample keys
+
+        :param keys: list of keys to preserve
+        :type keys: list
+        :param negate: TRUE to delete input keys, FALSE delete all but keys
+        :type negate: bool
+        """
+        super().__init__()
+        self._keys = keys
+        self._negate = negate
+
+    def __call__(self, x: Sample) -> Sample:
+
+        out: Sample = x.copy()
+        for k in x.keys():
+            condition = (k in self._keys) if self._negate else (k not in self._keys)
+            if condition:
+                del out[k]
+        return out
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'keys': list,
+            'negate': bool
+        }
+
+    def to_dict(self):
+        return {
+            'keys': self._keys,
+            'negate': self._negate
+        }
+
+
+@BeanFactory.make_serializable
+class StageAugmentations(SampleStage, Bean):
 
     def __init__(self, transform_cfg: dict, targets: dict):
         super().__init__()
@@ -200,32 +193,21 @@ class StageAugmentations(SampleStage):
             raise Exception(f'Stage[{self.__class__.__name__}] -> {e}')
 
     @classmethod
-    def stage_name(cls) -> str:
-        return StageAugmentations.__name__
+    def bean_schema(cls) -> dict:
+        return {
+            'transform_cfg': dict,
+            'targets': dict
+        }
 
     @classmethod
-    def factory_schema(cls) -> Schema:
-        return Schema({
-            'type': cls.stage_name(),
-            'options': {
-                'transform_cfg': dict,
-                'targets': dict
-            }
-        })
-
-    @classmethod
-    def build_from_dict(cls, d: dict):
-        super().build_from_dict(d)
+    def from_dict(cls, d: dict):
         return StageAugmentations(
-            transform_cfg=d['options']['transform_cfg'],
-            targets=d['options']['targets']
+            transform_cfg=d['transform_cfg'],
+            targets=d['targets']
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         return {
-            'type': self.stage_name(),
-            'options': {
-                'transform_cfg': self._transform_cfg,
-                'targets': self._targets
-            }
+            'transform_cfg': self._transform_cfg,
+            'targets': self._targets
         }

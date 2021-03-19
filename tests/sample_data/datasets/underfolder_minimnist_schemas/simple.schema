@@ -1,0 +1,9 @@
+from schema import Optional
+
+deep = False
+schema = {
+    'cfg': object,
+    'numbers': object,
+    'image': object,
+    Optional(str): object
+}

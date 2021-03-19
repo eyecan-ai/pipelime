@@ -1,3 +1,4 @@
+
 from pathlib import Path
 from pipelime.tools.toydataset import ToyDatasetGenerator
 from pipelime.sequences.samples import PlainSample, SamplesSequence
@@ -19,6 +20,7 @@ def plain_samples_generator():
             data = {
                 'idx': f'{namespace}{i}',
                 'number': i,
+                'reverse_number': N - i,
                 'fraction': i / 1000.,
                 'odd': i % 2 == 1,
                 'data0': np.random.uniform(0.0, 1.0, (64, 64, 3)) if heavy_data else 1.64643,
