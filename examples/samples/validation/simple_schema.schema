@@ -1,0 +1,8 @@
+from schema import Optional
+
+deep = False
+schema = {
+    'counter': object,
+    'name': object,
+    Optional(str): object
+}

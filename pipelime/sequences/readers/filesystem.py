@@ -23,7 +23,8 @@ class UnderfolderReaderTemplate(object):
 class UnderfolderReader(BaseReader):
     DATA_SUBFOLDER = 'data'
 
-    def __init__(self, folder: str, copy_root_files: bool = True) -> None:
+    def __init__(self, folder: str, copy_root_files: bool = True, lazy_samples: bool = True) -> None:
+
         self._folder = Path(folder)
         self._copy_root_files = copy_root_files
         self._datafolder = self._folder / self.DATA_SUBFOLDER
@@ -46,7 +47,7 @@ class UnderfolderReader(BaseReader):
             if self._copy_root_files:
                 data.update(self._root_data)
 
-            sample = FileSystemSample(data_map=data, lazy=True, id=self._ids[idx])
+            sample = FileSystemSample(data_map=data, lazy=lazy_samples, id=self._ids[idx])
             samples.append(sample)
 
         super().__init__(samples=samples)

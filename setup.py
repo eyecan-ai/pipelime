@@ -32,7 +32,7 @@ setup(
     description="data pipeline 101",
     entry_points={
         'console_scripts': [
-            'pipelime=pipelime.cli:main',
+            'pipelime=pipelime.cli.main:pipelime',
         ],
     },
     install_requires=requirements,

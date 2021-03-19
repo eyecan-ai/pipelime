@@ -1,7 +1,7 @@
 from pipelime.sequences.samples import SamplesSequence
 
 
-class TestOperationSum(object):
+class TestSequenceNormalized(object):
 
     def test_normalized(self, plain_samples_sequence_generator):
 
