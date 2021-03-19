@@ -2,7 +2,7 @@
 
 __author__ = "eyecan"
 __email__ = 'daniele.degregorio@eyecan.ai'
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 
 # Import transforms in order to register classes for serialization
