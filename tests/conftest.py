@@ -51,6 +51,28 @@ def filesystem_datasets(data_folder):
     return {
         'minimnist_underfolder': {
             'folder': Path(data_folder) / 'datasets' / 'underfolder_minimnist',
-            'type': 'Undefolder'
+            'type': 'Undefolder',
+            'schemas': {
+                'simple': {
+                    'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'simple.schema',
+                    'valid': True,
+                    'should_pass': True
+                },
+                'deep': {
+                    'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'deep.schema',
+                    'valid': True,
+                    'should_pass': True
+                },
+                'invalid': {
+                    'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'invalid.schema',
+                    'valid': True,
+                    'should_pass': False
+                },
+                'bad_file': {
+                    'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'bad.schema',
+                    'valid': False,
+                    'should_pass': False
+                }
+            }
         }
     }

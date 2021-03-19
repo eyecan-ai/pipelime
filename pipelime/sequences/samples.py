@@ -62,6 +62,10 @@ class Sample(MutableMapping):
     def metaitem(self, key: any) -> MetaItem:
         pass
 
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self.keys()}
+
 
 class GroupedSample(Sample):
 
@@ -230,6 +234,10 @@ class FileSystemSample(Sample):
             return FilesystemItem(self._filesmap[key])
         else:
             return MemoryItem()
+
+    @property
+    def skeleton(self) -> dict:
+        return {x: None for x in self._filesmap.keys()}
 
 
 class SamplesSequence(Sequence):

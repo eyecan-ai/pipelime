@@ -1,0 +1,9 @@
+from schema import And
+import numpy as np
+
+deep = True
+schema = {
+    'counter': int,
+    'name': str,
+    'data': And(np.ndarray, lambda x: len(x.shape) == 3)
+}

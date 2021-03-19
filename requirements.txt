@@ -8,3 +8,4 @@ imageio
 pydash
 Pillow>=8.0.0
 pygraphviz
+appdirs
