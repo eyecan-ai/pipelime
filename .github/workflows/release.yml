@@ -18,6 +18,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install graphviz
+      run: sudo apt-get install graphviz libgraphviz-dev pkg-config
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
