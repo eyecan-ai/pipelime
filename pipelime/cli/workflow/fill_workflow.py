@@ -11,7 +11,7 @@ def fill(workflow, output_filename, folder):
     from pipelime.workflow.cwl import CwlWorkflowTemplate
 
     workflow_template = CwlWorkflowTemplate.from_file(workflow)
-    workflow_template = CwlNodesManager.fill_workflow(workflow_template)
+    workflow_template = CwlNodesManager.fill_workflow(workflow_template, folder=folder)
     workflow_template.dumps(output_filename)
 
 
