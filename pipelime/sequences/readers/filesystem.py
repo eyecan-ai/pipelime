@@ -79,6 +79,11 @@ class UnderfolderReader(BaseReader):
         else:
             None
 
+    def flush(self):
+        """ Clear cache for each internal FileSystemSample """
+        for sample in self:
+            sample.flush()
+
     @classmethod
     def bean_schema(cls) -> dict:
         return {

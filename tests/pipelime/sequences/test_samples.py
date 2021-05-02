@@ -83,8 +83,7 @@ class TestFilesystemSample(object):
                 temp = sample[key]
                 assert sample.is_cached(key)
 
-        for sample in reader:
-            sample.flush()
+        reader.flush()
 
         for sample in reader:
             sample: FileSystemSample

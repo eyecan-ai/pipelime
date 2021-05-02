@@ -2,6 +2,7 @@ import click
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.sequences.operations import OperationFilterByScript
+import rich
 
 
 @click.command('filter_by_script', help='Filter UnderfolderReader by external script')
@@ -25,6 +26,7 @@ def filter_by_script(dataset, output, script):
     )
     out = op(reader)
     writer(out)
+    rich.print(f"Removed [red]{len(out) - len(reader)}[/red] samples!")
 
 
 if __name__ == '__main__':
