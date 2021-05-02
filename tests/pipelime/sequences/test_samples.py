@@ -70,6 +70,27 @@ class TestFilesystemSample(object):
 
         del sample['_NEW_IMAGE_']
 
+    def test_flush(self, filesystem_datasets, tmp_path_factory):
+
+        dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
+
+        reader = UnderfolderReader(folder=dataset_folder)
+
+        temp = None
+        for sample in reader:
+            sample: FileSystemSample
+            for key in sample.keys():
+                temp = sample[key]
+                assert sample.is_cached(key)
+
+        for sample in reader:
+            sample.flush()
+
+        for sample in reader:
+            sample: FileSystemSample
+            for key in sample.keys():
+                assert not sample.is_cached(key)
+
     def test_filesystem_sample_nonlazy(self, filesystem_datasets, tmp_path_factory):
 
         dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']

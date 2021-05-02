@@ -632,3 +632,47 @@ class OperationFilterKeys(SequenceOperation, Bean):
             'keys': self._keys,
             'negate': self._negate
         }
+
+
+@BeanFactory.make_serializable
+class OperationFilterByScript(SequenceOperation, Bean):
+
+    def __init__(self, path: str) -> None:
+        """ Filter sequence elements based on custom python script. The script has to contain a function
+        named `check_sample` with signature `(x: Sample, s: SampleSequence) -> bool` .
+
+        :param path: python script path
+        :type path: str
+        """
+        self._path = path
+
+    def input_port(self):
+        return OperationPort(SamplesSequence)
+
+    def output_port(self):
+        return OperationPort(SamplesSequence)
+
+    def __call__(self, x: SamplesSequence) -> SamplesSequence:
+        super().__call__(x)
+        filtered_samples = []
+        for sample in x.samples:
+            if dq.match(sample, self._query):
+                filtered_samples.append(sample)
+        return SamplesSequence(samples=filtered_samples)
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {
+            'query': str
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationFilterByScript(
+            query=d['query']
+        )
+
+    def to_dict(self):
+        return {
+            'query': self._query
+        }
