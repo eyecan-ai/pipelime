@@ -2,9 +2,11 @@ click>=7.1.2
 rich>=9.9.0
 dictquery
 schema
+numpy
 albumentations>=0.5.2
 choixe
 imageio
 pydash
 Pillow>=8.0.0
 appdirs
+loguru

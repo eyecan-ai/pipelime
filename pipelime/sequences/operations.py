@@ -1,3 +1,5 @@
+from loguru import logger
+import loguru
 from pipelime.sequences.stages import StageKeysFilter
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorUUID
 from pipelime.factories import Bean, BeanFactory
@@ -5,7 +7,7 @@ import pydash as py_
 import dictquery as dq
 import numpy as np
 import random
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
 from abc import ABC, abstractmethod
 from schema import Or, Schema
@@ -637,14 +639,33 @@ class OperationFilterKeys(SequenceOperation, Bean):
 @BeanFactory.make_serializable
 class OperationFilterByScript(SequenceOperation, Bean):
 
-    def __init__(self, path: str) -> None:
-        """ Filter sequence elements based on custom python script. The script has to contain a function
-        named `check_sample` with signature `(x: Sample, s: SampleSequence) -> bool` .
+    def __init__(self, path_or_func: Union[str, Callable]) -> None:
+        """ Filter sequence elements based on custom python script (or callable). The script has to contain a function
+        named `check_sample` with signature `(sample: Sample, sequence: SampleSequence) -> bool` .
 
-        :param path: python script path
-        :type path: str
+        :param path_or_func: python script path, or can be a callable function for On-The-Fly usage
+        :type path_or_func: Union[str, Callable]
         """
-        self._path = path
+        if isinstance(path_or_func, str):
+            self._path = path_or_func
+            self._check_sample = lambda x: True
+            if len(self._path) > 0:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("check_sample", self._path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self._check_sample = module.check_sample
+                assert self._check_sample is not None
+            else:
+                logger.warning(f'The input script function is empty! Operation performs no checks!')
+
+            self._serializable = True
+        elif isinstance(path_or_func, Callable):
+            self._path = ''
+            self._check_sample = path_or_func
+            self._serializable = False
+        else:
+            raise NotImplementedError(f'Only str|Callable are allowed as input script ')
 
     def input_port(self):
         return OperationPort(SamplesSequence)
@@ -656,23 +677,24 @@ class OperationFilterByScript(SequenceOperation, Bean):
         super().__call__(x)
         filtered_samples = []
         for sample in x.samples:
-            if dq.match(sample, self._query):
+            if self._check_sample(sample, x):
                 filtered_samples.append(sample)
         return SamplesSequence(samples=filtered_samples)
 
     @classmethod
     def bean_schema(cls) -> dict:
         return {
-            'query': str
+            'path_or_func': str
         }
 
     @classmethod
     def from_dict(cls, d: dict):
         return OperationFilterByScript(
-            query=d['query']
+            path_or_func=d['path_or_func']
         )
 
     def to_dict(self):
+        logger.warning("Operation has on-the-fly mode! No script serialized!")
         return {
-            'query': self._query
+            'path_or_func': self._path
         }

@@ -7,7 +7,7 @@ import pytest
 import rich
 from pipelime.sequences.samples import SamplesSequence
 from pipelime.sequences.operations import (
-    OperationDict2List, OperationFilterByQuery, OperationFilterKeys, OperationGroupBy,
+    OperationDict2List, OperationFilterByQuery, OperationFilterByScript, OperationFilterKeys, OperationGroupBy,
     OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
     OperationSplitByQuery, OperationSplits, OperationSubsample,
     OperationSum, SequenceOperation
@@ -437,3 +437,45 @@ class TestOperationGroupBy(object):
                         assert len(out) == 1
                     else:
                         assert len(out) == 0
+
+
+class TestOperationFilterByScript(object):
+
+    def test_filter_by_script(self, plain_samples_sequence_generator, tmpdir):
+
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N)
+
+        # Bad filename
+        with pytest.raises(Exception):
+            op = OperationFilterByScript(path='/tmp/script_IMPOSSIBLE_NAME@@!!')
+
+        func = ''
+        func += "import numpy as np\n"
+        func += "def check_sample(sample, sequence):\n"
+        func += " return np.array(sample['number']) % 2 == 0\n"
+
+        script_path = tmpdir.join('custom_script.py')
+        with open(script_path, 'w') as f:
+            f.write(func)
+
+        op = OperationFilterByScript(path_or_func=str(script_path))
+        _plug_test(op)
+        out = op(dataset)
+
+        assert len(out) < len(dataset)
+
+    def test_filter_by_script_onthefly(self, plain_samples_sequence_generator, tmpdir):
+
+        N = 128
+        dataset = plain_samples_sequence_generator('d0_', N)
+
+        def check_sample_onthefly(sample, sequence):
+            import numpy as np
+            return np.array(sample['number']) % 2 == 0
+
+        op = OperationFilterByScript(path_or_func=check_sample_onthefly)
+        _plug_test(op)
+        out = op(dataset)
+
+        assert len(out) < len(dataset)
