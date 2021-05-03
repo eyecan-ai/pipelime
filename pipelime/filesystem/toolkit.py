@@ -12,6 +12,11 @@ from collections import defaultdict
 
 class FSToolkit(object):
 
+    # Default imageio options for each image format
+    OPTIONS = {
+        'png': {'compress_level': 4},
+    }
+
     # Declare TREE structure
     @classmethod
     def tree(cls):
@@ -133,11 +138,10 @@ class FSToolkit(object):
 
     @classmethod
     def store_data(cls, filename: str, data: any):
-
         extension = cls.get_file_extension(filename)
-
         if DataCoding.is_image_extension(extension):
-            imageio.imwrite(filename, data)
+            options = cls.OPTIONS.get(extension, {})
+            imageio.imwrite(filename, data, **options)
         elif DataCoding.is_text_extension(extension):
             np.savetxt(filename, data)
         elif DataCoding.is_numpy_extension(extension):
