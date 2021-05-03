@@ -185,8 +185,11 @@ class TestPipes(object):
         rich.print(graph.serialize())
         graph = BeanFactory.create(graph.serialize())
 
-        f, a = graph.draw_to_file()
-        print(f, a)
+        try:
+            f, a = graph.draw_to_file()
+            print(f, a)
+        except ImportError:
+            pytest.skip(msg='No pygraphviz module found!')
 
         graph.execute()
 
