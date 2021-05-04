@@ -4,7 +4,7 @@ from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.writers.base import BaseWriter
 from pipelime.tools.idgenerators import IdGeneratorUUID
 import tempfile
-from networkx.drawing.nx_agraph import to_agraph
+
 from pipelime.factories import Bean, BeanFactory
 import networkx as nx
 from schema import Or
@@ -273,31 +273,37 @@ class NodeGraph(Bean):
         }
 
     def draw_to_file(self, filename: str = None):
-        A = to_agraph(self._graph)
-        for i, node in enumerate(A.iternodes()):
-            print(i, node)
-            if node in self._nodes_map:
-                ref = self._nodes_map[node]
-                if isinstance(ref, OperationNode):
-                    node.attr['label'] = self._nodes_map[node].operation.__class__.__name__
-                    node.attr['style'] = 'filled'
-                    node.attr['fillcolor'] = '#ffd54f'
-                    node.attr['shape'] = 'box'
-                elif isinstance(ref, ReaderNode):
-                    node.attr['label'] = self._nodes_map[node].reader.__class__.__name__
-                    node.attr['style'] = 'filled'
-                    node.attr['fillcolor'] = '#009688'
-                    node.attr['shape'] = 'box'
-                elif isinstance(ref, WriterNode):
-                    node.attr['label'] = self._nodes_map[node].writer.__class__.__name__
-                    node.attr['style'] = 'filled'
-                    node.attr['fillcolor'] = '#9c27b0'
-                    node.attr['shape'] = 'box'
 
-            else:
-                node.attr['shape'] = 'circle'
+        try:
+            from networkx.drawing.nx_agraph import to_agraph
+            A = to_agraph(self._graph)
+            for i, node in enumerate(A.iternodes()):
+                print(i, node)
+                if node in self._nodes_map:
+                    ref = self._nodes_map[node]
+                    if isinstance(ref, OperationNode):
+                        node.attr['label'] = self._nodes_map[node].operation.__class__.__name__
+                        node.attr['style'] = 'filled'
+                        node.attr['fillcolor'] = '#ffd54f'
+                        node.attr['shape'] = 'box'
+                    elif isinstance(ref, ReaderNode):
+                        node.attr['label'] = self._nodes_map[node].reader.__class__.__name__
+                        node.attr['style'] = 'filled'
+                        node.attr['fillcolor'] = '#009688'
+                        node.attr['shape'] = 'box'
+                    elif isinstance(ref, WriterNode):
+                        node.attr['label'] = self._nodes_map[node].writer.__class__.__name__
+                        node.attr['style'] = 'filled'
+                        node.attr['fillcolor'] = '#9c27b0'
+                        node.attr['shape'] = 'box'
 
-        A.layout('dot')
-        fname = f'{tempfile.NamedTemporaryFile().name}.png' if filename is None else filename
-        A.draw(fname)
-        return A, fname
+                else:
+                    node.attr['shape'] = 'circle'
+
+            A.layout('dot')
+            fname = f'{tempfile.NamedTemporaryFile().name}.png' if filename is None else filename
+            A.draw(fname)
+            return A, fname
+
+        except ImportError:
+            return None, None
