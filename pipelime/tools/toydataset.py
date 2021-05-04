@@ -98,7 +98,8 @@ class ToyDatasetGenerator(object):
         return {
             'rgb': np.array(image),
             'mask': np.array(mask),
-            'instances': np.array(instances)
+            'instances': np.array(instances),
+            'invmask': np.logical_not(np.array(mask)).astype(np.float32)
         }
 
     def generate_image_sample(self, size, max_label=5, objects_number_range=[1, 5]):
@@ -152,6 +153,7 @@ class ToyDatasetGenerator(object):
             image_name = f'{name}_image.png'
             mask_name = f'{name}_mask.png'
             instances_name = f'{name}_inst.png'
+            inverse_mask_name = f'{name}_invmask.exr'
             metadata_name = f'{name}_metadata.yml'
             keypoints_name = f'{name}_keypoints.txt'
             bboxes_name = f'{name}_bboxes.npy'
@@ -159,6 +161,7 @@ class ToyDatasetGenerator(object):
             imageio.imwrite(str(output_folder / image_name), sample['rgb'])
             imageio.imwrite(str(output_folder / mask_name), sample['mask'])
             imageio.imwrite(str(output_folder / instances_name), sample['instances'])
+            imageio.imwrite(str(output_folder / inverse_mask_name), sample['invmask'])
             np.savetxt(str(output_folder / keypoints_name), sample['keypoints'])
             np.save(str(output_folder / bboxes_name), sample['bboxes'])
 
