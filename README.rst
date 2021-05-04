@@ -37,6 +37,7 @@ The **Underfolder** format is one of the pipelime dataset formats: i.e. a flexib
 .. image:: docs/images/underfolder.png
   :width: 400
   :align: center
+  :alt: underfolder structure
 
 An Underfolder **dataset** is a collection of samples. A **sample** is a collection of items. 
 An **item** is a unitary block of data, it can be a generic tensor (e.g. a multi-channel image, 
@@ -49,6 +50,7 @@ will act as “global” items injected into each sample.
 .. image:: docs/images/naming.png
   :width: 400
   :align: center
+  :alt: naming convention
 
 Items are named using the following naming convention:
 
@@ -121,8 +123,8 @@ If for any reason it is unable to retrieve the original extension, it will use *
 serialize the object.
 
 If you don't want to use pickle, you can choose a **custom extension** for each item name.
-You can also choose which items are going to be saved as **root files** (if they are the same 
-across every sample).
+You can also choose which items are going to be saved as **root files** (if the contained data 
+is the same for all samples).
 
 .. code-block:: python
 
