@@ -147,5 +147,3 @@ graph = {
 graph: NodeGraph = BeanFactory.create(graph)
 
 graph.execute()
-# f, a = graph.draw_to_file()
-# print(f, a)

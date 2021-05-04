@@ -66,6 +66,9 @@ class Sample(MutableMapping):
     def skeleton(self) -> dict:
         return {x: None for x in self.keys()}
 
+    def flush(self):
+        pass
+
 
 class GroupedSample(Sample):
 
@@ -238,6 +241,11 @@ class FileSystemSample(Sample):
     @property
     def skeleton(self) -> dict:
         return {x: None for x in self._filesmap.keys()}
+
+    def flush(self):
+        keys = list(self._cached.keys())
+        for k in keys:
+            del self._cached[k]
 
 
 class SamplesSequence(Sequence):

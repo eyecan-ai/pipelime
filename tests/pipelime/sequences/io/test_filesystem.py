@@ -1,5 +1,6 @@
 
 
+from itertools import product
 import uuid
 import numpy as np
 from pathlib import Path
@@ -136,6 +137,39 @@ class TestUnderfolderReaderWriterTemplating(object):
             zfill=reader.get_filesystem_template().idx_length
         )
         writer(filtered_reader)
+
+    def test_writer_copy_correct_extension(self, toy_dataset_small, tmpdir_factory):
+        
+        folder = toy_dataset_small['folder']
+        keys = toy_dataset_small['expected_keys']
+
+        for lazy_samples, copy_files, use_symlinks in product([True, False], repeat=3):
+            reader = UnderfolderReader(folder=folder, lazy_samples=lazy_samples)
+            extensions_map = reader.get_filesystem_template().extensions_map
+            changed_keys = []
+            old_ext = 'png'
+            new_ext = 'jpg'
+            for k, ext in extensions_map.items():
+                if ext == old_ext:
+                    extensions_map[k] = new_ext
+                    changed_keys.append(k)
+
+            writer_folder = Path(tmpdir_factory.mktemp('writer_folder'))
+            writer = UnderfolderWriter(
+                folder=writer_folder,
+                extensions_map=extensions_map,
+                root_files_keys=reader.get_filesystem_template().root_files_keys,
+                zfill=reader.get_filesystem_template().idx_length,
+                copy_files=copy_files,
+                use_symlinks=use_symlinks
+            )
+            writer(reader)
+
+            # if the extension is changed, it should have cached the item
+            # even if the writer has copy_files=True
+            for sample in reader:
+                for k in changed_keys:
+                    assert sample.is_cached(k)
 
 
 class TestUnderfolderReaderWriterConsistency(object):

@@ -106,11 +106,12 @@ class UnderfolderWriter(BaseWriter):
                 item = sample.metaitem(key)
                 if not sample.is_cached(key) and isinstance(item, FilesystemItem):
                     path = item.source()
-                    if not self._use_symlinks:
-                        shutil.copy(path, output_file)
-                    else:
-                        os.symlink(path, output_file)
-                    return
+                    if path.suffix == output_file.suffix:
+                        if not self._use_symlinks:
+                            shutil.copy(path, output_file)
+                        else:
+                            os.symlink(path, output_file)
+                        return
 
         # Default action
         FSToolkit.store_data(output_file, sample[key])
