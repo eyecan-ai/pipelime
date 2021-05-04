@@ -1,11 +1,10 @@
-import yaml
 import json
 from pathlib import Path
 from typing import Sequence
 import numpy as np
 from PIL import Image, ImageDraw
 import uuid
-import imageio
+from pipelime.filesystem.toolkit import FSToolkit
 
 
 class ToyDatasetGenerator(object):
@@ -158,11 +157,10 @@ class ToyDatasetGenerator(object):
             keypoints_name = f'{name}_keypoints.txt'
             bboxes_name = f'{name}_bboxes.npy'
 
-            imageio.imwrite(str(output_folder / image_name), sample['rgb'])
-            imageio.imwrite(str(output_folder / mask_name), sample['mask'])
-            imageio.imwrite(str(output_folder / instances_name), sample['instances'])
-            imageio.imwrite(str(output_folder / inverse_mask_name), sample['invmask'])
-            np.savetxt(str(output_folder / keypoints_name), sample['keypoints'])
-            np.save(str(output_folder / bboxes_name), sample['bboxes'])
-
-            yaml.safe_dump(metadata, open(str(output_folder / metadata_name), 'w'))
+            FSToolkit.store_data(str(output_folder / image_name), sample['rgb'])
+            FSToolkit.store_data(str(output_folder / mask_name), sample['mask'])
+            FSToolkit.store_data(str(output_folder / instances_name), sample['instances'])
+            FSToolkit.store_data(str(output_folder / inverse_mask_name), sample['invmask'])
+            FSToolkit.store_data(str(output_folder / keypoints_name), sample['keypoints'])
+            FSToolkit.store_data(str(output_folder / bboxes_name), sample['bboxes'])
+            FSToolkit.store_data(str(output_folder / metadata_name), metadata)
