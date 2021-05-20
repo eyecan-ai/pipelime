@@ -3,8 +3,8 @@
 import click
 
 
-@click.command('operation_sum', help='Sum input underfolders')
-@click.option('-i', '--input_folders', required=True, multiple=True, type=str, help='Input Underfolder')
+@click.command('sum', help='Sum input underfolders')
+@click.option('-i', '--input_folders', required=True, multiple=True, type=str, help='Input Underfolder [multiple]')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder')
 def operation_sum(input_folders, output_folder):
 
@@ -33,7 +33,7 @@ def operation_sum(input_folders, output_folder):
         writer(output_dataset)
 
 
-@click.command('operation_sum', help='Subsample input underfolder')
+@click.command('subsample', help='Subsample input underfolder')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-f', '--factor', required=True, type=float, help='Subsamplig factor. INT (1,inf) or FLOAT [0.0,1.0]')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder')
@@ -60,7 +60,7 @@ def operation_subsample(input_folder, factor, output_folder):
     writer(output_dataset)
 
 
-@click.command('operation_shuffle', help='Shuffle input underfolder')
+@click.command('shuffle', help='Shuffle input underfolder')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder')
 @click.option('-s', '--seed', default=-1, type=int, help='Random seed')
@@ -87,9 +87,9 @@ def operation_shuffle(input_folder, output_folder, seed):
     writer(output_dataset)
 
 
-@click.command('operation_split', help='Split input underfolder')
+@click.command('split', help='Split input underfolder')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
-@click.option('-s', '--splits', required=True, multiple=True, nargs=2, help='Splits map')
+@click.option('-s', '--splits', required=True, multiple=True, nargs=2, help='Splits map, pairs (path, percentage) [multple]')
 def operation_split(input_folder, splits):
 
     from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -121,7 +121,7 @@ def operation_split(input_folder, splits):
         writer(op_reindex(dataset))
 
 
-@click.command('operation_filterbyquery', help='Filter input underfolder by query')
+@click.command('filter_by_query', help='Filter input underfolder by query')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-q', '--query', required=True, type=str, help='Filtering query')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
@@ -148,7 +148,7 @@ def operation_filterbyquery(input_folder, query, output_folder):
     writer(output_dataset)
 
 
-@click.command('operation_filterbyquery', help='Filter input underfolder by query')
+@click.command('split_by_query', help='Filter input underfolder by query')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-q', '--query', required=True, type=str, help='Filtering query')
 @click.option('-o1', '--output_folder_1', required=True, type=str, help='Output Underfolder for positive matches')
@@ -182,7 +182,7 @@ def operation_splitbyquery(input_folder, query, output_folder_1, output_folder_2
         writer(op_reindex(output_dataset))
 
 
-@click.command('operation_filterbyquery', help='Filter input underfolder by query')
+@click.command('filter_by_script', help='Filter input underfolder by query')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-s', '--script', required=True, type=str, help='Filtering python script')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
@@ -209,9 +209,9 @@ def operation_filterbyscript(input_folder, script, output_folder):
     writer(output_dataset)
 
 
-@click.command('operation_filterkeys', help='Filter input underfolder keys')
+@click.command('filter_keys', help='Filter input underfolder keys')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
-@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys')
+@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys [multiple]')
 @click.option('--negate/--no-negate', required=False, type=bool, help='Negate filtering effets (i.e. all but selected keys)')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
 def operation_filterkeys(input_folder, keys, negate, output_folder):
@@ -237,9 +237,9 @@ def operation_filterkeys(input_folder, keys, negate, output_folder):
     writer(output_dataset)
 
 
-@click.command('operation_orderby', help='Order input underfolder samples')
+@click.command('order_by', help='Order input underfolder samples')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
-@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys')
+@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys [multiple]')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
 def operation_orderby(input_folder, keys, output_folder):
 
@@ -264,7 +264,7 @@ def operation_orderby(input_folder, keys, output_folder):
     writer(output_dataset)
 
 
-@click.command('operation_groupby', help='Group input underfolder by key')
+@click.command('group_by', help='Group input underfolder by key')
 @click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
 @click.option('-k', '--key', required=True, type=str, help='Grouping keys')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
