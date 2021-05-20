@@ -182,5 +182,112 @@ def operation_splitbyquery(input_folder, query, output_folder_1, output_folder_2
         writer(op_reindex(output_dataset))
 
 
+@click.command('operation_filterbyquery', help='Filter input underfolder by query')
+@click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
+@click.option('-s', '--script', required=True, type=str, help='Filtering python script')
+@click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
+def operation_filterbyscript(input_folder, script, output_folder):
+
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationFilterByScript, OperationResetIndices
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_filesystem_template()
+
+    # operations
+    op_filterbyquery = OperationFilterByScript(path_or_func=script)
+    op_reindex = OperationResetIndices()
+    output_dataset = op_reindex(op_filterbyquery(dataset))
+
+    writer = UnderfolderWriter(
+        folder=output_folder,
+        copy_files=True,
+        root_files_keys=template.root_files_keys,
+        extensions_map=template.extensions_map
+    )
+    writer(output_dataset)
+
+
+@click.command('operation_filterkeys', help='Filter input underfolder keys')
+@click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
+@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys')
+@click.option('--negate/--no-negate', required=False, type=bool, help='Negate filtering effets (i.e. all but selected keys)')
+@click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
+def operation_filterkeys(input_folder, keys, negate, output_folder):
+
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationFilterKeys, OperationResetIndices
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_filesystem_template()
+
+    # operations
+    op_filterbyquery = OperationFilterKeys(keys=keys, negate=negate)
+    op_reindex = OperationResetIndices()
+    output_dataset = op_reindex(op_filterbyquery(dataset))
+
+    writer = UnderfolderWriter(
+        folder=output_folder,
+        copy_files=True,
+        root_files_keys=template.root_files_keys,
+        extensions_map=template.extensions_map
+    )
+    writer(output_dataset)
+
+
+@click.command('operation_orderby', help='Order input underfolder samples')
+@click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
+@click.option('-k', '--keys', required=True, type=str, multiple=True, help='Filtering keys')
+@click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
+def operation_orderby(input_folder, keys, output_folder):
+
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationOrderBy, OperationResetIndices
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_filesystem_template()
+
+    # operations
+    op_filterbyquery = OperationOrderBy(order_keys=keys)
+    op_reindex = OperationResetIndices()
+    output_dataset = op_reindex(op_filterbyquery(dataset))
+
+    writer = UnderfolderWriter(
+        folder=output_folder,
+        copy_files=True,
+        root_files_keys=template.root_files_keys,
+        extensions_map=template.extensions_map
+    )
+    writer(output_dataset)
+
+
+@click.command('operation_groupby', help='Group input underfolder by key')
+@click.option('-i', '--input_folder', required=True, type=str, help='Input Underfolder')
+@click.option('-k', '--key', required=True, type=str, help='Grouping keys')
+@click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder for positive matches')
+def operation_groupby(input_folder, key, output_folder):
+
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationGroupBy, OperationResetIndices
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_filesystem_template()
+
+    # operations
+    op_filterbyquery = OperationGroupBy(field=key)
+    op_reindex = OperationResetIndices()
+    output_dataset = op_reindex(op_filterbyquery(dataset))
+
+    writer = UnderfolderWriter(
+        folder=output_folder,
+        copy_files=True,
+    )
+    writer(output_dataset)
+
+
 if __name__ == '__main__':
     operation_filterbyquery()

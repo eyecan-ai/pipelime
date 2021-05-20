@@ -185,3 +185,149 @@ class TestCLIUnderfolderOperationSplitByQuery:
             output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
             cumulative += len(output_reader)
         assert cumulative == len(input_dataset)
+
+
+class TestCLIUnderfolderOperationFilterByScript:
+
+    def test_filterbyscript(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_filterbyscript
+        from pathlib import Path
+        import uuid
+        input_folder = sample_underfolder_minimnist['folder']
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        # script
+        func = ''
+        func += "import numpy as np\n"
+        func += "def check_sample(sample, sequence):\n"
+        func += " return np.array(sample['metadata']['double']) > 4\n"
+        script_path = tmpdir.join('custom_script.py')
+        with open(script_path, 'w') as f:
+            f.write(func)
+
+        # Samples whose double is > 4 17! Check it!
+        expected_size = 17
+
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+
+        options = []
+        options.extend(['-i', str(input_folder)])
+        options.extend(['-o', f'{str(output_folder)}'])
+        options.extend(['-s', f'{str(script_path)}'])
+
+        runner = CliRunner()
+        result = runner.invoke(operation_filterbyscript, options)
+        print(result)
+
+        assert result.exit_code == 0
+
+        output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+        assert len(output_reader) == expected_size
+
+
+class TestCLIUnderfolderOperationFilterKeys:
+
+    def test_filterkeys(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_filterkeys
+        from pathlib import Path
+        import uuid
+        input_folder = sample_underfolder_minimnist['folder']
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        # script
+        filtering_keys = ['image', 'label', 'metadata']
+
+        for negate in [False, True]:
+            output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+
+            options = []
+            options.extend(['-i', str(input_folder)])
+            for k in filtering_keys:
+                options.extend(['-k', f'{str(k)}'])
+            options.extend(['-o', f'{str(output_folder)}'])
+            if negate:
+                options.extend(['--negate'])
+
+            runner = CliRunner()
+            result = runner.invoke(operation_filterkeys, options)
+            print(result)
+
+            assert result.exit_code == 0
+
+            output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+            assert len(output_reader) == len(input_dataset)
+
+            for sample in output_reader:
+                for key in sample.keys():
+                    if negate:
+                        assert key not in filtering_keys
+                    else:
+                        assert key in filtering_keys
+                break
+
+
+class TestCLIUnderfolderOperationOrderKeys:
+
+    def test_orderkeys(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_orderby
+        from pathlib import Path
+        import uuid
+        input_folder = sample_underfolder_minimnist['folder']
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        # script
+        filtering_keys = ['-metadata.sample_id']
+
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        print("OUTPUT", output_folder)
+
+        options = []
+        options.extend(['-i', str(input_folder)])
+        for k in filtering_keys:
+            options.extend(['-k', f'{str(k)}'])
+        options.extend(['-o', f'{str(output_folder)}'])
+
+        runner = CliRunner()
+        result = runner.invoke(operation_orderby, options)
+        print(result)
+
+        assert result.exit_code == 0
+
+        output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+        assert len(output_reader) == len(input_dataset)
+
+        assert output_reader[0]['label'] == 9  # The first sample should be `9`! CHeck it!!
+
+
+class TestCLIUnderfolderOperationGroupBy:
+
+    def test_groupby(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_groupby
+        from pathlib import Path
+        import uuid
+        input_folder = sample_underfolder_minimnist['folder']
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        # script
+        group_key = 'metadata.sample_id'
+
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        print("OUTPUT", output_folder)
+
+        options = []
+        options.extend(['-i', str(input_folder)])
+        options.extend(['-k', f'{str(group_key)}'])
+        options.extend(['-o', f'{str(output_folder)}'])
+
+        runner = CliRunner()
+        result = runner.invoke(operation_groupby, options)
+        print(result)
+
+        assert result.exit_code == 0
+
+        output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+        assert len(output_reader) == len(input_dataset)  # TODO: this test is pretty useless! check content!
