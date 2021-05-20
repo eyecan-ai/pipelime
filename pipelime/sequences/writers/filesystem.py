@@ -82,6 +82,8 @@ class UnderfolderWriter(BaseWriter):
                 self._root_files_keys = list(template.root_files_keys)
                 self._zfill = template.idx_length
 
+        self._zfill = max(self._zfill, x.best_zfill())
+
         saved_root_keys = set()
         for sample in track(x):
             basename = self._build_sample_basename(sample)
