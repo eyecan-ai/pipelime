@@ -283,3 +283,11 @@ class SamplesSequence(Sequence):
                 if new_keys_set != keys_set:
                     return False
         return True
+
+    def best_zfill(self) -> int:
+        """ Computes the best zfill for integer indexing
+
+        :return: zfill values (maximum number of digits based on current size)
+        :rtype: int
+        """
+        return len(str(len(self)))

@@ -1,7 +1,7 @@
 from loguru import logger
 import loguru
 from pipelime.sequences.stages import StageKeysFilter
-from pipelime.tools.idgenerators import IdGenerator, IdGeneratorUUID
+from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger, IdGeneratorUUID
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
 import dictquery as dq
@@ -137,7 +137,7 @@ class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
         """ Reset indices of sample
         """
         super().__init__()
-        self._generator: Optional[IdGenerator] = generator if generator is not None else IdGeneratorUUID()
+        self._generator: Optional[IdGenerator] = generator if generator is not None else IdGeneratorInteger()
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
@@ -191,7 +191,7 @@ class OperationSubsample(SequenceOperation, Bean):
 
         new_samples = x.samples.copy()
         if isinstance(self._factor, int):
-            new_samples = new_samples[::self._factor]
+            new_samples = new_samples[::self._factor]  # Pick an element each `self._factor` elements
         elif isinstance(self._factor, float):
             new_size = int(len(new_samples) * min(max(self._factor, 0), 1.0))
             new_samples = new_samples[:new_size]
@@ -285,6 +285,7 @@ class OperationSplits(SequenceOperation, Bean):
         :return: list of PandasDatabase
         :rtype: list
         """
+
         assert np.array(percentages).sum() <= 1.0, "Percentages sum must be <= 1.0"
         sizes = []
         for p in percentages:

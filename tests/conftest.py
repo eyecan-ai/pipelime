@@ -76,3 +76,8 @@ def filesystem_datasets(data_folder):
             }
         }
     }
+
+
+@pytest.fixture(scope='session')
+def sample_underfolder_minimnist(filesystem_datasets):
+    return filesystem_datasets['minimnist_underfolder']

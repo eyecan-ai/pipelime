@@ -1,0 +1,92 @@
+
+Global:
+  'flow' '{'
+    rows *= GenericRow
+  '}'
+;
+
+GenericRow:
+  Link | Declaration | Comment
+;
+
+Comment:
+ '#' Text '\n'
+;
+
+Declaration:
+  name = NSTRING '=' operation = Operation ';'
+;
+
+OperationName:
+  'OperationSum' | 
+  'OperationSubsample' | 
+  'OperationSplit'  | 
+  'Reader' | 
+  'Writer'
+;
+
+OperationSum: name ='OperationSum' '(' arguments *= Argument ')';
+OperationSplit: name ='OperationSplit' '(' arguments *= Argument')';
+OperationSplitByQuery: name ='OperationSplitByQuery' '(' query = ASTRING ')';
+Reader: 'Reader' '(' folder = FOLDER ')';
+Writer: 'Writer' '(' folder = FOLDER ')';
+
+
+FOLDER: QSTRING | Placeholder;
+
+Operation:
+  OperationSum | OperationSplit | OperationSplitByQuery | Reader | Writer
+;
+
+Link:
+  start=Node
+  '->'
+  end=Node
+  ';'
+;
+
+Node:
+  name = NSTRING
+  port=Port?
+  
+;
+
+Port:
+  ':' name= NSTRING
+  arity=Arity?
+;
+
+Arity:
+  '['  idx=/[0-9]+/? name=NSTRING? ']'
+;
+
+
+
+ASTRING:
+  /([`])(?:(?=(\\?))\2.)*?\1/ 
+;
+
+QSTRING:
+  /(["'])(?:(?=(\\?))\2.)*?\1/ 
+;
+
+NSTRING:
+  /[A-Za-z0-9_.]+/
+;
+
+VariableValue:
+  NSTRING | Placeholder 
+;
+
+Placeholder:
+  name = /\$[A-Za-z0-9_]+/
+;
+
+
+Argument:
+  name = NSTRING '=' value = VariableValue ','
+;
+
+Text:
+  content = /[^\n]*/
+;
