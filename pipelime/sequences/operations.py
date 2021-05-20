@@ -191,7 +191,7 @@ class OperationSubsample(SequenceOperation, Bean):
 
         new_samples = x.samples.copy()
         if isinstance(self._factor, int):
-            new_samples = new_samples[::self._factor]
+            new_samples = new_samples[::self._factor]  # Pick an element each `self._factor` elements
         elif isinstance(self._factor, float):
             new_size = int(len(new_samples) * min(max(self._factor, 0), 1.0))
             new_samples = new_samples[:new_size]
