@@ -19,6 +19,7 @@ class FSToolkit(object):
     # Default imageio options for each image format
     OPTIONS = {
         'png': {'compress_level': 4},
+        'exr': {'flags': imageio.plugins.freeimage.IO_FLAGS.EXR_FLOAT}
     }
 
     # Declare TREE structure
