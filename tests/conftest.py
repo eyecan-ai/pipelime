@@ -41,7 +41,7 @@ def toy_dataset_small(tmpdir):
         'zfill': zfill,
         'keypoints_format': 'xyas',
         'bboxes_format': 'pascal_voc',
-        'expected_keys': ['image', 'mask', 'inst', 'invmask', 'keypoints', 'metadata', 'bboxes'],
+        'expected_keys': ['image', 'mask', 'inst', 'keypoints', 'metadata', 'bboxes'],
         'root_keys': ['global_meta']
     }
 

@@ -8,7 +8,7 @@ from typing import Tuple
 
 class DataCoding(object):
 
-    IMAGE_CODECS = ['jpg', 'jpeg', 'png', 'tiff', 'bmp', 'exr']
+    IMAGE_CODECS = ['jpg', 'jpeg', 'png', 'tiff', 'bmp']
     IMAGE_CODECS_IS_LOSSY = {
         'jpg': True,
         'jpeg': True

@@ -12,14 +12,11 @@ from collections import defaultdict
 
 class FSToolkit(object):
 
-    INSTALLED_LIBRARIES = {
-        'exr': False,
-    }
+    INSTALLED_LIBRARIES = {}
  
     # Default imageio options for each image format
     OPTIONS = {
-        'png': {'compress_level': 4},
-        'exr': {'flags': imageio.plugins.freeimage.IO_FLAGS.EXR_FLOAT}
+        'png': {'compress_level': 4}
     }
 
     # Declare TREE structure
@@ -184,6 +181,4 @@ class FSToolkit(object):
         :type lib: str
         """
 
-        # Install EXR support for ImageIO
-        if lib == 'exr':
-            imageio.plugins.freeimage.download()
+        pass
