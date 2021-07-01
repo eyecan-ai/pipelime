@@ -11,8 +11,6 @@ from collections import defaultdict
 
 
 class FSToolkit(object):
-
-    INSTALLED_LIBRARIES = {}
  
     # Default imageio options for each image format
     OPTIONS = {
@@ -113,8 +111,6 @@ class FSToolkit(object):
         :rtype: Union[None, np.ndarray, dict]
         """
 
-        cls._check_libraries()
-
         extension = cls.get_file_extension(filename)
         data = None
 
@@ -142,7 +138,6 @@ class FSToolkit(object):
 
     @classmethod
     def store_data(cls, filename: str, data: any):
-        cls._check_libraries()
 
         extension = cls.get_file_extension(filename)
         if DataCoding.is_image_extension(extension):
@@ -161,24 +156,3 @@ class FSToolkit(object):
             pickle.dump(data, open(filename, 'wb'))
         else:
             raise NotImplementedError(f'Unknown file extension: {filename}')
-
-    @classmethod
-    def _check_libraries(cls):
-        """ Check if required libraries are installed,
-        if missing it install them
-        """
-
-        for k, v in cls.INSTALLED_LIBRARIES.items():
-            if not v:
-                cls._install_library(k)
-                cls.INSTALLED_LIBRARIES[k] = True
-
-    @classmethod
-    def _install_library(cls, lib: str):
-        """ Install a specified library
-
-        :param lib: library to install
-        :type lib: str
-        """
-
-        pass
