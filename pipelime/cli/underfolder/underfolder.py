@@ -9,6 +9,7 @@ from pipelime.cli.underfolder.operations import operation_splitbyquery
 from pipelime.cli.underfolder.operations import operation_filterbyscript
 from pipelime.cli.underfolder.operations import operation_filterkeys
 from pipelime.cli.underfolder.operations import operation_orderby
+from pipelime.cli.underfolder.operations import operation_split_by_value
 from pipelime.cli.underfolder.operations import operation_groupby
 
 
@@ -26,4 +27,5 @@ underfolder.add_command(operation_splitbyquery)
 underfolder.add_command(operation_filterbyscript)
 underfolder.add_command(operation_filterkeys)
 underfolder.add_command(operation_orderby)
+underfolder.add_command(operation_split_by_value)
 underfolder.add_command(operation_groupby)

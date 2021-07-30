@@ -9,7 +9,7 @@ from pipelime.sequences.samples import SamplesSequence
 from pipelime.sequences.operations import (
     OperationDict2List, OperationFilterByQuery, OperationFilterByScript, OperationFilterKeys, OperationGroupBy,
     OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
-    OperationSplitByQuery, OperationSplits, OperationSubsample,
+    OperationSplitByQuery, OperationSplitByValue, OperationSplits, OperationSubsample,
     OperationSum, SequenceOperation
 )
 
@@ -359,6 +359,26 @@ class TestOperationSplitByQuery(object):
             sumup_exp = functools.reduce(lambda a, b: a + b, expecteds)
 
             assert sumup == sumup_exp
+
+
+class TestOperationSplitByValue:
+    def test_split_by_value(self, plain_samples_sequence_generator):
+        N = 20
+        G = 5
+        key = "metadata.deep.groupby_field"
+        dataset = plain_samples_sequence_generator("d0_", N, group_each=G)
+        op = OperationSplitByValue(key)
+        _plug_test(op)
+        out = op(dataset)
+
+        assert len(out) == N // G
+        total = 0
+        for split in out:
+            total += len(split)
+            target = pydash.get(split[0], key)
+            for sample in split:
+                assert pydash.get(sample, key) == target
+        assert total == len(dataset)
 
 
 class TestOperationFilterKeys(object):

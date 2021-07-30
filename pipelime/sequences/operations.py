@@ -463,6 +463,55 @@ class OperationSplitByQuery(SequenceOperation, Bean):  # TODO: Replace dictquery
 
 
 @BeanFactory.make_serializable
+class OperationSplitByValue(SequenceOperation, Bean):
+    def __init__(self, key: str) -> None:
+        """Similar to OperationGroupBy, but instead of using grouped samples, it simply
+        splits the input dataset into many samples sequences, one for each unique value of
+        the specified key
+
+        :param key: the split key, pydash notation
+        :type key: str
+        """
+        super().__init__()
+        self._key = key
+
+    def input_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(Sequence[SamplesSequence])
+
+    def __call__(self, x: Any) -> Any:
+        super().__call__(x)
+
+        groups_map = {}
+        for sample in x:
+            value = py_.get(sample, self._key)
+            if value is not None:
+                if value not in groups_map:
+                    groups_map[value] = []
+                groups_map[value].append(sample)
+
+        for k, samples in groups_map.items():
+            groups_map[k] = SamplesSequence(samples)
+
+        keys = sorted(list(groups_map.keys()))
+        res = [groups_map[k] for k in keys]
+        return res
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {'key': str}
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationSplitByValue(key=d['key'])
+
+    def to_dict(self):
+        return {'key': self._key}
+
+
+@BeanFactory.make_serializable
 class OperationGroupBy(SequenceOperation, Bean):
 
     def __init__(self, field: str, ungrouped: bool = False) -> None:

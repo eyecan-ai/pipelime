@@ -302,6 +302,42 @@ class TestCLIUnderfolderOperationOrderKeys:
         assert output_reader[0]['label'] == 9  # The first sample should be `9`! CHeck it!!
 
 
+class TestCLIUnderfolderOperationSplitByValue:
+
+    def test_split_by_value(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_split_by_value
+        from pathlib import Path
+        import uuid
+
+        input_folder = sample_underfolder_minimnist['folder']
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        # script
+        split_key = 'metadata.sample_id'
+
+        output_folder = Path(tmpdir.mkdir(str(uuid.uuid1())))
+        print("OUTPUT", output_folder)
+
+        options = []
+        options.extend(['-i', str(input_folder)])
+        options.extend(['-k', f'{str(split_key)}'])
+        options.extend(['-o', f'{str(output_folder)}'])
+
+        runner = CliRunner()
+        result = runner.invoke(operation_split_by_value, options)
+        print(result)
+
+        assert result.exit_code == 0
+
+        total = 0
+        for subfolder in output_folder.iterdir():
+            print(subfolder)
+            output_reader = UnderfolderReader(folder=subfolder)
+            total += len(output_reader)
+        assert total == len(input_dataset)
+
+
 class TestCLIUnderfolderOperationGroupBy:
 
     def test_groupby(self, tmpdir, sample_underfolder_minimnist):
