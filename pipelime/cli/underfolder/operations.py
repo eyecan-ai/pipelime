@@ -1,4 +1,5 @@
-
+from pathlib import Path
+from sys import prefix
 
 import click
 
@@ -6,7 +7,8 @@ import click
 @click.command('sum', help='Sum input underfolders')
 @click.option('-i', '--input_folders', required=True, multiple=True, type=str, help='Input Underfolder [multiple]')
 @click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder')
-def operation_sum(input_folders, output_folder):
+@click.option('-c', '--convert_root_file', multiple=True, type=str, help='Convert a root file into an item to avoid conflicts [multiple]')
+def operation_sum(input_folders, output_folder, convert_root_file):
 
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
@@ -26,7 +28,7 @@ def operation_sum(input_folders, output_folder):
         writer = UnderfolderWriter(
             folder=output_folder,
             copy_files=True,
-            root_files_keys=template.root_files_keys,
+            root_files_keys=list(set(template.root_files_keys) - set(convert_root_file)),
             extensions_map=template.extensions_map,
             zfill=template.idx_length
         )
@@ -262,6 +264,35 @@ def operation_orderby(input_folder, keys, output_folder):
         extensions_map=template.extensions_map
     )
     writer(output_dataset)
+
+
+@click.command('split_by_value', help="Split input underfolder by value")
+@click.option('-i', '--input_folder', required=True, type=Path, help='Input Underfolder')
+@click.option('-k', '--key', required=True, type=str, help='split key')
+@click.option('-o', '--output_folder', required=True, type=Path, help='Output parent folder')
+@click.option('-p', '--output_prefix', default="split", type=str, help="Prefix for each output underfolder")
+def operation_split_by_value(input_folder, key, output_folder, output_prefix):
+
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationSplitByValue, OperationResetIndices
+    from math import log10, ceil
+
+    dataset = UnderfolderReader(input_folder)
+    template = dataset.get_filesystem_template()
+
+    op_split = OperationSplitByValue(key=key)
+    splits = op_split(dataset)
+
+    zfill = max(ceil(log10(len(splits) + 1)), 1)
+    for i, split in enumerate(splits):
+        op_reindex = OperationResetIndices()
+        split = op_reindex(split)
+        UnderfolderWriter(
+            output_folder / f"{output_prefix}_{str(i).zfill(zfill)}",
+            root_files_keys=template.root_files_keys,
+            extensions_map=template.extensions_map
+        )(split)
 
 
 @click.command('group_by', help='Group input underfolder by key')
