@@ -8,10 +8,11 @@ import dictquery as dq
 import numpy as np
 import random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
-from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
+from pipelime.sequences.samples import FileSystemSample, GroupedSample, PlainSample, Sample, SamplesSequence
 from abc import ABC, abstractmethod
 from schema import Or, Schema
 import rich
+import copy
 
 
 class OperationPort(object):
@@ -748,3 +749,67 @@ class OperationFilterByScript(SequenceOperation, Bean):
         return {
             'path_or_func': self._path
         }
+
+
+@BeanFactory.make_serializable
+class OperationMix(SequenceOperation, Bean):
+
+    def __init__(self) -> None:
+        """ Mixes multiple sequences with same length and disjoint item sets
+        """
+        super().__init__()
+
+    def input_port(self) -> OperationPort:
+        return OperationPort([SamplesSequence])
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def _check_length(sekf, x: Sequence[SamplesSequence]) -> None:
+        N = len(x[0])
+        for seq in x:
+            assert len(seq) == N, "Not all sample sequences have the same length"
+
+    def _check_keys(self, x: Sequence[SamplesSequence]) -> None:
+        keys_sets = []
+        for i in range(1, len(x)):
+            keys_sets.append(set(x[i][0].keys()))
+        keys_list = []
+        keys_set = set()
+        for k_set in keys_sets:
+            keys_list.extend(list(k_set))
+            keys_set = keys_set.union(set(k_set))
+        assert len(keys_set) == len(keys_list)
+
+    def __call__(self, x: Sequence[SamplesSequence]) -> SamplesSequence:
+        from rich.progress import track
+        super().__call__(x)
+        self._check_length(x)
+        self._check_keys(x)
+        N = len(x[0])
+        # out = []
+        # for i in range(N):
+        #     data = {}
+        #     for seq in x:
+        #         data.update(seq[i])
+        #     out.append(PlainSample(data, id=i))
+        # out = SamplesSequence(out)
+        out = copy.deepcopy(x[0])
+        for i in track(range(N)):
+            for seq in x:
+                if isinstance(out[i], FileSystemSample) and isinstance(seq[i], FileSystemSample):
+                    out[i].filesmap.update(seq[i].filesmap)
+                else:
+                    out[i].update(seq[i])
+        return out
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {}
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return OperationMix()
+
+    def to_dict(self):
+        return {}

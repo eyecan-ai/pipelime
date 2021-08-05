@@ -10,7 +10,7 @@ from pipelime.sequences.operations import (
     OperationDict2List, OperationFilterByQuery, OperationFilterByScript, OperationFilterKeys, OperationGroupBy,
     OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
     OperationSplitByQuery, OperationSplitByValue, OperationSplits, OperationSubsample,
-    OperationSum, SequenceOperation
+    OperationSum, SequenceOperation, OperationMix
 )
 
 from pipelime.factories import BeanFactory
@@ -499,3 +499,54 @@ class TestOperationFilterByScript(object):
         out = op(dataset)
 
         assert len(out) < len(dataset)
+
+
+class TestOperationMix(object):
+
+    def _process(self, N, keys_to_filter, gen):
+        D = len(keys_to_filter)
+        datasets = []
+        for idx in range(D):
+            d = gen('d{idx}_', N)
+            op_filter = OperationFilterKeys(keys_to_filter[idx])
+            d = op_filter(d)
+            datasets.append(d)
+        return datasets
+
+    def test_mix(self, plain_samples_sequence_generator):
+        N = 32
+        keys_to_filter = [
+            ["idx"],
+            ["number", "reverse_number"],
+            ["fraction"],
+            ["odd", "data0", "data1"],
+            ["metadata"],
+        ]
+        datasets = self._process(N, keys_to_filter, plain_samples_sequence_generator)
+
+        op = OperationMix()
+        _plug_test(op)
+
+        out = op(datasets)
+        assert isinstance(out, SamplesSequence)
+        assert N == len(out)
+        expected_keys = set()
+        for k in keys_to_filter:
+            expected_keys = expected_keys.union(k)
+        for x in out:
+            assert set(x.keys()) == expected_keys
+
+        datasets[0] = SamplesSequence([datasets[0][i] for i in range(1, len(datasets[0]))])
+        with pytest.raises(AssertionError):
+            out = op(datasets)
+
+        keys_to_filter = [
+            ["idx"],
+            ["number", "reverse_number", "fraction"],
+            ["fraction"],
+            ["odd", "data0", "data1"],
+            ["metadata"],
+        ]
+        datasets = self._process(N, keys_to_filter, plain_samples_sequence_generator)
+        with pytest.raises(AssertionError):
+            out = op(datasets)

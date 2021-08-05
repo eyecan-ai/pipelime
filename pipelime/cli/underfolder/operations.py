@@ -1,5 +1,6 @@
 from pathlib import Path
 from sys import prefix
+from tests.pipelime.sequences.test_operations import TestOperationSubsample
 
 import click
 
@@ -31,6 +32,42 @@ def operation_sum(input_folders, output_folder, convert_root_file):
             root_files_keys=list(set(template.root_files_keys) - set(convert_root_file)),
             extensions_map=template.extensions_map,
             zfill=template.idx_length
+        )
+        writer(output_dataset)
+
+
+@click.command('mix', help='Mix input underfolders')
+@click.option('-i', '--input_folders', required=True, multiple=True, type=str, help='Input Underfolder [multiple]')
+@click.option('-o', '--output_folder', required=True, type=str, help='Output Underfolder')
+def operation_mix(input_folders, output_folder):
+
+    from click import ClickException
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.operations import OperationMix
+
+    if len(input_folders) > 0:
+        datasets = [UnderfolderReader(folder=x, lazy_samples=True) for x in input_folders]
+
+        # operations
+        op_mix = OperationMix()
+        try:
+            output_dataset = op_mix(datasets)
+        except AssertionError as e:
+            raise ClickException("Input underfolders must have the same length and their item sets must be disjoint.")
+
+        root_files = []
+        ext_map = {}
+        for d in datasets:
+            template = d.get_filesystem_template()
+            root_files.extend(template.root_files_keys)
+            ext_map.update(template.extensions_map)
+
+        writer = UnderfolderWriter(
+            folder=output_folder,
+            copy_files=True,
+            root_files_keys=root_files,
+            extensions_map=ext_map,
         )
         writer(output_dataset)
 

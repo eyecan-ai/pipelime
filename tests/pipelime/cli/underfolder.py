@@ -367,3 +367,34 @@ class TestCLIUnderfolderOperationGroupBy:
 
         output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
         assert len(output_reader) == len(input_dataset)  # TODO: this test is pretty useless! check content!
+
+
+class TestCLIUnderfolderOperationMix:
+
+    def test_mix(self, tmpdir, sample_underfolder_minimnist):
+
+        from pipelime.cli.underfolder.operations import operation_mix, operation_filterkeys
+        from pathlib import Path
+        import uuid
+        input_folder = sample_underfolder_minimnist["folder"]
+        input_dataset = UnderfolderReader(folder=input_folder)
+        input_folder_a = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        input_folder_b = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        print(set(input_dataset[0].keys()))
+        runner = CliRunner()
+        runner.invoke(operation_filterkeys, f"-i {input_folder} -o {input_folder_a} -k pose -k label")
+        runner.invoke(operation_filterkeys, f"-i {input_folder} -o {input_folder_b} -k image -k points")
+
+        options = []
+        options.extend(['-i', str(input_folder_a)])
+        options.extend(['-i', str(input_folder_b)])
+        options.extend(['-o', f'{str(output_folder)}'])
+
+        res = runner.invoke(operation_mix, options)
+        assert res.exit_code == 0
+
+        output_reader = UnderfolderReader(folder=output_folder)
+        assert len(output_reader) == len(input_dataset)
+        keys = set(output_reader[0].keys())
+        assert keys == {"pose", "label", "image", "points"}
