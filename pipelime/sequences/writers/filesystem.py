@@ -110,7 +110,8 @@ class UnderfolderWriter(BaseWriter):
                     path = item.source()
                     if path.suffix == output_file.suffix:
                         if not self._use_symlinks:
-                            shutil.copy(path, output_file)
+                            if path != output_file:
+                                shutil.copy(path, output_file)
                         else:
                             os.symlink(path, output_file)
                         return
