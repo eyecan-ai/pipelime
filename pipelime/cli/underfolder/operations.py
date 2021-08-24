@@ -1,6 +1,4 @@
 from pathlib import Path
-from sys import prefix
-from tests.pipelime.sequences.test_operations import TestOperationSubsample
 
 import click
 
