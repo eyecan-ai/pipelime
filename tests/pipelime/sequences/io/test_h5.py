@@ -1,21 +1,17 @@
-
-
-from itertools import product
+from pipelime.sequences.writers.base import BaseWriter
 from pipelime.sequences.writers.h5 import H5Writer
-import uuid
 import numpy as np
 from pathlib import Path
-from pipelime.sequences.operations import OperationFilterKeys
-from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.factories import BeanFactory
 from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
+from pipelime.sequences.samples import Sample
 from pipelime.sequences.readers.h5 import H5Item, H5Reader, H5Sample
-from schema import Schema
+import pytest
+import h5py
 
 
 def _plug_test(reader: BaseReader):
-    """ Test what a generic BaseReader should do
+    """Test what a generic BaseReader should do
 
     :param reader: input BaseReader
     :type reader: BaseReader
@@ -31,14 +27,30 @@ def _plug_test(reader: BaseReader):
     assert isinstance(factored, BaseReader)
 
 
-class TestH5(object):
+def _plug_test_writer(writer: BaseWriter):
+    """Test what a generic BaseWriter should do
 
+    :param writer: input BaseWriter
+    :type writer: BaseWriter
+    """
+
+    assert isinstance(writer, BaseWriter)
+
+    print(writer.serialize())
+    rewriter = writer.hydrate(writer.serialize())
+    assert isinstance(rewriter, BaseWriter)
+
+    factored = BeanFactory.create(writer.serialize())
+    assert isinstance(factored, BaseWriter)
+
+
+class TestH5(object):
     def test_reader(self, h5_datasets: dict, tmpdir):
 
         output_folder = Path(tmpdir.mkdir("test_h5reader_writer"))
 
         for dataset_name, cfg in h5_datasets.items():
-            filename = cfg['filename']
+            filename = cfg["filename"]
             reader = H5Reader(filename=filename, copy_root_files=True)
 
             _plug_test(reader)
@@ -48,8 +60,9 @@ class TestH5(object):
                 assert isinstance(sample, H5Sample)
                 assert len(sample.keys()) > 0
 
-            out_filename = output_folder / 'output_dataset.h5'
+            out_filename = output_folder / "output_dataset.h5"
             writer = H5Writer(filename=out_filename)
+            _plug_test_writer(writer)
             writer(reader)
 
             second_reader = H5Reader(filename=out_filename, copy_root_files=True)
@@ -67,7 +80,7 @@ class TestH5(object):
     def test_reader_copy_root(self, h5_datasets: dict, tmpdir):
 
         for dataset_name, cfg in h5_datasets.items():
-            filename = cfg['filename']
+            filename = cfg["filename"]
             reader_copy = H5Reader(filename=filename, copy_root_files=True)
             reader_nocopy = H5Reader(filename=filename, copy_root_files=False)
 
@@ -77,159 +90,91 @@ class TestH5(object):
                 assert len(sample_copy.keys()) > len(sample_nocopy.keys())
 
 
-# class TestUnderfolderReaderWriterTemplating(object):
+class TestH5Sample(object):
+    def test_h5_sample(self, h5_datasets):
 
-#     def test_reader_writer(self, toy_dataset_small, tmpdir_factory):
+        for dataset_name, cfg in h5_datasets.items():
+            filename = cfg["filename"]
+            reader = H5Reader(filename=filename, copy_root_files=True)
 
-#         folder = toy_dataset_small['folder']
-#         keys = toy_dataset_small['expected_keys']
-#         root_keys = toy_dataset_small['root_keys']
+            sample = reader[0]
 
-#         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-#         template = reader.get_filesystem_template()
-#         assert template is not None
-#         assert isinstance(template, UnderfolderReaderTemplate)
+            for key in sample.keys():
+                assert isinstance(sample.metaitem(key), H5Item)
+                item: H5Item = sample.metaitem(key)
+                assert isinstance(item.source(), h5py.Dataset)
 
-#         assert set(template.extensions_map.keys()) == set(keys + root_keys)
-#         assert set(template.root_files_keys) == set(root_keys)
+            assert len(sample) > 0
+            assert isinstance(sample["image"], np.ndarray)
+            assert isinstance(sample, H5Sample)
 
-#         writer_folder = Path(tmpdir_factory.mktemp("writer_folder"))
-#         writer = UnderfolderWriter(
-#             folder=writer_folder,
-#             root_files_keys=template.root_files_keys,
-#             extensions_map=template.extensions_map,
-#             zfill=template.idx_length
-#         )
-#         writer(reader)
-#         print("Writer", writer_folder)
+            with pytest.raises(NotImplementedError):
+                sample.rename("image", "_NEW_IMAGE_")
 
-#         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-#         re_template = re_reader.get_filesystem_template()
+            del sample["image"]
 
-#         assert set(template.extensions_map.keys()) == set(re_template.extensions_map.keys())
-#         assert set(template.root_files_keys) == set(re_template.root_files_keys)
-#         assert template.idx_length == re_template.idx_length
+    def test_flush(self, h5_datasets):
 
-#     def test_reader_writer_without_explicit_template(self, toy_dataset_small, tmpdir_factory):
+        for dataset_name, cfg in h5_datasets.items():
+            filename = cfg["filename"]
+            reader = H5Reader(filename=filename, copy_root_files=True)
 
-#         folder = toy_dataset_small['folder']
-#         keys = toy_dataset_small['expected_keys']
-#         root_keys = toy_dataset_small['root_keys']
+            temp = None
+            for sample in reader:
+                sample: H5Sample
+                for key in sample.keys():
+                    temp = sample[key]
+                    assert sample.is_cached(key)
 
-#         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-#         template = reader.get_filesystem_template()
-#         assert template is not None
-#         assert isinstance(template, UnderfolderReaderTemplate)
-#         assert set(template.extensions_map.keys()) == set(keys + root_keys)
-#         assert set(template.root_files_keys) == set(root_keys)
+            reader.flush()
 
-#         writer_folder = Path(tmpdir_factory.mktemp("writer_folder"))
-#         writer = UnderfolderWriter(folder=writer_folder)
-#         writer(reader)
-#         print("Writer", writer_folder)
+            for sample in reader:
+                sample: H5Sample
+                for key in sample.keys():
+                    assert not sample.is_cached(key)
 
-#         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-#         re_template = re_reader.get_filesystem_template()
+    def test_copy(self, h5_datasets):
 
-#         assert set(template.extensions_map.keys()) == set(re_template.extensions_map.keys())
-#         assert set(template.root_files_keys) == set(re_template.root_files_keys)
-#         assert template.idx_length == re_template.idx_length
+        for dataset_name, cfg in h5_datasets.items():
+            filename = cfg["filename"]
+            reader = H5Reader(filename=filename, copy_root_files=True)
 
-#     def test_filtered_reader_writer_without_explicit_template(self, toy_dataset_small, tmpdir_factory):
+            for sample in reader:
+                sample: H5Sample
 
-#         folder = toy_dataset_small['folder']
-#         keys = toy_dataset_small['expected_keys']
-#         root_keys = toy_dataset_small['root_keys']
+                keys = list(sample.keys())[:2]
+                for key in keys:
+                    temp = sample[key]
+                    assert sample.is_cached(key)
 
-#         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-#         op = OperationFilterKeys(keys=keys[0], negate=False)
+                sample_copy = sample.copy()
+                assert isinstance(sample_copy, type(sample))
 
-#         filtered_reader = op(reader)
+                for key in sample.keys():
+                    assert sample.is_cached(key) == sample_copy.is_cached(key)
 
-#         writer_folder = Path(tmpdir_factory.mktemp("writer_folder"))
-#         print("Filtered writer", writer_folder)
-#         writer = UnderfolderWriter(
-#             folder=writer_folder,
-#             extensions_map=reader.get_filesystem_template().extensions_map,
-#             root_files_keys=reader.get_filesystem_template().root_files_keys,
-#             zfill=reader.get_filesystem_template().idx_length
-#         )
-#         writer(filtered_reader)
+    def test_skeleton(self, h5_datasets):
 
-#     def test_writer_copy_correct_extension(self, toy_dataset_small, tmpdir_factory):
+        for dataset_name, cfg in h5_datasets.items():
+            filename = cfg["filename"]
+            reader = H5Reader(filename=filename, copy_root_files=True)
 
-#         folder = toy_dataset_small['folder']
-#         keys = toy_dataset_small['expected_keys']
+            for sample in reader:
+                sample: H5Sample
+                assert sample.skeleton.keys() == sample.keys()
+                for key in sample.skeleton.keys():
+                    assert sample.skeleton[key] is None
 
-#         for lazy_samples, copy_files, use_symlinks in product([True, False], repeat=3):
-#             reader = UnderfolderReader(folder=folder, lazy_samples=lazy_samples)
-#             extensions_map = reader.get_filesystem_template().extensions_map
-#             changed_keys = []
-#             old_ext = 'png'
-#             new_ext = 'jpg'
-#             for k, ext in extensions_map.items():
-#                 if ext == old_ext:
-#                     extensions_map[k] = new_ext
-#                     changed_keys.append(k)
+    def test_nonlazy(self, h5_datasets: dict, tmpdir):
 
-#             writer_folder = Path(tmpdir_factory.mktemp('writer_folder'))
-#             writer = UnderfolderWriter(
-#                 folder=writer_folder,
-#                 extensions_map=extensions_map,
-#                 root_files_keys=reader.get_filesystem_template().root_files_keys,
-#                 zfill=reader.get_filesystem_template().idx_length,
-#                 copy_files=copy_files,
-#                 use_symlinks=use_symlinks
-#             )
-#             writer(reader)
+        for dataset_name, cfg in h5_datasets.items():
+            filename = cfg["filename"]
+            reader = H5Reader(
+                filename=filename, lazy_samples=False, copy_root_files=True
+            )
 
-#             # if the extension is changed, it should have cached the item
-#             # even if the writer has copy_files=True
-#             for sample in reader:
-#                 for k in changed_keys:
-#                     assert sample.is_cached(k)
-
-
-# class TestUnderfolderReaderWriterConsistency(object):
-
-#     def test_reader_writer_content(self, toy_dataset_small, tmpdir_factory):
-
-#         # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-#         # be careful comparing the content of the samples!
-#         # For example, make sure they are not JPEGs because they could be compressed
-#         # when being written and therefore change their numeric content.
-#         # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-
-#         folder = toy_dataset_small['folder']
-#         keys = toy_dataset_small['expected_keys']
-#         root_keys = toy_dataset_small['root_keys']
-
-#         combo_items = [
-#             {'copy_files': True, 'use_symlinks': False},
-#             {'copy_files': False, 'use_symlinks': False},
-#             {'copy_files': False, 'use_symlinks': True},
-#             {'copy_files': True, 'use_symlinks': True},
-#         ]
-
-#         for combo in combo_items:
-
-#             reader = UnderfolderReader(folder=folder, copy_root_files=True)
-#             template = reader.get_filesystem_template()
-
-#             print("\nCombo", combo)
-#             writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
-#             print(writer_folder)
-#             writer = UnderfolderWriter(
-#                 folder=writer_folder,
-#                 copy_files=combo['copy_files'],
-#                 use_symlinks=combo['use_symlinks']
-#             )
-#             writer(reader)
-
-#             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-#             re_template = re_reader.get_filesystem_template()
-
-#             for idx in range(len(re_reader)):
-#                 data = reader[idx]['image']
-#                 re_data = re_reader[idx]['image']
-#                 assert np.array_equal(data, re_data)
+            for sample in reader:
+                assert isinstance(sample, H5Sample)
+                for key in sample.keys():
+                    assert sample.is_cached(key)
+                    assert isinstance(sample.metaitem(key), H5Item)

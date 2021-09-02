@@ -146,25 +146,8 @@ class H5Database(object):
         group_key = self.get_global_group_name(key=key)
         return self.get_group(group_key, force_create=force_create)
 
-    def get_global_root(self, force_create: bool = True) -> h5py.Group:
-        """ Fetches the Global Group root
-
-        :param force_create: True to create group if not present, defaults to True
-        :type force_create: bool, optional
-        :return: fetched Group if any
-        :rtype: h5py.Group
-        """
-        return self.get_group(f'/{self.GLOBAL_BRANCH_NAME}/', force_create=force_create)
-
     def sample_keys(self) -> set:
         group = self.get_sample_root(force_create=False)
-        if group is not None:
-            return set(group.keys())
-        else:
-            return set()
-
-    def global_keys(self) -> set:
-        group = self.get_global_root(force_create=True)
         if group is not None:
             return set(group.keys())
         else:
@@ -210,7 +193,7 @@ class H5ToolKit:
                 buffer = BytesIO(bytes())
                 pickle.dump(data, buffer)
                 group[key] = buffer.getbuffer()
-                group[key].attrs[cls.ENCODING_STRING] = cls.ENCODING_BINARY
+                cls.set_encoding(group[key], cls.ENCODING_STRING)
 
         elif DataCoding.is_image_extension(encoding):
             options = cls.OPTIONS.get(encoding, {})
@@ -222,7 +205,7 @@ class H5ToolKit:
             buffer = BytesIO(bytes())
             pickle.dump(data, buffer)
             group[key] = buffer.getbuffer()
-            group[key].attrs[cls.ENCODING_STRING] = cls.ENCODING_BINARY
+            cls.set_encoding(group[key], cls.ENCODING_STRING)
 
         if encoding is not None:
             group[key].attrs[cls.ENCODING_STRING] = encoding

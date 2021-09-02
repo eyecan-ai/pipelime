@@ -117,7 +117,7 @@ class H5Writer(BaseWriter):
     @ classmethod
     def from_dict(cls, d: dict):
         return H5Writer(
-            folder=d.get('filename'),
+            filename=d.get('filename'),
             root_files_keys=d.get('root_files_keys', None),
             extensions_map=d.get('extensions_map', None),
             zfill=d.get('zfill', 5),

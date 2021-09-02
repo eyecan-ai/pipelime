@@ -83,14 +83,11 @@ class H5Sample(Sample):
         return newsample
 
     def rename(self, old_key: str, new_key: str):
-        if new_key not in self._group and old_key in self._group:
-            self._group[new_key] = self._group.pop(old_key)
-            if old_key in self._cached:
-                self._cached[new_key] = self._cached.pop(old_key)
+        raise NotImplementedError
 
     def metaitem(self, key: any):
         if key in self._group:
-            return H5Item(self._filesmap[key])
+            return H5Item(self._group[key])
         else:
             return MemoryItem()
 
@@ -132,14 +129,6 @@ class H5Reader(BaseReader):
 
         self._ids = list(sorted(self._h5database.sample_keys()))
         self._root_files_keys = set()
-
-        # self._root_files = [x for x in Path(self._folder).glob('*') if x.is_file()]
-        # self._root_files = [x for x in self._root_files if not x.name.startswith('.')]
-        # self._root_data = {}
-        # self._root_files_keys = set()
-        # for f in self._root_files:
-        #     self._root_files_keys.add(f.stem)
-        #     self._root_data[f.stem] = str(f)  # FSToolkit.load_data(f)
 
         samples = []
         for idx in range(len(self._ids)):
