@@ -160,6 +160,7 @@ class H5ToolKit:
     OPTIONS = {
         'png': {'compress_level': 4}
     }
+    ALLOWED_ENCODINGS = DataCoding.IMAGE_CODECS + [ENCODING_BINARY]
 
     @classmethod
     def get_encoding(cls, dataset: h5py.Dataset) -> Optional[str]:
@@ -176,8 +177,11 @@ class H5ToolKit:
         encoding = cls.get_encoding(dataset)
         data = None
         if encoding is not None:
-            data = DataCoding.bytes_to_data(dataset[...], encoding)
-            if data is None:
+            if encoding in cls.ALLOWED_ENCODINGS:
+                data = DataCoding.bytes_to_data(dataset[...], encoding)
+                if data is None:
+                    data = pickle.loads(dataset[...])
+            else:
                 data = pickle.loads(dataset[...])
         else:
             data = dataset[...]
@@ -193,7 +197,7 @@ class H5ToolKit:
                 buffer = BytesIO(bytes())
                 pickle.dump(data, buffer)
                 group[key] = buffer.getbuffer()
-                cls.set_encoding(group[key], cls.ENCODING_STRING)
+                cls.set_encoding(group[key], cls.ENCODING_BINARY)
 
         elif DataCoding.is_image_extension(encoding):
             options = cls.OPTIONS.get(encoding, {})
@@ -205,7 +209,4 @@ class H5ToolKit:
             buffer = BytesIO(bytes())
             pickle.dump(data, buffer)
             group[key] = buffer.getbuffer()
-            cls.set_encoding(group[key], cls.ENCODING_STRING)
-
-        if encoding is not None:
-            group[key].attrs[cls.ENCODING_STRING] = encoding
+            cls.set_encoding(group[key], cls.ENCODING_BINARY)

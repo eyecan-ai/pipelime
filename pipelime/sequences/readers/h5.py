@@ -134,7 +134,12 @@ class H5Reader(BaseReader):
         for idx in range(len(self._ids)):
             group = self._h5database.get_sample_group(self._ids[idx], force_create=False)
 
-            sample = H5Sample(group=group, copy_global_items=self._copy_root_files, lazy=self._lazy_samples)
+            sample = H5Sample(
+                group=group,
+                copy_global_items=self._copy_root_files,
+                lazy=self._lazy_samples,
+                id=idx
+            )
             samples.append(sample)
 
         if len(samples) > 0:
@@ -145,7 +150,10 @@ class H5Reader(BaseReader):
 
         super().__init__(samples=samples)
 
-    def get_h5_template(self) -> Union[H5ReaderTemplate, None]:
+    def is_root_key(self, key: str):
+        return key in self._root_files_keys
+
+    def get_reader_template(self) -> Union[H5ReaderTemplate, None]:
         """ Retrieves the template of the h5 reader, i.e. a mapping
         between sample_key/file_extension and a list of root files keys
 
@@ -162,7 +170,8 @@ class H5Reader(BaseReader):
             extensions_map = {}
             idx_length = len(str(sample.id))
             for key in sample:
-                extensions_map[key] = sample.get_encoding(key)
+                if sample.get_encoding(key) is not None:
+                    extensions_map[key] = sample.get_encoding(key)
 
             return H5ReaderTemplate(
                 extensions_map=extensions_map,

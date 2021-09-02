@@ -1,23 +1,10 @@
 from pathlib import Path
 from typing import Dict, Sequence, Union
 from pipelime.factories import Bean, BeanFactory
-from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample
 from pipelime.filesystem.toolkit import FSToolkit
 from schema import Optional
-
-
-class UnderfolderReaderTemplate(object):
-
-    def __init__(
-        self,
-        extensions_map: Dict[str, any],
-        root_files_keys: Sequence[str],
-        idx_length: int = 5
-    ):
-        self.extensions_map = extensions_map
-        self.root_files_keys = root_files_keys
-        self.idx_length = idx_length
 
 
 class UnderfolderReader(BaseReader):
@@ -52,13 +39,16 @@ class UnderfolderReader(BaseReader):
 
         super().__init__(samples=samples)
 
-    def get_filesystem_template(self) -> Union[UnderfolderReaderTemplate, None]:
+    def is_root_key(self, key: str):
+        return key in self._root_files_keys
+
+    def get_reader_template(self) -> Union[ReaderTemplate, None]:
         """ Retrieves the template of the underfolder reader, i.e. a mapping
         between sample_key/file_extension and a list of root files keys
 
         :raises TypeError: If first sample is not a FileSystemSample
-        :return: None if dataset is empty, otherwise an UnderfolderReaderTemplate
-        :rtype: Union[UnderfolderReaderTemplate, None]
+        :return: None if dataset is empty, otherwise an ReaderTemplate
+        :rtype: Union[ReaderTemplate, None]
         """
 
         if len(self) > 0:
@@ -71,13 +61,25 @@ class UnderfolderReader(BaseReader):
             for key, filename in sample.filesmap.items():
                 extensions_map[key] = Path(filename).suffix.replace('.', '')
 
-            return UnderfolderReaderTemplate(
+            return ReaderTemplate(
                 extensions_map=extensions_map,
                 root_files_keys=list(self._root_files_keys),
                 idx_length=idx_length
             )
         else:
             None
+
+    @classmethod
+    def get_reader_template_from_folder(cls, folder: str) -> Union[ReaderTemplate, None]:
+        """Helper class function to retrieve a reader template directly from folder
+
+        :param folder: underfolder folder
+        :type folder: str
+        :return: ReaderTemplate of the loaded underfolder
+        :rtype: Union[ReaderTemplate, None]
+        """
+        reader = UnderfolderReader(folder=folder, copy_root_files=True, lazy_samples=True)
+        return reader.get_reader_template()
 
     def flush(self):
         """ Clear cache for each internal FileSystemSample """

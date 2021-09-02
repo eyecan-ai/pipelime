@@ -1,3 +1,4 @@
+from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.readers.h5 import H5Reader
 from pipelime.h5.toolkit import H5Database, H5ToolKit
 from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -60,15 +61,8 @@ class H5Writer(BaseWriter):
 
     def __call__(self, x: SamplesSequence) -> None:
 
-        if isinstance(x, UnderfolderReader) and self._empty_template:
-            template = x.get_filesystem_template()
-            if template is not None:
-                self._extensions_map = template.extensions_map
-                self._root_files_keys = list(template.root_files_keys)
-                self._zfill = template.idx_length
-
-        if isinstance(x, H5Reader) and self._empty_template:
-            template = x.get_h5_template()
+        if isinstance(x, BaseReader) and self._empty_template:
+            template = x.get_reader_template()
             if template is not None:
                 self._extensions_map = template.extensions_map
                 self._root_files_keys = list(template.root_files_keys)

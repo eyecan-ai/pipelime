@@ -5,7 +5,7 @@ import rich
 
 # ➡️➡️➡️ Reader
 reader = UnderfolderReader(folder='../../data/underfolder/example_dataset', copy_root_files=True)
-reader_template = reader.get_filesystem_template()
+reader_template = reader.get_reader_template()
 
 # ➡️➡️➡️ Writer with manual template input
 writer_folder = tempfile.mkdtemp()

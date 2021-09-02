@@ -7,9 +7,9 @@ from pathlib import Path
 from pipelime.sequences.operations import OperationFilterKeys
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.factories import BeanFactory
-from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
-from pipelime.sequences.readers.filesystem import UnderfolderReader, UnderfolderReaderTemplate
+from pipelime.sequences.readers.filesystem import UnderfolderReader
 from schema import Schema
 
 
@@ -68,9 +68,12 @@ class TestUnderfolderReaderWriterTemplating(object):
         root_keys = toy_dataset_small['root_keys']
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-        template = reader.get_filesystem_template()
+        template = reader.get_reader_template()
+        _helper_template = UnderfolderReader.get_reader_template_from_folder(folder=folder)
+        assert _helper_template == template
+
         assert template is not None
-        assert isinstance(template, UnderfolderReaderTemplate)
+        assert isinstance(template, ReaderTemplate)
 
         assert set(template.extensions_map.keys()) == set(keys + root_keys)
         assert set(template.root_files_keys) == set(root_keys)
@@ -86,7 +89,7 @@ class TestUnderfolderReaderWriterTemplating(object):
         print("Writer", writer_folder)
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-        re_template = re_reader.get_filesystem_template()
+        re_template = re_reader.get_reader_template()
 
         assert set(template.extensions_map.keys()) == set(re_template.extensions_map.keys())
         assert set(template.root_files_keys) == set(re_template.root_files_keys)
@@ -99,9 +102,9 @@ class TestUnderfolderReaderWriterTemplating(object):
         root_keys = toy_dataset_small['root_keys']
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-        template = reader.get_filesystem_template()
+        template = reader.get_reader_template()
         assert template is not None
-        assert isinstance(template, UnderfolderReaderTemplate)
+        assert isinstance(template, ReaderTemplate)
         assert set(template.extensions_map.keys()) == set(keys + root_keys)
         assert set(template.root_files_keys) == set(root_keys)
 
@@ -111,7 +114,7 @@ class TestUnderfolderReaderWriterTemplating(object):
         print("Writer", writer_folder)
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-        re_template = re_reader.get_filesystem_template()
+        re_template = re_reader.get_reader_template()
 
         assert set(template.extensions_map.keys()) == set(re_template.extensions_map.keys())
         assert set(template.root_files_keys) == set(re_template.root_files_keys)
@@ -132,20 +135,20 @@ class TestUnderfolderReaderWriterTemplating(object):
         print("Filtered writer", writer_folder)
         writer = UnderfolderWriter(
             folder=writer_folder,
-            extensions_map=reader.get_filesystem_template().extensions_map,
-            root_files_keys=reader.get_filesystem_template().root_files_keys,
-            zfill=reader.get_filesystem_template().idx_length
+            extensions_map=reader.get_reader_template().extensions_map,
+            root_files_keys=reader.get_reader_template().root_files_keys,
+            zfill=reader.get_reader_template().idx_length
         )
         writer(filtered_reader)
 
     def test_writer_copy_correct_extension(self, toy_dataset_small, tmpdir_factory):
-        
+
         folder = toy_dataset_small['folder']
         keys = toy_dataset_small['expected_keys']
 
         for lazy_samples, copy_files, use_symlinks in product([True, False], repeat=3):
             reader = UnderfolderReader(folder=folder, lazy_samples=lazy_samples)
-            extensions_map = reader.get_filesystem_template().extensions_map
+            extensions_map = reader.get_reader_template().extensions_map
             changed_keys = []
             old_ext = 'png'
             new_ext = 'jpg'
@@ -158,8 +161,8 @@ class TestUnderfolderReaderWriterTemplating(object):
             writer = UnderfolderWriter(
                 folder=writer_folder,
                 extensions_map=extensions_map,
-                root_files_keys=reader.get_filesystem_template().root_files_keys,
-                zfill=reader.get_filesystem_template().idx_length,
+                root_files_keys=reader.get_reader_template().root_files_keys,
+                zfill=reader.get_reader_template().idx_length,
                 copy_files=copy_files,
                 use_symlinks=use_symlinks
             )
@@ -196,7 +199,7 @@ class TestUnderfolderReaderWriterConsistency(object):
         for combo in combo_items:
 
             reader = UnderfolderReader(folder=folder, copy_root_files=True)
-            template = reader.get_filesystem_template()
+            template = reader.get_reader_template()
 
             print("\nCombo", combo)
             writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
@@ -209,7 +212,7 @@ class TestUnderfolderReaderWriterConsistency(object):
             writer(reader)
 
             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-            re_template = re_reader.get_filesystem_template()
+            re_template = re_reader.get_reader_template()
 
             for idx in range(len(re_reader)):
                 data = reader[idx]['image']
