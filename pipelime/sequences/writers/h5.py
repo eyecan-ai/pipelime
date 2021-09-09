@@ -1,4 +1,6 @@
 from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.h5 import H5Reader
+from pipelime.h5.toolkit import H5Database, H5ToolKit
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from rich.progress import track
 from pipelime.filesystem.toolkit import FSToolkit
@@ -10,25 +12,24 @@ from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample,
 from schema import Optional, Or
 import shutil
 import os
+import h5py
 
 
-class UnderfolderWriter(BaseWriter):
+class H5Writer(BaseWriter):
     DATA_SUBFOLDER = 'data'
-    DEFAULT_EXTENSION = 'pkl'
+    DEFAULT_EXTENSION = None
 
     def __init__(
         self,
-        folder: str,
+        filename: str,
         root_files_keys: list = None,
         extensions_map: dict = None,
-        zfill: int = 5,
-        copy_files: bool = True,
-        use_symlinks: bool = False
+        zfill: int = 5
     ) -> None:
-        """ UnderfolderWriter for an input SamplesSequence
+        """ H5Writer for an input SamplesSequence
 
-        :param folder: destiantion folder
-        :type folder: str
+        :param filename: destiantion hdf5 filename
+        :type filename: str
         :param root_files_keys: list of keys to write as underfolder root files (only the first element
         encountered will be stored as root file, the others will be discarded), defaults to None
         :type root_files_keys: list, optional
@@ -37,22 +38,14 @@ class UnderfolderWriter(BaseWriter):
         :type extensions_map: dict, optional
         :param zfill: Length of zero padding in case of integer sample indices, defaults to 5
         :type zfill: int, optional
-        :param copy_files: TRUE to copy FileSystemSample directly if not cached before, defaults to True
-        :type copy_files: bool, optional
-        :param use_symlinks: if TRUE (and copy_files == TRUE) the copy will be replaced with a symlink, defaults to False
-        :type use_symlinks: bool, optional
         """
-        self._folder = Path(folder)
+        self._filename = Path(filename)
 
         self._empty_template = root_files_keys is None and extensions_map is None
         self._root_files_keys = root_files_keys if root_files_keys is not None else []
         self._extensions_map = extensions_map if extensions_map is not None else {}
         self._zfill = zfill
-        self._copy_files = copy_files
-        self._use_symlinks = use_symlinks
-        self._datafolder = self._folder / self.DATA_SUBFOLDER
-        if not self._datafolder.exists():
-            self._datafolder.mkdir(parents=True, exist_ok=True)
+        self._h5database = H5Database(filename=self._filename, readonly=False)
 
     def _build_sample_basename(self, sample: Sample):
         if isinstance(sample.id, int):
@@ -61,18 +54,10 @@ class UnderfolderWriter(BaseWriter):
             return str(sample.id)
 
     def _build_item_extension(self, key: str):
-        extension = UnderfolderWriter.DEFAULT_EXTENSION
-        for r, ext in self._extensions_map.items():
-            if re.match(r, key) is not None:
-                extension = ext
-                break
-        return extension
+        return self._extensions_map.get(key, H5Writer.DEFAULT_EXTENSION)
 
     def _is_root_key(self, key: str):
-        for r in self._root_files_keys:
-            if re.match(r, key) is not None:
-                return True
-        return False
+        return key in self._root_files_keys
 
     def __call__(self, x: SamplesSequence) -> None:
 
@@ -85,54 +70,48 @@ class UnderfolderWriter(BaseWriter):
 
         self._zfill = max(self._zfill, x.best_zfill())
 
+        self._h5database.open()
         saved_root_keys = set()
+
+        # Populate global links
+        global_links = {}
+        for sample in x:
+            basename = self._build_sample_basename(sample)
+            for key in sample.keys():
+                if self._is_root_key(key):
+                    if key not in saved_root_keys:
+                        group = self._h5database.get_global_group(key=basename, force_create=True)
+                        H5ToolKit.store_data(group, key=key, data=sample[key], encoding=self._build_item_extension(key))
+                        # h5py.SoftLink(self._h5database.get_global_group_name(key=basename))
+                        global_links[key] = h5py.SoftLink(group[key].name)
+            break
+
         for sample in track(x):
             basename = self._build_sample_basename(sample)
 
             for key in sample.keys():
-                if self._is_root_key(key):
-                    if key not in saved_root_keys:
-                        saved_root_keys.add(key)
-                        itemname = f'{key}.{self._build_item_extension(key)}'
-                        output_file = Path(self._folder) / itemname
-                        self._write_sample_item(output_file, sample, key)
+                if not self._is_root_key(key):
+                    group = self._h5database.get_sample_group(key=basename, force_create=True)
+                    H5ToolKit.store_data(group, key=key, data=sample[key], encoding=self._build_item_extension(key))
                 else:
-                    itemname = f'{basename}_{key}.{self._build_item_extension(key)}'
-                    output_file = Path(self._datafolder) / itemname
+                    group = self._h5database.get_sample_group(key=basename, force_create=True)
+                    group[key] = global_links[key]
 
-                    self._write_sample_item(output_file, sample, key)
+        self._h5database.close()
 
-    def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
-
-        if self._copy_files:
-            if isinstance(sample, FileSystemSample):
-                item = sample.metaitem(key)
-                if not sample.is_cached(key) and isinstance(item, FilesystemItem):
-                    path = item.source()
-                    if path.suffix == output_file.suffix:
-                        if not self._use_symlinks:
-                            if path != output_file:
-                                shutil.copy(path, output_file)
-                        else:
-                            os.symlink(path, output_file)
-                        return
-
-        # Default action
-        FSToolkit.store_data(output_file, sample[key])
-
-    @classmethod
+    @ classmethod
     def bean_schema(cls) -> dict:
         return {
-            'folder': str,
+            'filename': str,
             Optional('root_files_keys'): Or(None, list),
             Optional('extensions_map'): Or(None, dict),
             Optional('zfill'): int,
         }
 
-    @classmethod
+    @ classmethod
     def from_dict(cls, d: dict):
-        return UnderfolderWriter(
-            folder=d.get('folder'),
+        return H5Writer(
+            filename=d.get('filename'),
             root_files_keys=d.get('root_files_keys', None),
             extensions_map=d.get('extensions_map', None),
             zfill=d.get('zfill', 5),
@@ -140,11 +119,11 @@ class UnderfolderWriter(BaseWriter):
 
     def to_dict(self) -> dict:
         return {
-            'folder': str(self._folder),
+            'filename': str(self._filename),
             'root_files_keys': self._root_files_keys,
             'extensions_map': self._extensions_map,
             'zfill': self._zfill
         }
 
 
-BeanFactory.register_bean(UnderfolderWriter)
+BeanFactory.register_bean(H5Writer)

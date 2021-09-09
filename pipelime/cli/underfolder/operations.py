@@ -22,7 +22,7 @@ def operation_sum(input_folders, output_folder, convert_root_file):
         output_dataset = op_reindex(op_sum(datasets))
 
         prototype_reader = datasets[0]
-        template = prototype_reader.get_filesystem_template()
+        template = prototype_reader.get_reader_template()
 
         writer = UnderfolderWriter(
             folder=output_folder,
@@ -81,7 +81,7 @@ def operation_subsample(input_folder, factor, output_folder):
     from pipelime.sequences.operations import OperationSubsample, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_subsample = OperationSubsample(factor=int(factor) if factor > 1 else factor)
@@ -108,7 +108,7 @@ def operation_shuffle(input_folder, output_folder, seed):
     from pipelime.sequences.operations import OperationShuffle, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_shuffle = OperationShuffle(seed=seed)
@@ -135,7 +135,7 @@ def operation_split(input_folder, splits):
     from functools import reduce
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # splitmap for nargs
     split_map = {str(k): float(v) for k, v in splits}
@@ -169,7 +169,7 @@ def operation_filterbyquery(input_folder, query, output_folder):
     from pipelime.sequences.operations import OperationFilterByQuery, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationFilterByQuery(query=query)
@@ -197,7 +197,7 @@ def operation_splitbyquery(input_folder, query, output_folder_1, output_folder_2
     from pipelime.sequences.operations import OperationSplitByQuery, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_splitbyquery = OperationSplitByQuery(query=query)
@@ -230,7 +230,7 @@ def operation_filterbyscript(input_folder, script, output_folder):
     from pipelime.sequences.operations import OperationFilterByScript, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationFilterByScript(path_or_func=script)
@@ -258,7 +258,7 @@ def operation_filterkeys(input_folder, keys, negate, output_folder):
     from pipelime.sequences.operations import OperationFilterKeys, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationFilterKeys(keys=keys, negate=negate)
@@ -285,7 +285,7 @@ def operation_orderby(input_folder, keys, output_folder):
     from pipelime.sequences.operations import OperationOrderBy, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationOrderBy(order_keys=keys)
@@ -314,7 +314,7 @@ def operation_split_by_value(input_folder, key, output_folder, output_prefix):
     from math import log10, ceil
 
     dataset = UnderfolderReader(input_folder)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     op_split = OperationSplitByValue(key=key)
     splits = op_split(dataset)
@@ -341,7 +341,7 @@ def operation_groupby(input_folder, key, output_folder):
     from pipelime.sequences.operations import OperationGroupBy, OperationResetIndices
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_filesystem_template()
+    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationGroupBy(field=key)
