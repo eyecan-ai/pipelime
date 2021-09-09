@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from collections.abc import MutableMapping
 from abc import abstractmethod
 from pathlib import Path
-from typing import Hashable, Sequence
+from typing import Any, Dict, Hashable, Sequence
 
 
 @dataclass
@@ -246,6 +246,15 @@ class FileSystemSample(Sample):
         keys = list(self._cached.keys())
         for k in keys:
             del self._cached[k]
+
+    def update(self, other: Dict[str, Any]) -> None:
+        if isinstance(other, FileSystemSample):
+            self.filesmap.update(other.filesmap)
+            for k in other.keys():
+                if other.is_cached(k):
+                    self[k] = other[k]
+        else:
+            super().update(other)
 
 
 class SamplesSequence(Sequence):
