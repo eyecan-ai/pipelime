@@ -14,7 +14,7 @@ def filter_by_script(dataset, output, script):
     reader = UnderfolderReader(folder=dataset)
     op = OperationFilterByScript(path_or_func=script)
 
-    reader_template = reader.get_filesystem_template()
+    reader_template = reader.get_reader_template()
 
     writer = UnderfolderWriter(
         folder=output,
