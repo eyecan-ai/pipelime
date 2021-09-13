@@ -9,7 +9,6 @@ from typing import Any, Dict, Hashable, Sequence
 
 @dataclass
 class MetaItem(object):
-
     def __init__(self) -> None:
         pass
 
@@ -19,7 +18,6 @@ class MetaItem(object):
 
 
 class MemoryItem(MetaItem):
-
     def __init__(self) -> None:
         super().__init__()
 
@@ -28,7 +26,6 @@ class MemoryItem(MetaItem):
 
 
 class FilesystemItem(MetaItem):
-
     def __init__(self, path: str) -> None:
         super().__init__()
         self._path = Path(path)
@@ -38,7 +35,6 @@ class FilesystemItem(MetaItem):
 
 
 class Sample(MutableMapping):
-
     def __init__(self, id: Hashable = None) -> None:
         self._id = id if id is not None else str(uuid.uuid1())
 
@@ -71,9 +67,8 @@ class Sample(MutableMapping):
 
 
 class GroupedSample(Sample):
-
     def __init__(self, samples: Sequence[Sample], id: Hashable = None) -> None:
-        """ Sample representing a group of basic samples
+        """Sample representing a group of basic samples
 
         :param samples: list of samples to group
         :type samples: Sequence[Sample]
@@ -133,9 +128,8 @@ class GroupedSample(Sample):
 
 
 class PlainSample(Sample):
-
     def __init__(self, data: dict = None, id: Hashable = None):
-        """ Plain sample (aka a dict wrapper)
+        """Plain sample (aka a dict wrapper)
 
         :param data: dictionary data, defaults to None
         :type data: dict, optional
@@ -176,9 +170,8 @@ class PlainSample(Sample):
 
 
 class FileSystemSample(Sample):
-
     def __init__(self, data_map: dict, lazy: bool = True, id: Hashable = None):
-        """ Creates a FileSystemSample based on a key/filename map
+        """Creates a FileSystemSample based on a key/filename map
 
         :param data_map: key/filename map
         :type data_map: dict
@@ -245,8 +238,9 @@ class FileSystemSample(Sample):
     def skeleton(self) -> dict:
         return {x: None for x in self._filesmap.keys()}
 
-    def flush(self):
-        keys = list(self._cached.keys())
+    def flush(self, keys: Sequence[str] = None):
+        if keys is None:
+            keys = list(self._cached.keys())
         for k in keys:
             del self._cached[k]
 
@@ -261,7 +255,6 @@ class FileSystemSample(Sample):
 
 
 class SamplesSequence(Sequence):
-
     def __init__(self, samples: Sequence[Sample]):
         self._samples = samples
 
@@ -279,7 +272,7 @@ class SamplesSequence(Sequence):
         return self._samples[idx]
 
     def is_normalized(self) -> bool:
-        """ Checks for normalization i.e. each sample has to contain same keys.
+        """Checks for normalization i.e. each sample has to contain same keys.
         !!This method could be very slow if samples are lazy!!
 
         :return: TRUE if sequence is normalized
@@ -297,7 +290,7 @@ class SamplesSequence(Sequence):
         return True
 
     def best_zfill(self) -> int:
-        """ Computes the best zfill for integer indexing
+        """Computes the best zfill for integer indexing
 
         :return: zfill values (maximum number of digits based on current size)
         :rtype: int
