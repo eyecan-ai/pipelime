@@ -218,3 +218,31 @@ class TestUnderfolderReaderWriterConsistency(object):
                 data = reader[idx]['image']
                 re_data = re_reader[idx]['image']
                 assert np.array_equal(data, re_data)
+
+
+class TestUnderfolderWriterForceCopy(object):
+
+    def test_reader_writer_force_copy(self, toy_dataset_small, tmpdir_factory):
+        folder = toy_dataset_small['folder']
+        image_key = "image"
+
+        reader = UnderfolderReader(folder=folder, copy_root_files=True)
+        sample: FileSystemSample = reader[0]
+        original_image = sample[image_key].copy()
+        sample[image_key] = 255 - original_image
+        assert sample.is_cached(image_key)
+        assert np.any(sample[image_key] != original_image)
+
+        writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
+        print(writer_folder)
+        writer = UnderfolderWriter(
+            folder=writer_folder,
+            copy_files=True,
+            use_symlinks=False,
+            force_copy_keys=[image_key]
+        )
+        writer(reader)
+
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        re_sample = re_reader[0]
+        assert np.all(re_sample[image_key] == original_image)

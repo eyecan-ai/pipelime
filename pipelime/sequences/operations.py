@@ -787,20 +787,10 @@ class OperationMix(SequenceOperation, Bean):
         self._check_length(x)
         self._check_keys(x)
         N = len(x[0])
-        # out = []
-        # for i in range(N):
-        #     data = {}
-        #     for seq in x:
-        #         data.update(seq[i])
-        #     out.append(PlainSample(data, id=i))
-        # out = SamplesSequence(out)
         out = copy.deepcopy(x[0])
         for i in track(range(N)):
             for seq in x:
-                if isinstance(out[i], FileSystemSample) and isinstance(seq[i], FileSystemSample):
-                    out[i].filesmap.update(seq[i].filesmap)
-                else:
-                    out[i].update(seq[i])
+                out[i].update(seq[i])
         return out
 
     @classmethod

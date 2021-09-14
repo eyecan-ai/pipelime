@@ -57,7 +57,7 @@ def operation_mix(input_folders, output_folder):
         root_files = []
         ext_map = {}
         for d in datasets:
-            template = d.get_filesystem_template()
+            template = d.get_reader_template()
             root_files.extend(template.root_files_keys)
             ext_map.update(template.extensions_map)
 

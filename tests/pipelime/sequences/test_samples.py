@@ -94,3 +94,23 @@ class TestFilesystemSample(object):
 
         dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
         reader = UnderfolderReader(folder=dataset_folder, lazy_samples=False)
+
+    def test_update(self, filesystem_datasets, tmp_path_factory):
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
+        reader = UnderfolderReader(folder=dataset_folder)
+        sample: FileSystemSample = reader[0]
+        other = {"a": 10, "b": 20}
+        sample.update(other)
+        for k, v in other.items():
+            assert k in sample
+            assert sample.is_cached(k)
+            assert k not in sample.filesmap
+            assert sample[k] == v
+
+        other = FileSystemSample({"c": "fake_path", "d": "fake_path"})
+        sample.update(other)
+        for k, v in other.filesmap.items():
+            assert k in sample
+            assert not sample.is_cached(k)
+            assert k in sample.filesmap
+            assert sample.filesmap[k] == v
