@@ -255,11 +255,6 @@ class TestUnderfolderWriterMultiprocessing(object):
         image_key = "image"
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
-        sample: FileSystemSample = reader[0]
-        original_image = sample[image_key].copy()
-        sample[image_key] = 255 - original_image
-        assert sample.is_cached(image_key)
-        assert np.any(sample[image_key] != original_image)
 
         workers_options = [1, 0, 1, 2, 3, 4]
 
@@ -270,11 +265,14 @@ class TestUnderfolderWriterMultiprocessing(object):
                 folder=writer_folder,
                 copy_files=True,
                 use_symlinks=False,
-                force_copy_keys=[image_key],
                 num_workers=num_workers
             )
             writer(reader)
 
             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
             re_sample = re_reader[0]
-            assert np.all(re_sample[image_key] == original_image)
+            assert len(reader) == len(re_reader)
+            for sample_id in range(len(re_reader)):
+                sample = reader[sample_id]
+                resample = re_reader[sample_id]
+                assert sample['metadata']['id'] == resample['metadata']['id']
