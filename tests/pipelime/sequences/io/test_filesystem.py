@@ -246,3 +246,33 @@ class TestUnderfolderWriterForceCopy(object):
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
         re_sample = re_reader[0]
         assert np.all(re_sample[image_key] == original_image)
+
+
+class TestUnderfolderWriterMultiprocessing(object):
+
+    def test_reader_writer_force_copy(self, toy_dataset_small, tmpdir_factory):
+        folder = toy_dataset_small['folder']
+        image_key = "image"
+
+        reader = UnderfolderReader(folder=folder, copy_root_files=True)
+
+        workers_options = [1, 0, 1, 2, 3, 4]
+
+        for num_workers in workers_options:
+            writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
+            print(writer_folder)
+            writer = UnderfolderWriter(
+                folder=writer_folder,
+                copy_files=True,
+                use_symlinks=False,
+                num_workers=num_workers
+            )
+            writer(reader)
+
+            re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+            re_sample = re_reader[0]
+            assert len(reader) == len(re_reader)
+            for sample_id in range(len(re_reader)):
+                sample = reader[sample_id]
+                resample = re_reader[sample_id]
+                assert sample['metadata']['id'] == resample['metadata']['id']

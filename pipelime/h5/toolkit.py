@@ -18,7 +18,7 @@ class H5Database(object):
         """
         self._filename = filename
         self._readonly = kwargs.get("readonly", True)
-        self._swmr = kwargs.get("swmr", False)
+        self._swmr = kwargs.get("swmr", True)
         self._handle = None
 
     def is_empty(self):
