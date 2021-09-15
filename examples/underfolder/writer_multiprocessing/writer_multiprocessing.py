@@ -1,7 +1,5 @@
-from rich.progress import track
 from tqdm import tqdm
-from pipelime.sequences.samples import PlainSample, Sample, SamplesSequence
-from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.sequences.samples import PlainSample,  SamplesSequence
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 import tempfile
 import rich
