@@ -17,7 +17,6 @@ from schema import Or, Optional
 import shutil
 import os
 import multiprocessing
-import tqdm
 
 
 class UnderfolderWriter(BaseWriter):
@@ -131,7 +130,7 @@ class UnderfolderWriter(BaseWriter):
             manager = multiprocessing.Manager()
             self._saved_root_keys = manager.dict()
             pool = multiprocessing.Pool(processes=None if self._num_workers == -1 else self._num_workers)
-            list(tqdm.tqdm(pool.imap_unordered(self._process_sample, x), total=len(x)))
+            list(track(pool.imap_unordered(self._process_sample, x), total=len(x)))
         else:
             self._saved_root_keys = {}
             for sample in track(x):
