@@ -12,6 +12,7 @@ from pipelime.cli.underfolder.operations import operation_orderby
 from pipelime.cli.underfolder.operations import operation_split_by_value
 from pipelime.cli.underfolder.operations import operation_groupby
 from pipelime.cli.underfolder.operations import operation_mix
+from pipelime.cli.underfolder.operations import summary
 
 
 @click.group()
@@ -31,3 +32,4 @@ underfolder.add_command(operation_orderby)
 underfolder.add_command(operation_split_by_value)
 underfolder.add_command(operation_groupby)
 underfolder.add_command(operation_mix)
+underfolder.add_command(summary)
