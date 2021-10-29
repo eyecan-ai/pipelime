@@ -1,6 +1,7 @@
 from pathlib import Path
 import imghdr
 import pickle
+import warnings
 from pipelime.tools.bytes import DataCoding
 from typing import Union
 import numpy as np
@@ -11,7 +12,7 @@ from collections import defaultdict
 
 
 class FSToolkit(object):
- 
+
     # Default imageio options for each image format
     OPTIONS = {
         'png': {'compress_level': 4}
@@ -80,11 +81,18 @@ class FSToolkit(object):
         return imghdr.what(filename) is not None
 
     @classmethod
+    def _numpy_load_txt(cls, filename: str) -> np.ndarray:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "loadtxt")
+            data = np.loadtxt(filename)
+        return data
+
+    @classmethod
     def is_numpy_array_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
         if ext in ['txt', 'data']:
             try:
-                np.loadtxt(filename)
+                cls._numpy_load_txt(filename)
                 return True
             except Exception:
                 return False
@@ -119,7 +127,7 @@ class FSToolkit(object):
 
         elif cls.is_numpy_array_file(filename):
             if extension in ['txt']:
-                data = np.loadtxt(filename)
+                data = cls._numpy_load_txt(filename)
             elif extension in ['npy', 'npz']:
                 data = np.load(filename)
             if data is not None:
