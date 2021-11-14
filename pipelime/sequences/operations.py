@@ -1,5 +1,6 @@
 import multiprocessing
 from loguru import logger
+from pipelime.sequences.stages import SampleStage
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
@@ -863,3 +864,23 @@ class OperationMix(SequenceOperation, Bean):
 
     def to_dict(self):
         return {}
+
+class OperationStage(MappableOperation):
+    """Transforms a `SampleStage` object into a multiprocessing-ready operation
+    that is applied on a whole dataset.
+
+    Unfortunately, this operation is not serializable, because a SampleStage object
+    might not be serializable necessarily.
+    """
+
+    def __init__(self, stage: SampleStage, **kwargs) -> None:
+        """Instantiates an `OperationStage` object
+
+        :param stage: the stage object to apply to every sample of a dataset
+        :type stage: SampleStage
+        """
+        super().__init__(**kwargs)
+        self._stage = stage
+
+    def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        return self._stage(sample)

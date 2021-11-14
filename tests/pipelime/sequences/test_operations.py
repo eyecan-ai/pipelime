@@ -20,19 +20,22 @@ from pipelime.sequences.operations import (MappableOperation,
                                            OperationShuffle,
                                            OperationSplitByQuery,
                                            OperationSplitByValue,
-                                           OperationSplits, OperationSubsample,
+                                           OperationSplits, OperationStage, OperationSubsample,
                                            OperationSum, SequenceOperation)
 from pipelime.sequences.samples import PlainSample, Sample, SamplesSequence
+from pipelime.sequences.stages import StageRemap
 from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 
 
 
 
-def _plug_test(op: SequenceOperation):
+def _plug_test(op: SequenceOperation, check_serialization: bool = True):
     """ Test what a generic SequenceOperation should do
 
     :param op: input SequenceOperation
     :type op: SequenceOperation
+    :param check_serialization: True to also check serialization/deserialization
+    :type check_serialization: bool
     """
 
     assert isinstance(op, SequenceOperation)
@@ -41,13 +44,14 @@ def _plug_test(op: SequenceOperation):
     assert op.input_port().match(op.input_port())
     assert op.output_port().match(op.output_port())
 
-    reop = op.from_dict(op.to_dict())
-    assert isinstance(reop, SequenceOperation)
-    assert isinstance(op.bean_schema(), dict)
-    op.print()
+    if check_serialization:
+        reop = op.from_dict(op.to_dict())
+        assert isinstance(reop, SequenceOperation)
+        assert isinstance(op.bean_schema(), dict)
+        op.print()
 
-    factored = BeanFactory.create(op.serialize())
-    assert isinstance(factored, SequenceOperation)
+        factored = BeanFactory.create(op.serialize())
+        assert isinstance(factored, SequenceOperation)
 
 
 class TestOperationSum(object):
@@ -543,10 +547,8 @@ class TestMappableOperation(object):
         op = self.OperationPlusOne(key, progress_bar=pb, num_workers=workers)
 
         out = op(dataset)
+        _plug_test(op, check_serialization=False)
 
-        assert op.input_port().is_valid_data(dataset)
-        assert op.output_port().is_valid_data(out)
-        
         expected_numbers = [x[key] + 1 for x in dataset]
         out_numbers = [x[key] for x in out]
 
@@ -560,4 +562,22 @@ class TestMappableOperation(object):
         
         assert len(out) == 10
 
+class TestOperationStage(object):
 
+    @pytest.mark.parametrize(("pb", "workers"), ((False, 0), (True, 0), (False, 5), (True, 5), (True, -1)))
+    def test_operation_stage(self, plain_samples_sequence_generator, pb, workers):
+        N = 32
+        key = "number"
+        key_2 = "number_2"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+        stage = StageRemap({key: key_2})
+        op = OperationStage(stage, progress_bar=pb, num_workers=workers)
+        _plug_test(op, check_serialization=False)
+        out = op(dataset)
+
+        assert isinstance(out, SamplesSequence)
+        assert N == len(out)
+        for x in out:
+            assert key_2 in x
+            assert key not in x
