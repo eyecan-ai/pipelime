@@ -1,19 +1,31 @@
-import pydash
-from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 import functools
 import hashlib
-from typing import Dict, Sequence
+import time
+from typing import Dict, Optional, Sequence
+
+import pydash
 import pytest
 import rich
-from pipelime.sequences.samples import SamplesSequence
-from pipelime.sequences.operations import (
-    OperationDict2List, OperationFilterByQuery, OperationFilterByScript, OperationFilterKeys, OperationGroupBy,
-    OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
-    OperationSplitByQuery, OperationSplitByValue, OperationSplits, OperationSubsample,
-    OperationSum, SequenceOperation, OperationMix
-)
 
 from pipelime.factories import BeanFactory
+from pipelime.sequences.operations import (MappableOperation,
+                                           OperationDict2List,
+                                           OperationFilterByQuery,
+                                           OperationFilterByScript,
+                                           OperationFilterKeys,
+                                           OperationGroupBy, OperationIdentity,
+                                           OperationMix, OperationOrderBy,
+                                           OperationPort,
+                                           OperationResetIndices,
+                                           OperationShuffle,
+                                           OperationSplitByQuery,
+                                           OperationSplitByValue,
+                                           OperationSplits, OperationSubsample,
+                                           OperationSum, SequenceOperation)
+from pipelime.sequences.samples import PlainSample, Sample, SamplesSequence
+from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
+
+
 
 
 def _plug_test(op: SequenceOperation):
@@ -320,7 +332,7 @@ class TestOperationFilterByQuery(object):
         for item in queries_items:
             query = item['query']
             expected = item['expected']
-            op = OperationFilterByQuery(query=query)
+            op = OperationFilterByQuery(query=query, num_workers=-1)
             _plug_test(op)
 
             out = op(dataset)
@@ -399,7 +411,7 @@ class TestOperationFilterKeys(object):
         for item in keys_to_filter:
             keys = item['keys']
             negate = item['negate']
-            op = OperationFilterKeys(keys=keys, negate=negate)
+            op = OperationFilterKeys(keys=keys, negate=negate, num_workers=-1)
             _plug_test(op)
             out = op(dataset)
 
@@ -501,52 +513,51 @@ class TestOperationFilterByScript(object):
         assert len(out) < len(dataset)
 
 
-class TestOperationMix(object):
+class TestMappableOperation(object):
 
-    def _process(self, N, keys_to_filter, gen):
-        D = len(keys_to_filter)
-        datasets = []
-        for idx in range(D):
-            d = gen('d{idx}_', N)
-            op_filter = OperationFilterKeys(keys_to_filter[idx])
-            d = op_filter(d)
-            datasets.append(d)
-        return datasets
+    class OperationPlusOne(MappableOperation):
+        def __init__(self, key: str, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._key = key
 
-    def test_mix(self, plain_samples_sequence_generator):
+        def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+            sample = sample.copy()
+            sample[self._key] += 1
+            return sample
+
+    class OperationLessThan10(MappableOperation):
+        def __init__(self, key: str, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._key = key
+
+        def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+            cond = sample[self._key] < 10
+            return sample if cond else None
+
+    @pytest.mark.parametrize(("pb", "workers"), ((False, 0), (True, 0), (False, 5), (True, 5), (True, -1)))
+    def test_mappable_operation(self, plain_samples_sequence_generator, pb, workers):
         N = 32
-        keys_to_filter = [
-            ["idx"],
-            ["number", "reverse_number"],
-            ["fraction"],
-            ["odd", "data0", "data1"],
-            ["metadata"],
-        ]
-        datasets = self._process(N, keys_to_filter, plain_samples_sequence_generator)
+        key = "number"
 
-        op = OperationMix()
-        _plug_test(op)
+        dataset = plain_samples_sequence_generator("d0_", N)
+        op = self.OperationPlusOne(key, progress_bar=pb, num_workers=workers)
 
-        out = op(datasets)
+        out = op(dataset)
+
+        assert op.input_port().is_valid_data(dataset)
+        assert op.output_port().is_valid_data(out)
+        
+        expected_numbers = [x[key] + 1 for x in dataset]
+        out_numbers = [x[key] for x in out]
+
         assert isinstance(out, SamplesSequence)
         assert N == len(out)
-        expected_keys = set()
-        for k in keys_to_filter:
-            expected_keys = expected_keys.union(k)
-        for x in out:
-            assert set(x.keys()) == expected_keys
+        for x, y in zip(expected_numbers, out_numbers):
+            assert x == y, (expected_numbers, out_numbers)
 
-        datasets[0] = SamplesSequence([datasets[0][i] for i in range(1, len(datasets[0]))])
-        with pytest.raises(AssertionError):
-            out = op(datasets)
+        op = self.OperationLessThan10(key)
+        out = op(dataset)
+        
+        assert len(out) == 10
 
-        keys_to_filter = [
-            ["idx"],
-            ["number", "reverse_number", "fraction"],
-            ["fraction"],
-            ["odd", "data0", "data1"],
-            ["metadata"],
-        ]
-        datasets = self._process(N, keys_to_filter, plain_samples_sequence_generator)
-        with pytest.raises(AssertionError):
-            out = op(datasets)
+
