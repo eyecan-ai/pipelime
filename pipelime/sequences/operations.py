@@ -1,19 +1,19 @@
+import multiprocessing
 from loguru import logger
-import loguru
-from pipelime.sequences.stages import StageKeysFilter
-from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger, IdGeneratorUUID
+from pipelime.sequences.stages import SampleStage
+from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
 from pipelime.factories import Bean, BeanFactory
 import pydash as py_
 import dictquery as dq
 import numpy as np
 import random
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
-from pipelime.sequences.samples import FileSystemSample, GroupedSample, PlainSample, Sample, SamplesSequence
+from typing import Any, Callable, Dict, Optional, Sequence, Union
+from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
 from abc import ABC, abstractmethod
 from schema import Or, Schema
 import rich
 import copy
-
+from rich.progress import track
 
 class OperationPort(object):
 
@@ -66,6 +66,89 @@ class SequenceOperation(ABC):
             'input': self.input_port(),
             'output': self.output_port()
         })
+
+
+class MappableOperation(SequenceOperation):
+    """Abstract class for generic mappable operations. A mappable operation has the
+    following requirements:
+
+    - Takes as input a single `SamplesSequence` `A`
+    - Returns a single `SamplesSequence` `B`
+    - len(`A`) >= len(`B`)
+    - Elements of `A` and `B` have the same order
+    - Each element of `B` is the result of a custom function applied on the 
+      corresponding element in sequence `A`.
+
+    `MappableOperation` automatically takes care of progress bar and multiprocessing, so
+    you do not need to write custom multiprocessing logic every time you implement this
+    kind of operation.
+    """
+
+    def __init__(self, num_workers: int = 0, progress_bar: bool = False) -> None:
+        """Constructor for `MappableOperation` subclasses
+
+        :param num_workers: the number of multiprocessing workers, set to -1 to spawn as 
+        many workers as possible, set to 0 to execute on current process, defaults to 0
+        :type num_workers: int, optional
+        :param progress_bar: Enable/disable rich progress bar printing on stdout, defaults to False
+        :type progress_bar: bool, optional
+        """
+        super().__init__()
+        self._num_workers = num_workers
+        self._progress_bar = progress_bar
+        self.pbar_desc = f"{self.__class__.__name__}..."
+
+    def input_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    @abstractmethod
+    def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        """Custom function that transforms a sample of sequence `A` to a sample of sequence `B`
+
+        :param sample: A sample of sequence `A`
+        :type sample: Sample
+        :return: The transformed sample of sequence `B`, None to discard the sample.
+        :rtype: Optional[Sample]
+        """
+        pass
+
+    def __call__(self, x: SamplesSequence) -> SamplesSequence:
+        super().__call__(x)
+        new_sequence = []
+        total = len(x)
+
+        if self._num_workers > 0 or self._num_workers == -1:
+            num_workers = None if self._num_workers == -1 else self._num_workers
+            pool = multiprocessing.Pool(processes=num_workers)
+            new_sequence = pool.imap(self.apply_to_sample, x)
+            
+            if self._progress_bar:
+                new_sequence = track(new_sequence, total=total)
+
+        else:
+            if self._progress_bar:
+                x = track(x)
+
+            for sample in x:
+                new_sample = self.apply_to_sample(sample)
+                new_sequence.append(new_sample)
+
+        new_sequence = [x for x in new_sequence if x is not None]
+
+        return SamplesSequence(samples=new_sequence)
+
+    @classmethod
+    def bean_schema(cls) -> dict:
+        return {"num_workers": int, "progress_bar": bool}
+
+    def to_dict(self) -> dict:
+        return {
+            "num_workers": self._num_workers,
+            "progress_bar": self._progress_bar,
+        }
 
 
 @BeanFactory.make_serializable
@@ -368,9 +451,9 @@ class OperationDict2List(SequenceOperation, Bean):
 
 
 @BeanFactory.make_serializable
-class OperationFilterByQuery(SequenceOperation, Bean):
+class OperationFilterByQuery(MappableOperation, Bean):
 
-    def __init__(self, query: str) -> None:
+    def __init__(self, query: str, **kwargs) -> None:
         """ Filter sequence elements based on query string. If sample contains a 'metadata' item
         storing a dict like {'metadata':{'num': 10}}, a query string could be something like
         query = '`metadata.num` > 10' .
@@ -378,38 +461,18 @@ class OperationFilterByQuery(SequenceOperation, Bean):
         :param query: query string (@see dictquery)
         :type query: str
         """
+        super().__init__(**kwargs)
         self._query = query
 
-    def input_port(self):
-        return OperationPort(SamplesSequence)
-
-    def output_port(self):
-        return OperationPort(SamplesSequence)
-
-    def __call__(self, x: SamplesSequence) -> SamplesSequence:
-        super().__call__(x)
-        filtered_samples = []
-        for sample in x.samples:
-            if dq.match(sample, self._query):
-                filtered_samples.append(sample)
-        return SamplesSequence(samples=filtered_samples)
+    def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        return sample if dq.match(sample, self._query) else None
 
     @classmethod
     def bean_schema(cls) -> dict:
-        return {
-            'query': str
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationFilterByQuery(
-            query=d['query']
-        )
+        return {'query': str, **super().bean_schema()}
 
     def to_dict(self):
-        return {
-            'query': self._query
-        }
+        return {'query': self._query, **super().to_dict()}
 
 
 @BeanFactory.make_serializable
@@ -646,9 +709,9 @@ class OperationOrderBy(SequenceOperation, Bean):
 
 
 @BeanFactory.make_serializable
-class OperationFilterKeys(SequenceOperation, Bean):
+class OperationFilterKeys(MappableOperation, Bean):
 
-    def __init__(self, keys: list, negate: bool = False) -> None:
+    def __init__(self, keys: list, negate: bool = False, **kwargs) -> None:
         """ Filter sequence elements by keys
 
         :param keys: list of keys to preserve
@@ -656,36 +719,34 @@ class OperationFilterKeys(SequenceOperation, Bean):
         :param negate: TRUE to delete input keys, FALSE delete all but keys
         :type negate: bool
         """
+        super().__init__(**kwargs)
         self._keys = keys
         self._negate = negate
-        self._stage = StageKeysFilter(keys=keys, negate=negate)
 
-    def input_port(self):
-        return OperationPort(SamplesSequence)
-
-    def output_port(self):
-        return OperationPort(SamplesSequence)
-
-    def __call__(self, x: SamplesSequence) -> SamplesSequence:
-        super().__call__(x)
-        filtered_samples = []
-        for sample in x.samples:
-            filtered_samples.append(self._stage(sample))
-        return SamplesSequence(samples=filtered_samples)
+    def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        sample = sample.copy()
+        if self._negate:
+            to_drop = set(sample.keys()).intersection(self._keys)
+        else:
+            to_drop = set(sample.keys()).difference(self._keys)
+        for k in to_drop:
+            del sample[k]
+        return sample
 
     @classmethod
     def bean_schema(cls) -> dict:
         return {
             'keys': list,
-            'negate': bool
+            'negate': bool,
+            **super().bean_schema()
         }
 
     def to_dict(self):
         return {
             'keys': self._keys,
-            'negate': self._negate
+            'negate': self._negate,
+            **super().to_dict()
         }
-
 
 @BeanFactory.make_serializable
 class OperationFilterByScript(SequenceOperation, Bean):
@@ -803,3 +864,23 @@ class OperationMix(SequenceOperation, Bean):
 
     def to_dict(self):
         return {}
+
+class OperationStage(MappableOperation):
+    """Transforms a `SampleStage` object into a multiprocessing-ready operation
+    that is applied on a whole dataset.
+
+    Unfortunately, this operation is not serializable, because a SampleStage object
+    might not be serializable necessarily.
+    """
+
+    def __init__(self, stage: SampleStage, **kwargs) -> None:
+        """Instantiates an `OperationStage` object
+
+        :param stage: the stage object to apply to every sample of a dataset
+        :type stage: SampleStage
+        """
+        super().__init__(**kwargs)
+        self._stage = stage
+
+    def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        return self._stage(sample)
