@@ -256,7 +256,7 @@ class TestUnderfolderWriterMultiprocessing(object):
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
 
-        workers_options = [1, 0, 1, 2, 3, 4]
+        workers_options = [-1, 0, 1, 2, 3, 4]
 
         for num_workers in workers_options:
             writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))

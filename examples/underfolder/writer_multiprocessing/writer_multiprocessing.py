@@ -1,8 +1,8 @@
-from tqdm import tqdm
 from pipelime.sequences.samples import PlainSample,  SamplesSequence
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 import tempfile
 import rich
+from rich.progress import track
 import numpy as np
 import time
 import shutil
@@ -16,7 +16,7 @@ def new_sample(i) -> PlainSample:
 # ➡️➡️➡️ Reader
 N = 1000
 pool = multiprocessing.Pool()
-samples = list(tqdm(pool.imap_unordered(new_sample, range(N)), total=N))
+samples = list(track(pool.imap_unordered(new_sample, range(N)), total=N))
 sequence = SamplesSequence(samples=samples)
 
 print(len(sequence))
