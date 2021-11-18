@@ -5,7 +5,7 @@ schema
 numpy
 albumentations>=0.5.2
 choixe
-imageio
+imageio<=2.10.5
 pydash
 Pillow>=8.0.0
 appdirs
