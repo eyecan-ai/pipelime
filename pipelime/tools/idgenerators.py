@@ -1,20 +1,17 @@
-
+import uuid
 from abc import ABC, abstractmethod
 from itertools import count
-from pipelime.factories import Bean, BeanFactory
-import uuid
+
+from choixe.spooks import Spook
 
 
 class IdGenerator(ABC):
-
     @abstractmethod
     def generate(self):
         pass
 
 
-@BeanFactory.make_serializable
-class IdGeneratorInteger(IdGenerator, Bean):
-
+class IdGeneratorInteger(IdGenerator, Spook):
     def __init__(self) -> None:
         super().__init__()
         self.COUNTER = count()
@@ -22,9 +19,10 @@ class IdGeneratorInteger(IdGenerator, Bean):
     def generate(self):
         return next(self.COUNTER)
 
+    def to_dict(self) -> dict:
+        return {}
 
-@BeanFactory.make_serializable
-class IdGeneratorUUID(IdGenerator, Bean):
 
+class IdGeneratorUUID(IdGenerator, Spook):
     def generate(self):
         return str(uuid.uuid1())

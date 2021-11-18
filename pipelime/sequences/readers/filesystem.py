@@ -1,20 +1,25 @@
-from pathlib import Path
-from typing import Dict, Sequence, Union
-from pipelime.factories import Bean, BeanFactory
-from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
-from pipelime.sequences.samples import FileSystemSample
-from pipelime.filesystem.toolkit import FSToolkit
-from schema import Optional
 import multiprocessing
+from pathlib import Path
+from typing import Union
+
 import tqdm
 from loguru import logger
+from schema import Optional
+
+from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
+from pipelime.sequences.samples import FileSystemSample
 
 
 class UnderfolderReader(BaseReader):
     DATA_SUBFOLDER = "data"
 
     def __init__(
-        self, folder: str, copy_root_files: bool = True, lazy_samples: bool = True, num_workers: int = 0
+        self,
+        folder: str,
+        copy_root_files: bool = True,
+        lazy_samples: bool = True,
+        num_workers: int = 0,
     ) -> None:
 
         self._folder = Path(folder)
@@ -37,9 +42,16 @@ class UnderfolderReader(BaseReader):
 
         if self._num_workers == -1 or self._num_workers > 0:
             if self._lazy_samples:
-                logger.warning(f'Multiprocessing with Lazy Samples are useless!')
-            pool = multiprocessing.Pool(None if self._num_workers == -1 else self._num_workers)
-            samples = list(tqdm.tqdm(pool.imap(self._read_sample, range(len(self._ids))), total=len(self._ids)))
+                logger.warning(f"Multiprocessing with Lazy Samples are useless!")
+            pool = multiprocessing.Pool(
+                None if self._num_workers == -1 else self._num_workers
+            )
+            samples = list(
+                tqdm.tqdm(
+                    pool.imap(self._read_sample, range(len(self._ids))),
+                    total=len(self._ids),
+                )
+            )
         else:
             samples = []
             for idx in tqdm.tqdm(range(len(self._ids))):
@@ -119,6 +131,3 @@ class UnderfolderReader(BaseReader):
 
     def to_dict(self) -> dict:
         return {"folder": str(self._folder), "copy_root_files": self._copy_root_files}
-
-
-BeanFactory.register_bean(UnderfolderReader)

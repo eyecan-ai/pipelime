@@ -1,32 +1,22 @@
-import albumentations as A
 from abc import ABC, abstractmethod
-from typing import Dict, Hashable, Sequence, Union
-from pipelime.factories import Bean, BeanFactory
+from typing import Dict, Optional, Sequence
+
+import albumentations as A
+from choixe.spooks import Spook
+
 from pipelime.sequences.samples import Sample
 
 
-class SampleStage(ABC):
-
+class SampleStage(ABC, Spook):
     def __init__(self):
         pass
 
     @abstractmethod
-    def __call__(self, x:
-                 Union[
-                     Sample,
-                     Sequence[Sample],
-                     Dict[Hashable, Sample]
-                 ]) -> Union[
-                     Sample,
-                     Sequence[Sample],
-                     Dict[Hashable, Sample]
-    ]:
+    def __call__(self, x: Sample) -> Sample:
         pass
 
 
-@BeanFactory.make_serializable
-class StageCompose(SampleStage, Bean):
-
+class StageCompose(SampleStage):
     def __init__(self, stages: Sequence[SampleStage]):
         super().__init__()
         self._stages = stages
@@ -38,48 +28,29 @@ class StageCompose(SampleStage, Bean):
         return out
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'stages': list
-        }
+    def spook_schema(cls) -> dict:
+        return {"stages": list}
 
     @classmethod
     def from_dict(cls, d: dict):
-        stages = [BeanFactory.create(s) for s in d['stages']]
+        stages = [Spook.create(s) for s in d["stages"]]
         return StageCompose(stages=stages)
 
     def to_dict(self):
-        return {
-            'stages': [s.serialize() for s in self._stages]
-        }
+        return {"stages": [s.serialize() for s in self._stages]}
 
 
-@BeanFactory.make_serializable
-class StageIdentity(SampleStage, Bean):
-
+class StageIdentity(SampleStage):
     def __init__(self):
         super().__init__()
 
     def __call__(self, x: any) -> any:
         return x
 
-    @classmethod
-    def bean_schema(cls) -> dict:
-        return {}
 
-    @classmethod
-    def from_dict(cls, d: dict):
-        return StageIdentity()
-
-    def to_dict(self):
-        return {}
-
-
-@BeanFactory.make_serializable
-class StageRemap(SampleStage, Bean):
-
+class StageRemap(SampleStage):
     def __init__(self, remap: dict, remove_missing: bool = True):
-        """ Remaps keys in sample
+        """Remaps keys in sample
 
         :param remap: old_key:new_key dictionary remap
         :type remap: dict
@@ -91,10 +62,8 @@ class StageRemap(SampleStage, Bean):
         self._remove_missing = remove_missing
 
     def __call__(self, x: Sample) -> Sample:
-
         out: Sample = x.copy()
         for k in x.keys():
-            # for k, v in x.items():
             if k in self._remap:
                 out.rename(k, self._remap[k])
             else:
@@ -103,31 +72,20 @@ class StageRemap(SampleStage, Bean):
         return out
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'remap': dict,
-            'remove_missing': bool
-        }
+    def spook_schema(cls) -> dict:
+        return {"remap": dict, "remove_missing": bool}
 
     @classmethod
     def from_dict(cls, d: dict):
-        return StageRemap(
-            remap=d['remap'],
-            remove_missing=d['remove_missing']
-        )
+        return StageRemap(remap=d["remap"], remove_missing=d["remove_missing"])
 
     def to_dict(self):
-        return {
-            'remap': self._remap,
-            'remove_missing': self._remove_missing
-        }
+        return {"remap": self._remap, "remove_missing": self._remove_missing}
 
 
-@BeanFactory.make_serializable
-class StageKeysFilter(SampleStage, Bean):
-
+class StageKeysFilter(SampleStage):
     def __init__(self, keys: list, negate: bool = False):
-        """ Filter sample keys
+        """Filter sample keys
 
         :param keys: list of keys to preserve
         :type keys: list
@@ -148,22 +106,14 @@ class StageKeysFilter(SampleStage, Bean):
         return out
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'keys': list,
-            'negate': bool
-        }
+    def spook_schema(cls) -> dict:
+        return {"keys": list, "negate": bool}
 
     def to_dict(self):
-        return {
-            'keys': self._keys,
-            'negate': self._negate
-        }
+        return {"keys": self._keys, "negate": self._negate}
 
 
-@BeanFactory.make_serializable
-class StageAugmentations(SampleStage, Bean):
-
+class StageAugmentations(SampleStage):
     def __init__(self, transform_cfg: dict, targets: dict):
         super().__init__()
         self._transform_cfg = transform_cfg
@@ -190,24 +140,17 @@ class StageAugmentations(SampleStage, Bean):
 
             return out
         except Exception as e:
-            raise Exception(f'Stage[{self.__class__.__name__}] -> {e}')
+            raise Exception(f"Stage[{self.__class__.__name__}] -> {e}")
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'transform_cfg': dict,
-            'targets': dict
-        }
+    def spook_schema(cls) -> dict:
+        return {"transform_cfg": dict, "targets": dict}
 
     @classmethod
     def from_dict(cls, d: dict):
         return StageAugmentations(
-            transform_cfg=d['transform_cfg'],
-            targets=d['targets']
+            transform_cfg=d["transform_cfg"], targets=d["targets"]
         )
 
     def to_dict(self):
-        return {
-            'transform_cfg': self._transform_cfg,
-            'targets': self._targets
-        }
+        return {"transform_cfg": self._transform_cfg, "targets": self._targets}

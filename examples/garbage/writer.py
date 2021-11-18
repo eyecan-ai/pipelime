@@ -1,5 +1,4 @@
 import re
-from pipelime.factories import Bean, BeanFactory
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.sequences.operations import OperationFilterByQuery, OperationSubsample

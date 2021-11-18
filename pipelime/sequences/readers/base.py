@@ -1,16 +1,17 @@
 from typing import Dict, Sequence, Union
-from pipelime.factories import Bean
-from pipelime.sequences.samples import SamplesSequence
+
+from choixe.spooks import Spook
 from deepdiff import DeepDiff
+
+from pipelime.sequences.samples import SamplesSequence
 
 
 class ReaderTemplate(object):
-
     def __init__(
         self,
         extensions_map: Dict[str, any],
         root_files_keys: Sequence[str],
-        idx_length: int = 5
+        idx_length: int = 5,
     ):
         self.extensions_map = extensions_map
         self.root_files_keys = root_files_keys
@@ -24,10 +25,9 @@ class ReaderTemplate(object):
         return equality
 
 
-class BaseReader(SamplesSequence, Bean):
-
+class BaseReader(SamplesSequence, Spook):
     def get_reader_template(self) -> Union[ReaderTemplate, None]:
-        """ Retrieves the template of the reader, i.e. a mapping
+        """Retrieves the template of the reader, i.e. a mapping
         between sample_key/file_extension/encoding and a list of root files keys
 
         :rtype: Union[ReaderTemplate, None]

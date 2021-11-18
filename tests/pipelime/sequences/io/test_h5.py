@@ -1,13 +1,15 @@
+from pathlib import Path
+
+import h5py
+import numpy as np
+import pytest
+from choixe.spooks import Spook
+
+from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.h5 import H5Item, H5Reader, H5Sample
+from pipelime.sequences.samples import Sample
 from pipelime.sequences.writers.base import BaseWriter
 from pipelime.sequences.writers.h5 import H5Writer
-import numpy as np
-from pathlib import Path
-from pipelime.factories import BeanFactory
-from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.samples import Sample
-from pipelime.sequences.readers.h5 import H5Item, H5Reader, H5Sample
-import pytest
-import h5py
 
 
 def _plug_test(reader: BaseReader):
@@ -23,7 +25,7 @@ def _plug_test(reader: BaseReader):
     rereader = reader.hydrate(reader.serialize())
     assert isinstance(rereader, BaseReader)
 
-    factored = BeanFactory.create(reader.serialize())
+    factored = Spook.create(reader.serialize())
     assert isinstance(factored, BaseReader)
 
 
@@ -40,7 +42,7 @@ def _plug_test_writer(writer: BaseWriter):
     rewriter = writer.hydrate(writer.serialize())
     assert isinstance(rewriter, BaseWriter)
 
-    factored = BeanFactory.create(writer.serialize())
+    factored = Spook.create(writer.serialize())
     assert isinstance(factored, BaseWriter)
 
 

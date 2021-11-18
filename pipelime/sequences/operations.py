@@ -1,31 +1,35 @@
+from __future__ import annotations
+
+import copy
 import multiprocessing
-from loguru import logger
-from pipelime.sequences.stages import SampleStage
-from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
-from pipelime.factories import Bean, BeanFactory
-import pydash as py_
+import random
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, Optional, Sequence, Union
+
 import dictquery as dq
 import numpy as np
-import random
-from typing import Any, Callable, Dict, Optional, Sequence, Union
-from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
-from abc import ABC, abstractmethod
-from schema import Or, Schema
+import pydash as py_
 import rich
-import copy
+from choixe.spooks import Spook
+from loguru import logger
 from rich.progress import track
+from schema import Or, Schema
+
+from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
+from pipelime.sequences.stages import SampleStage
+from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
+
 
 class OperationPort(object):
-
     def __init__(self, schema: dict):
-        """ Creates an Operation Port with an associated schema (as dict)
+        """Creates an Operation Port with an associated schema (as dict)
 
         :param schema: port data schema
         :type schema: dict
         """
         self._schema = Schema(schema)
 
-    def match(self, o: 'OperationPort'):
+    def match(self, o: "OperationPort"):
         return self._schema.json_schema(0) == o._schema.json_schema(0)
 
     def is_valid_data(self, o: Any):
@@ -36,8 +40,7 @@ class OperationPort(object):
 
 
 class SequenceOperation(ABC):
-    """Object representing a generic pipeline operation on a sequence
-    """
+    """Object representing a generic pipeline operation on a sequence"""
 
     def __init__(self) -> None:
         pass
@@ -55,17 +58,19 @@ class SequenceOperation(ABC):
         p = self.input_port()
         assert p.is_valid_data(x)
 
-    def match(self, x: 'SequenceOperation'):
+    def match(self, x: "SequenceOperation"):
         p0 = self.output_port()
         p1 = x.input_port()
         return p0.match(p1)
 
     def print(self):
-        rich.print({
-            'name': self.__class__.__name__,
-            'input': self.input_port(),
-            'output': self.output_port()
-        })
+        rich.print(
+            {
+                "name": self.__class__.__name__,
+                "input": self.input_port(),
+                "output": self.output_port(),
+            }
+        )
 
 
 class MappableOperation(SequenceOperation):
@@ -76,7 +81,7 @@ class MappableOperation(SequenceOperation):
     - Returns a single `SamplesSequence` `B`
     - len(`A`) >= len(`B`)
     - Elements of `A` and `B` have the same order
-    - Each element of `B` is the result of a custom function applied on the 
+    - Each element of `B` is the result of a custom function applied on the
       corresponding element in sequence `A`.
 
     `MappableOperation` automatically takes care of progress bar and multiprocessing, so
@@ -87,7 +92,7 @@ class MappableOperation(SequenceOperation):
     def __init__(self, num_workers: int = 0, progress_bar: bool = False) -> None:
         """Constructor for `MappableOperation` subclasses
 
-        :param num_workers: the number of multiprocessing workers, set to -1 to spawn as 
+        :param num_workers: the number of multiprocessing workers, set to -1 to spawn as
         many workers as possible, set to 0 to execute on current process, defaults to 0
         :type num_workers: int, optional
         :param progress_bar: Enable/disable rich progress bar printing on stdout, defaults to False
@@ -124,7 +129,7 @@ class MappableOperation(SequenceOperation):
             num_workers = None if self._num_workers == -1 else self._num_workers
             pool = multiprocessing.Pool(processes=num_workers)
             new_sequence = pool.imap(self.apply_to_sample, x)
-            
+
             if self._progress_bar:
                 new_sequence = track(new_sequence, total=total)
 
@@ -141,7 +146,7 @@ class MappableOperation(SequenceOperation):
         return SamplesSequence(samples=new_sequence)
 
     @classmethod
-    def bean_schema(cls) -> dict:
+    def spook_schema(cls) -> dict:
         return {"num_workers": int, "progress_bar": bool}
 
     def to_dict(self) -> dict:
@@ -151,12 +156,9 @@ class MappableOperation(SequenceOperation):
         }
 
 
-@BeanFactory.make_serializable
-class OperationSum(SequenceOperation, Bean):
-
+class OperationSum(SequenceOperation, Spook):
     def __init__(self) -> None:
-        """ Concatenatas multiple sequences
-        """
+        """Concatenatas multiple sequences"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -172,24 +174,10 @@ class OperationSum(SequenceOperation, Bean):
             new_samples += s.samples
         return SamplesSequence(samples=new_samples)
 
-    @classmethod
-    def bean_schema(cls) -> dict:
-        return {}
 
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationSum()
-
-    def to_dict(self):
-        return {}
-
-
-@BeanFactory.make_serializable
-class OperationIdentity(SequenceOperation, Bean):
-
+class OperationIdentity(SequenceOperation, Spook):
     def __init__(self) -> None:
-        """ No Op
-        """
+        """No Op"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -202,26 +190,14 @@ class OperationIdentity(SequenceOperation, Bean):
         super().__call__(x)
         return x
 
-    @classmethod
-    def bean_schema(cls) -> dict:
-        return {}
 
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationIdentity()
-
-    def to_dict(self):
-        return {}
-
-
-@BeanFactory.make_serializable
-class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
-
+class OperationResetIndices(SequenceOperation, Spook):  # TODO: unit test!
     def __init__(self, generator: Union[IdGenerator, None] = None) -> None:
-        """ Reset indices of sample
-        """
+        """Reset indices of sample"""
         super().__init__()
-        self._generator: Optional[IdGenerator] = generator if generator is not None else IdGeneratorInteger()
+        self._generator: Optional[IdGenerator] = (
+            generator if generator is not None else IdGeneratorInteger()
+        )
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
@@ -236,27 +212,20 @@ class OperationResetIndices(SequenceOperation, Bean):  # TODO: unit test!
         return x
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'generator': dict
-        }
+    def spook_schema(cls) -> dict:
+        return {"generator": dict}
 
     @classmethod
     def from_dict(cls, d: dict):
-        return OperationResetIndices(
-            generator=BeanFactory.create(d['generator'])
-        )
+        return OperationResetIndices(generator=Spook.create(d["generator"]))
 
     def to_dict(self):
-        return {
-            'generator': self._generator.serialize()
-        }
+        return {"generator": self._generator.serialize()}
 
 
-@BeanFactory.make_serializable
-class OperationSubsample(SequenceOperation, Bean):
+class OperationSubsample(SequenceOperation, Spook):
     def __init__(self, factor: Union[int, float]) -> None:
-        """ Subsample an input sequence elements
+        """Subsample an input sequence elements
 
         :param factor: if INT is the subsampling factor, if FLOAT is the percentage of input elements to preserve
         :type factor: Union[int, float]
@@ -275,7 +244,9 @@ class OperationSubsample(SequenceOperation, Bean):
 
         new_samples = x.samples.copy()
         if isinstance(self._factor, int):
-            new_samples = new_samples[::self._factor]  # Pick an element each `self._factor` elements
+            new_samples = new_samples[
+                :: self._factor
+            ]  # Pick an element each `self._factor` elements
         elif isinstance(self._factor, float):
             new_size = int(len(new_samples) * min(max(self._factor, 0), 1.0))
             new_samples = new_samples[:new_size]
@@ -283,28 +254,16 @@ class OperationSubsample(SequenceOperation, Bean):
         return SamplesSequence(samples=new_samples)
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'factor': Or(float, int)
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationSubsample(
-            factor=d['factor']
-        )
+    def spook_schema(cls) -> dict:
+        return {"factor": Or(float, int)}
 
     def to_dict(self):
-        return {
-            'factor': self._factor
-        }
+        return {"factor": self._factor}
 
 
-@BeanFactory.make_serializable
-class OperationShuffle(SequenceOperation, Bean):
-
+class OperationShuffle(SequenceOperation, Spook):
     def __init__(self, seed=-1) -> None:
-        """ Shuffle input sequence elements
+        """Shuffle input sequence elements
 
         :param seed: random seed (-1 for current system time), defaults to -1
         :type seed: int, optional
@@ -326,28 +285,16 @@ class OperationShuffle(SequenceOperation, Bean):
         return SamplesSequence(samples=new_data)
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'seed': int
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationShuffle(
-            seed=d['seed']
-        )
+    def spook_schema(cls) -> dict:
+        return {"seed": int}
 
     def to_dict(self):
-        return {
-            'seed': self._seed
-        }
+        return {"seed": self._seed}
 
 
-@BeanFactory.make_serializable
-class OperationSplits(SequenceOperation, Bean):
-
+class OperationSplits(SequenceOperation, Spook):
     def __init__(self, split_map: Dict[str, float]) -> None:
-        """ Splits an input sequence in multiple sub-sequences in a key/sequence map
+        """Splits an input sequence in multiple sub-sequences in a key/sequence map
 
         :param split_map: key/percengate map used as split map. Sum of percentages must be 1.0
         :type split_map: Dict[str, float]
@@ -380,12 +327,16 @@ class OperationSplits(SequenceOperation, Bean):
         chunks = []
         current_index = 0
         for s in sizes:
-            _samples = x.samples[current_index:current_index + s]
+            _samples = x.samples[current_index : current_index + s]
             chunks.append(SamplesSequence(samples=_samples))
             current_index += s
         return tuple(chunks)
 
-    def _splits_as_dict(self, x: SamplesSequence, percentages_dictionary: dict = {'train': 0.9, 'test': 0.1}):
+    def _splits_as_dict(
+        self,
+        x: SamplesSequence,
+        percentages_dictionary: dict = {"train": 0.9, "test": 0.1},
+    ):
         """Splits PandasDatabase in N objects based on a percentage dictionary name/percentage
 
         :param percentages_dictionary: percentages dictionary, defaults to {'train': 0.9, 'test': 0.1}
@@ -397,7 +348,9 @@ class OperationSplits(SequenceOperation, Bean):
         percentages = list(percentages_dictionary.values())
         chunks = self._splits(x, percentages=percentages)
         output = {}
-        assert len(names) == len(chunks), "Len of chunks is different from percentage names number"
+        assert len(names) == len(
+            chunks
+        ), "Len of chunks is different from percentage names number"
         for idx in range(len(names)):
             output[names[idx]] = chunks[idx]
         return output
@@ -407,29 +360,16 @@ class OperationSplits(SequenceOperation, Bean):
         return self._splits_as_dict(x, self._split_map)
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'split_map': {str: float}
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationSplits(
-            split_map=d['split_map']
-        )
+    def spook_schema(cls) -> dict:
+        return {"split_map": {str: float}}
 
     def to_dict(self):
-        return {
-            'split_map': self._split_map
-        }
+        return {"split_map": self._split_map}
 
 
-@BeanFactory.make_serializable
-class OperationDict2List(SequenceOperation, Bean):
-
+class OperationDict2List(SequenceOperation, Spook):
     def __init__(self) -> None:
-        """ Converts a Dict of sequences into a play list of sequences
-        """
+        """Converts a Dict of sequences into a play list of sequences"""
         super().__init__()
 
     def input_port(self):
@@ -442,19 +382,10 @@ class OperationDict2List(SequenceOperation, Bean):
         super().__call__(x)
         return list(x.values())
 
-    @classmethod
-    def bean_schema(cls) -> dict:
-        return {}
 
-    def to_dict(self):
-        return {}
-
-
-@BeanFactory.make_serializable
-class OperationFilterByQuery(MappableOperation, Bean):
-
+class OperationFilterByQuery(MappableOperation, Spook):
     def __init__(self, query: str, **kwargs) -> None:
-        """ Filter sequence elements based on query string. If sample contains a 'metadata' item
+        """Filter sequence elements based on query string. If sample contains a 'metadata' item
         storing a dict like {'metadata':{'num': 10}}, a query string could be something like
         query = '`metadata.num` > 10' .
 
@@ -468,18 +399,17 @@ class OperationFilterByQuery(MappableOperation, Bean):
         return sample if dq.match(sample, self._query) else None
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {'query': str, **super().bean_schema()}
+    def spook_schema(cls) -> dict:
+        return {"query": str, **super().spook_schema()}
 
     def to_dict(self):
-        return {'query': self._query, **super().to_dict()}
+        return {"query": self._query, **super().to_dict()}
 
 
-@BeanFactory.make_serializable
-class OperationSplitByQuery(SequenceOperation, Bean):  # TODO: Replace dictquery with pydash?
-
+# TODO: Replace dictquery with pydash?
+class OperationSplitByQuery(SequenceOperation, Spook):
     def __init__(self, query: str) -> None:
-        """ Splits sequence elements in two sub-sequences based on an input query. The first list
+        """Splits sequence elements in two sub-sequences based on an input query. The first list
         will contains elements with positve query matches, the second list the negative ones.
 
         :param query: query string (@see dictquery)
@@ -503,31 +433,17 @@ class OperationSplitByQuery(SequenceOperation, Bean):  # TODO: Replace dictquery
             else:
                 b.append(sample)
 
-        return (
-            SamplesSequence(samples=a),
-            SamplesSequence(samples=b)
-        )
+        return (SamplesSequence(samples=a), SamplesSequence(samples=b))
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'query': str
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationSplitByQuery(
-            query=d['query']
-        )
+    def spook_schema(cls) -> dict:
+        return {"query": str}
 
     def to_dict(self):
-        return {
-            'query': self._query
-        }
+        return {"query": self._query}
 
 
-@BeanFactory.make_serializable
-class OperationSplitByValue(SequenceOperation, Bean):
+class OperationSplitByValue(SequenceOperation, Spook):
     def __init__(self, key: str) -> None:
         """Similar to OperationGroupBy, but instead of using grouped samples, it simply
         splits the input dataset into many samples sequences, one for each unique value of
@@ -564,22 +480,16 @@ class OperationSplitByValue(SequenceOperation, Bean):
         return res
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {'key': str}
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationSplitByValue(key=d['key'])
+    def spook_schema(cls) -> dict:
+        return {"key": str}
 
     def to_dict(self):
-        return {'key': self._key}
+        return {"key": self._key}
 
 
-@BeanFactory.make_serializable
-class OperationGroupBy(SequenceOperation, Bean):
-
+class OperationGroupBy(SequenceOperation, Spook):
     def __init__(self, field: str, ungrouped: bool = False) -> None:
-        """ Groups sequence elements accoring to specific field
+        """Groups sequence elements accoring to specific field
 
         :param query: field string (@see pydash deep path notation)
         :type query: str
@@ -588,7 +498,7 @@ class OperationGroupBy(SequenceOperation, Bean):
         they will be put in this special group.
         :type ungrouped: bool
         """
-        self._field = field.replace('`', '')
+        self._field = field.replace("`", "")
         self._ungrouped = ungrouped
 
     def input_port(self):
@@ -624,31 +534,15 @@ class OperationGroupBy(SequenceOperation, Bean):
         return SamplesSequence(samples=out_samples)
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'field': str,
-            'ungrouped': bool
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationGroupBy(
-            field=d['field'],
-            ungrouped=d['ungrouped']
-        )
+    def spook_schema(cls) -> dict:
+        return {"field": str, "ungrouped": bool}
 
     def to_dict(self):
-        return {
-            'field': self._field,
-            'ungrouped': self._ungrouped
-        }
+        return {"field": self._field, "ungrouped": self._ungrouped}
 
 
-@BeanFactory.make_serializable
-class OperationOrderBy(SequenceOperation, Bean):
-
+class OperationOrderBy(SequenceOperation, Spook):
     class reversor:
-
         def __init__(self, obj):
             self.obj = obj
 
@@ -659,7 +553,7 @@ class OperationOrderBy(SequenceOperation, Bean):
             return other.obj < self.obj
 
     def __init__(self, order_keys: Sequence[str]) -> None:
-        """ Order sequence elements based on pydash dict key . like '`metadata.num`'.
+        """Order sequence elements based on pydash dict key . like '`metadata.num`'.
 
         :param order_keys: list of keys to order by
         :type order_keys: Sequence[str]
@@ -673,8 +567,8 @@ class OperationOrderBy(SequenceOperation, Bean):
         return OperationPort(SamplesSequence)
 
     def _order_pair_from_string(self, v: str):
-        if v.startswith('+') or v.startswith('-'):
-            return True if v[0] == '-' else False, v[1:]
+        if v.startswith("+") or v.startswith("-"):
+            return True if v[0] == "-" else False, v[1:]
         else:
             return False, v
 
@@ -691,28 +585,16 @@ class OperationOrderBy(SequenceOperation, Bean):
         return SamplesSequence(samples=sorted(x, key=self._order_by))
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'order_keys': [str]
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationOrderBy(
-            order_keys=d['order_keys']
-        )
+    def spook_schema(cls) -> dict:
+        return {"order_keys": [str]}
 
     def to_dict(self):
-        return {
-            'order_keys': self._order_keys
-        }
+        return {"order_keys": self._order_keys}
 
 
-@BeanFactory.make_serializable
-class OperationFilterKeys(MappableOperation, Bean):
-
+class OperationFilterKeys(MappableOperation, Spook):
     def __init__(self, keys: list, negate: bool = False, **kwargs) -> None:
-        """ Filter sequence elements by keys
+        """Filter sequence elements by keys
 
         :param keys: list of keys to preserve
         :type keys: list
@@ -734,25 +616,16 @@ class OperationFilterKeys(MappableOperation, Bean):
         return sample
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'keys': list,
-            'negate': bool,
-            **super().bean_schema()
-        }
+    def spook_schema(cls) -> dict:
+        return {"keys": list, "negate": bool, **super().spook_schema()}
 
     def to_dict(self):
-        return {
-            'keys': self._keys,
-            'negate': self._negate,
-            **super().to_dict()
-        }
+        return {"keys": self._keys, "negate": self._negate, **super().to_dict()}
 
-@BeanFactory.make_serializable
-class OperationFilterByScript(SequenceOperation, Bean):
 
+class OperationFilterByScript(SequenceOperation, Spook):
     def __init__(self, path_or_func: Union[str, Callable]) -> None:
-        """ Filter sequence elements based on custom python script (or callable). The script has to contain a function
+        """Filter sequence elements based on custom python script (or callable). The script has to contain a function
         named `check_sample` with signature `(sample: Sample, sequence: SampleSequence) -> bool` .
 
         :param path_or_func: python script path, or can be a callable function for On-The-Fly usage
@@ -763,21 +636,26 @@ class OperationFilterByScript(SequenceOperation, Bean):
             self._check_sample = lambda x: True
             if len(self._path) > 0:
                 import importlib.util
-                spec = importlib.util.spec_from_file_location("check_sample", self._path)
+
+                spec = importlib.util.spec_from_file_location(
+                    "check_sample", self._path
+                )
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 self._check_sample = module.check_sample
                 assert self._check_sample is not None
             else:
-                logger.warning(f'The input script function is empty! Operation performs no checks!')
+                logger.warning(
+                    f"The input script function is empty! Operation performs no checks!"
+                )
 
             self._serializable = True
         elif isinstance(path_or_func, Callable):
-            self._path = ''
+            self._path = ""
             self._check_sample = path_or_func
             self._serializable = False
         else:
-            raise NotImplementedError(f'Only str|Callable are allowed as input script ')
+            raise NotImplementedError(f"Only str|Callable are allowed as input script ")
 
     def input_port(self):
         return OperationPort(SamplesSequence)
@@ -794,30 +672,17 @@ class OperationFilterByScript(SequenceOperation, Bean):
         return SamplesSequence(samples=filtered_samples)
 
     @classmethod
-    def bean_schema(cls) -> dict:
-        return {
-            'path_or_func': str
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationFilterByScript(
-            path_or_func=d['path_or_func']
-        )
+    def spook_schema(cls) -> dict:
+        return {"path_or_func": str}
 
     def to_dict(self):
         logger.warning("Operation has on-the-fly mode! No script serialized!")
-        return {
-            'path_or_func': self._path
-        }
+        return {"path_or_func": self._path}
 
 
-@BeanFactory.make_serializable
-class OperationMix(SequenceOperation, Bean):
-
+class OperationMix(SequenceOperation, Spook):
     def __init__(self) -> None:
-        """ Mixes multiple sequences with same length and disjoint item sets
-        """
+        """Mixes multiple sequences with same length and disjoint item sets"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -844,6 +709,7 @@ class OperationMix(SequenceOperation, Bean):
 
     def __call__(self, x: Sequence[SamplesSequence]) -> SamplesSequence:
         from rich.progress import track
+
         super().__call__(x)
         self._check_length(x)
         self._check_keys(x)
@@ -854,23 +720,10 @@ class OperationMix(SequenceOperation, Bean):
                 out[i].update(seq[i])
         return out
 
-    @classmethod
-    def bean_schema(cls) -> dict:
-        return {}
 
-    @classmethod
-    def from_dict(cls, d: dict):
-        return OperationMix()
-
-    def to_dict(self):
-        return {}
-
-class OperationStage(MappableOperation):
+class OperationStage(MappableOperation, Spook):
     """Transforms a `SampleStage` object into a multiprocessing-ready operation
     that is applied on a whole dataset.
-
-    Unfortunately, this operation is not serializable, because a SampleStage object
-    might not be serializable necessarily.
     """
 
     def __init__(self, stage: SampleStage, **kwargs) -> None:
@@ -884,3 +737,15 @@ class OperationStage(MappableOperation):
 
     def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
         return self._stage(sample)
+
+    @classmethod
+    def spook_schema(cls) -> dict:
+        return {"stage": dict, **super().spook_schema()}
+
+    def to_dict(self) -> dict:
+        return {"stage": self._stage.serialize(), **super().to_dict()}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> OperationStage:
+        stage = Spook.create(d.pop("stage"))
+        return cls(stage, **d)

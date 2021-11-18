@@ -1,22 +1,18 @@
-from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.readers.h5 import H5Reader
-from pipelime.h5.toolkit import H5Database, H5ToolKit
-from pipelime.sequences.readers.filesystem import UnderfolderReader
-from rich.progress import track
-from pipelime.filesystem.toolkit import FSToolkit
-import re
 from pathlib import Path
-from pipelime.factories import Bean, BeanFactory
-from pipelime.sequences.writers.base import BaseWriter
-from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample, SamplesSequence
-from schema import Optional, Or
-import shutil
-import os
+
 import h5py
+from choixe.spooks import Spook
+from rich.progress import track
+from schema import Optional, Or
+
+from pipelime.h5.toolkit import H5Database, H5ToolKit
+from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.samples import Sample, SamplesSequence
+from pipelime.sequences.writers.base import BaseWriter
 
 
 class H5Writer(BaseWriter):
-    DATA_SUBFOLDER = 'data'
+    DATA_SUBFOLDER = "data"
     DEFAULT_EXTENSION = None
 
     def __init__(
@@ -24,9 +20,9 @@ class H5Writer(BaseWriter):
         filename: str,
         root_files_keys: list = None,
         extensions_map: dict = None,
-        zfill: int = 5
+        zfill: int = 5,
     ) -> None:
-        """ H5Writer for an input SamplesSequence
+        """H5Writer for an input SamplesSequence
 
         :param filename: destiantion hdf5 filename
         :type filename: str
@@ -80,8 +76,15 @@ class H5Writer(BaseWriter):
             for key in sample.keys():
                 if self._is_root_key(key):
                     if key not in saved_root_keys:
-                        group = self._h5database.get_global_group(key=basename, force_create=True)
-                        H5ToolKit.store_data(group, key=key, data=sample[key], encoding=self._build_item_extension(key))
+                        group = self._h5database.get_global_group(
+                            key=basename, force_create=True
+                        )
+                        H5ToolKit.store_data(
+                            group,
+                            key=key,
+                            data=sample[key],
+                            encoding=self._build_item_extension(key),
+                        )
                         # h5py.SoftLink(self._h5database.get_global_group_name(key=basename))
                         global_links[key] = h5py.SoftLink(group[key].name)
             break
@@ -91,39 +94,45 @@ class H5Writer(BaseWriter):
 
             for key in sample.keys():
                 if not self._is_root_key(key):
-                    group = self._h5database.get_sample_group(key=basename, force_create=True)
-                    H5ToolKit.store_data(group, key=key, data=sample[key], encoding=self._build_item_extension(key))
+                    group = self._h5database.get_sample_group(
+                        key=basename, force_create=True
+                    )
+                    H5ToolKit.store_data(
+                        group,
+                        key=key,
+                        data=sample[key],
+                        encoding=self._build_item_extension(key),
+                    )
                 else:
-                    group = self._h5database.get_sample_group(key=basename, force_create=True)
+                    group = self._h5database.get_sample_group(
+                        key=basename, force_create=True
+                    )
                     group[key] = global_links[key]
 
         self._h5database.close()
 
-    @ classmethod
+    @classmethod
     def bean_schema(cls) -> dict:
         return {
-            'filename': str,
-            Optional('root_files_keys'): Or(None, list),
-            Optional('extensions_map'): Or(None, dict),
-            Optional('zfill'): int,
+            "filename": str,
+            Optional("root_files_keys"): Or(None, list),
+            Optional("extensions_map"): Or(None, dict),
+            Optional("zfill"): int,
         }
 
-    @ classmethod
+    @classmethod
     def from_dict(cls, d: dict):
         return H5Writer(
-            filename=d.get('filename'),
-            root_files_keys=d.get('root_files_keys', None),
-            extensions_map=d.get('extensions_map', None),
-            zfill=d.get('zfill', 5),
+            filename=d.get("filename"),
+            root_files_keys=d.get("root_files_keys", None),
+            extensions_map=d.get("extensions_map", None),
+            zfill=d.get("zfill", 5),
         )
 
     def to_dict(self) -> dict:
         return {
-            'filename': str(self._filename),
-            'root_files_keys': self._root_files_keys,
-            'extensions_map': self._extensions_map,
-            'zfill': self._zfill
+            "filename": str(self._filename),
+            "root_files_keys": self._root_files_keys,
+            "extensions_map": self._extensions_map,
+            "zfill": self._zfill,
         }
-
-
-BeanFactory.register_bean(H5Writer)
