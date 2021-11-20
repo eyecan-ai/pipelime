@@ -21,7 +21,14 @@ from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
 
 
 class OperationPort(object):
-    def __init__(self, schema: dict):
+    """Input/Output port of a pipelime `Operation`. Declares what an operation must receive
+    as input or what it returns as output and provides methods to:
+
+    - Validate - check if an object satisfies given requirements
+    - Check if two ports are compatible with each other
+    """
+
+    def __init__(self, schema: dict) -> None:
         """Creates an Operation Port with an associated schema (as dict)
 
         :param schema: port data schema
@@ -29,13 +36,27 @@ class OperationPort(object):
         """
         self._schema = Schema(schema)
 
-    def match(self, o: "OperationPort"):
+    def match(self, o: OperationPort) -> bool:
+        """Check if this port is compabile with another port.
+
+        :param o: the other port
+        :type o: OperationPort
+        :return: True if the ports match.
+        :rtype: bool
+        """
         return self._schema.json_schema(0) == o._schema.json_schema(0)
 
-    def is_valid_data(self, o: Any):
+    def is_valid_data(self, o: Any) -> bool:
+        """Check if a python object matches the schema of this port.
+
+        :param o: any python object
+        :type o: Any
+        :return: True if the object matches the schema
+        :rtype: bool
+        """
         return self._schema.validate(o)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self._schema)
 
 
@@ -47,23 +68,51 @@ class SequenceOperation(ABC):
 
     @abstractmethod
     def input_port(self) -> OperationPort:
+        """The input port of this `SequenceOperation`.
+
+        :raises NotImplementedError: if this method is not implemented
+        :return: The input port.
+        :rtype: OperationPort
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def output_port(self) -> OperationPort:
+        """The output port of this `SequenceOperation`
+
+        :raises NotImplementedError: if this method is not implemented
+        :return: The output port.
+        :rtype: OperationPort
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def __call__(self, x: Any) -> Any:
+        """Performs the operation on input data
+
+        :param x: An object matching this operation input port.
+        :type x: Any
+        :return: The operation result, matching this operation output port.
+        :rtype: Any
+        """
         p = self.input_port()
         assert p.is_valid_data(x)
 
-    def match(self, x: "SequenceOperation"):
+    def match(self, x: SequenceOperation) -> bool:
+        """Checks if this operation can be composed with another operation -
+        i.e. if the output of this operation can be passed as input to the other operation.
+
+        :param x: Another operation to be composed with this.
+        :type x: SequenceOperation
+        :return: True if the operations are composable
+        :rtype: bool
+        """
         p0 = self.output_port()
         p1 = x.input_port()
         return p0.match(p1)
 
-    def print(self):
+    def print(self) -> None:
+        """Rich-prints this operation details."""
         rich.print(
             {
                 "name": self.__class__.__name__,
@@ -157,8 +206,9 @@ class MappableOperation(SequenceOperation):
 
 
 class OperationSum(SequenceOperation, Spook):
+    """Concatenates multiple sequences."""
+
     def __init__(self) -> None:
-        """Concatenatas multiple sequences"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -176,8 +226,9 @@ class OperationSum(SequenceOperation, Spook):
 
 
 class OperationIdentity(SequenceOperation, Spook):
+    """An Identity operation that does nothing (NoOp)."""
+
     def __init__(self) -> None:
-        """No Op"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -192,8 +243,15 @@ class OperationIdentity(SequenceOperation, Spook):
 
 
 class OperationResetIndices(SequenceOperation, Spook):  # TODO: unit test!
-    def __init__(self, generator: Union[IdGenerator, None] = None) -> None:
-        """Reset indices of sample"""
+    """Regenerates every sample id according to a custom id generation strategy."""
+
+    def __init__(self, generator: Optional[IdGenerator] = None) -> None:
+        """Creates an `OperationResetIndices` with a custom id generator.
+
+        :param generator: The id generator to use, if set to `None` a simple progressive
+        integer number generator is used. Defaults to None
+        :type generator: Optional[IdGenerator], optional
+        """
         super().__init__()
         self._generator: Optional[IdGenerator] = (
             generator if generator is not None else IdGeneratorInteger()
@@ -224,10 +282,16 @@ class OperationResetIndices(SequenceOperation, Spook):  # TODO: unit test!
 
 
 class OperationSubsample(SequenceOperation, Spook):
-    def __init__(self, factor: Union[int, float]) -> None:
-        """Subsample an input sequence elements
+    """Subsamples an input sequence picking one element every K."""
 
-        :param factor: if INT is the subsampling factor, if FLOAT is the percentage of input elements to preserve
+    def __init__(self, factor: Union[int, float]) -> None:
+        """Instantiates an `OperationSubsample` with a given factor.
+
+        :param factor: Set to:
+
+        - an `int` to specify a subsampling factor (one element every `factor`)
+        - a `float` to specify a percentage of input elements to preserve
+
         :type factor: Union[int, float]
         """
         super().__init__()
@@ -262,8 +326,10 @@ class OperationSubsample(SequenceOperation, Spook):
 
 
 class OperationShuffle(SequenceOperation, Spook):
+    """Shuffle input sequence elements"""
+
     def __init__(self, seed=-1) -> None:
-        """Shuffle input sequence elements
+        """Creates an `OperationShuffle` with an optional a random seed
 
         :param seed: random seed (-1 for current system time), defaults to -1
         :type seed: int, optional
@@ -293,8 +359,10 @@ class OperationShuffle(SequenceOperation, Spook):
 
 
 class OperationSplits(SequenceOperation, Spook):
+    """Splits an input sequence in multiple sub-sequences in a key/sequence map"""
+
     def __init__(self, split_map: Dict[str, float]) -> None:
-        """Splits an input sequence in multiple sub-sequences in a key/sequence map
+        """Creates an `OperationSplits`.
 
         :param split_map: key/percengate map used as split map. Sum of percentages must be 1.0
         :type split_map: Dict[str, float]
@@ -368,8 +436,9 @@ class OperationSplits(SequenceOperation, Spook):
 
 
 class OperationDict2List(SequenceOperation, Spook):
+    """Converts a Dict of sequences into a list of sequences"""
+
     def __init__(self) -> None:
-        """Converts a Dict of sequences into a play list of sequences"""
         super().__init__()
 
     def input_port(self):
@@ -384,18 +453,31 @@ class OperationDict2List(SequenceOperation, Spook):
 
 
 class OperationFilterByQuery(MappableOperation, Spook):
-    def __init__(self, query: str, **kwargs) -> None:
-        """Filter sequence elements based on query string. If sample contains a 'metadata' item
-        storing a dict like {'metadata':{'num': 10}}, a query string could be something like
-        query = '`metadata.num` > 10' .
+    """Filter sequence elements based on query string.
 
-        :param query: query string (@see dictquery)
+    If, for example, a sample contains a 'metadata' item
+    storing a dictionary like::
+
+        {'metadata':{'num': 10}}
+
+    a query string to keep only samples with `num` greater than 10 could be::
+
+        query = '`metadata.num` > 10'.
+
+    See dictquery docs for details.
+    """
+
+    def __init__(self, query: str, **kwargs) -> None:
+        """Creates an `OperationFilterByQuery` from custom query string.
+
+        :param query: dictquery query string
         :type query: str
         """
         super().__init__(**kwargs)
         self._query = query
 
     def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        """Applies the operation to a single sample"""
         return sample if dq.match(sample, self._query) else None
 
     @classmethod
@@ -408,11 +490,16 @@ class OperationFilterByQuery(MappableOperation, Spook):
 
 # TODO: Replace dictquery with pydash?
 class OperationSplitByQuery(SequenceOperation, Spook):
-    def __init__(self, query: str) -> None:
-        """Splits sequence elements in two sub-sequences based on an input query. The first list
-        will contains elements with positve query matches, the second list the negative ones.
+    """Splits an input sequence in two sub-sequences according to an input query. The first sequence
+    will contains elements with positve query matches, the second sequence the negative ones.
 
-        :param query: query string (@see dictquery)
+    See dictquery docs for details.
+    """
+
+    def __init__(self, query: str) -> None:
+        """Creates am `OperationSplitByQuery` from a given query string
+
+        :param query: dictquery query string
         :type query: str
         """
         self._query = query
@@ -444,12 +531,15 @@ class OperationSplitByQuery(SequenceOperation, Spook):
 
 
 class OperationSplitByValue(SequenceOperation, Spook):
-    def __init__(self, key: str) -> None:
-        """Similar to OperationGroupBy, but instead of using grouped samples, it simply
-        splits the input dataset into many samples sequences, one for each unique value of
-        the specified key
+    """Similar to OperationGroupBy, but instead of using grouped samples, it simply
+    splits the input sequence into many sequences, one for each unique value of
+    the specified key
+    """
 
-        :param key: the split key, pydash notation
+    def __init__(self, key: str) -> None:
+        """Creates an `OperationSplitByValue`
+
+        :param key: key string on which to base the splitting operation. Can be use pydash dot notation.
         :type key: str
         """
         super().__init__()
@@ -488,8 +578,10 @@ class OperationSplitByValue(SequenceOperation, Spook):
 
 
 class OperationGroupBy(SequenceOperation, Spook):
+    """Groups sequence elements accoring to specific field"""
+
     def __init__(self, field: str, ungrouped: bool = False) -> None:
-        """Groups sequence elements accoring to specific field
+        """Creates an `OperationGroupBy`
 
         :param query: field string (@see pydash deep path notation)
         :type query: str
@@ -542,6 +634,8 @@ class OperationGroupBy(SequenceOperation, Spook):
 
 
 class OperationOrderBy(SequenceOperation, Spook):
+    """Performs multiple-key sorting of an input sequence."""
+
     class reversor:
         def __init__(self, obj):
             self.obj = obj
@@ -553,10 +647,15 @@ class OperationOrderBy(SequenceOperation, Spook):
             return other.obj < self.obj
 
     def __init__(self, order_keys: Sequence[str]) -> None:
-        """Order sequence elements based on pydash dict key . like '`metadata.num`'.
+        """Creates an `OperationOrderBy` from list of sorting keys
 
-        :param order_keys: list of keys to order by
+        :param order_keys: list of keys to order by. Prepend a `+` or `-` sign to specify
+        if sorting order should be ascending or descending.
         :type order_keys: Sequence[str]
+
+        Example::
+
+            order_keys = ['+metadata.value_a', '-metadata.value_b'].
         """
         self._order_keys = order_keys
 
@@ -593,12 +692,16 @@ class OperationOrderBy(SequenceOperation, Spook):
 
 
 class OperationFilterKeys(MappableOperation, Spook):
+    """Filters items of every sample of a sequence"""
+
     def __init__(self, keys: list, negate: bool = False, **kwargs) -> None:
-        """Filter sequence elements by keys
+        """Creates an `OperationFilterKeys`
 
         :param keys: list of keys to preserve
         :type keys: list
-        :param negate: TRUE to delete input keys, FALSE delete all but keys
+        :param negate: Set to:
+         - `True` to delete input keys.
+         - `False` to delete all but keys
         :type negate: bool
         """
         super().__init__(**kwargs)
@@ -606,6 +709,7 @@ class OperationFilterKeys(MappableOperation, Spook):
         self._negate = negate
 
     def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        """Applies operation to a single sample"""
         sample = sample.copy()
         if self._negate:
             to_drop = set(sample.keys()).intersection(self._keys)
@@ -624,9 +728,12 @@ class OperationFilterKeys(MappableOperation, Spook):
 
 
 class OperationFilterByScript(SequenceOperation, Spook):
+    """Filter sequence elements based on custom python script (or callable). The script has to contain a function
+    named `check_sample` with signature `(sample: Sample, sequence: SampleSequence) -> bool`.
+    """
+
     def __init__(self, path_or_func: Union[str, Callable]) -> None:
-        """Filter sequence elements based on custom python script (or callable). The script has to contain a function
-        named `check_sample` with signature `(sample: Sample, sequence: SampleSequence) -> bool` .
+        """Creates an `OperationFilterByScript` from a script file or callable function.
 
         :param path_or_func: python script path, or can be a callable function for On-The-Fly usage
         :type path_or_func: Union[str, Callable]
@@ -681,8 +788,9 @@ class OperationFilterByScript(SequenceOperation, Spook):
 
 
 class OperationMix(SequenceOperation, Spook):
+    """Mixes multiple sequences with same length and disjoint item sets"""
+
     def __init__(self) -> None:
-        """Mixes multiple sequences with same length and disjoint item sets"""
         super().__init__()
 
     def input_port(self) -> OperationPort:
@@ -727,7 +835,7 @@ class OperationStage(MappableOperation, Spook):
     """
 
     def __init__(self, stage: SampleStage, **kwargs) -> None:
-        """Instantiates an `OperationStage` object
+        """Creates an `OperationStage`
 
         :param stage: the stage object to apply to every sample of a dataset
         :type stage: SampleStage
@@ -736,6 +844,7 @@ class OperationStage(MappableOperation, Spook):
         self._stage = stage
 
     def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+        """Applies the stage to a single sample"""
         return self._stage(sample)
 
     @classmethod

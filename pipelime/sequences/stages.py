@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Sequence
+from typing import Sequence
 
 import albumentations as A
 from choixe.spooks import Spook

@@ -1,12 +1,13 @@
-from pipelime.sequences.samples import Sample
-from schema import Schema
-import uuid
-import types
 import importlib.machinery
+import types
+import uuid
+
+from schema import Schema
+
+from pipelime.sequences.samples import Sample
 
 
 class SampleSchema:
-
     def __init__(self, schema: Schema, deep: bool = True):
         self._schema = schema
         self._deep = deep
@@ -27,15 +28,17 @@ class SampleSchema:
 
 
 class SchemaLoader:
-    DEFAULT_SCHEMA_VARIABLE_NAME = 'schema'
-    DEFAULT_DEEP_VARIABLE_NAME = 'deep'
+    DEFAULT_SCHEMA_VARIABLE_NAME = "schema"
+    DEFAULT_DEEP_VARIABLE_NAME = "deep"
 
     @classmethod
     def load(cls, filename: str) -> SampleSchema:
         module = cls._load_module(str(filename))
         sname = SchemaLoader.DEFAULT_SCHEMA_VARIABLE_NAME
         if not hasattr(module, sname):
-            raise ModuleNotFoundError(f'No variable with name {sname} found in file: {filename}')
+            raise ModuleNotFoundError(
+                f"No variable with name {sname} found in file: {filename}"
+            )
 
         schema = Schema(getattr(module, sname))
         deep = getattr(module, SchemaLoader.DEFAULT_DEEP_VARIABLE_NAME, True)

@@ -1,14 +1,18 @@
 import numpy as np
+
 from pipelime.sequences.readers.filesystem import UnderfolderReader
-import rich
-from pipelime.sequences.samples import FileSystemSample, FilesystemItem, GroupedSample, MemoryItem, PlainSample, SamplesSequence
+from pipelime.sequences.samples import (
+    FilesystemItem,
+    FileSystemSample,
+    GroupedSample,
+    MemoryItem,
+)
 
 
 class TestPlainSamples(object):
-
     def test_plain_sample(self, plain_samples_generator):
 
-        dataset = plain_samples_generator('d0_', 10)
+        dataset = plain_samples_generator("d0_", 10)
         for sample in dataset:
             assert set(sample.keys()) == set(sample.skeleton.keys())
             for key in sample.keys():
@@ -16,13 +20,12 @@ class TestPlainSamples(object):
 
 
 class TestGroupedSamples(object):
-
     def _empty(*args):
         pass
 
     def test_groupby_samples(self, plain_samples_generator):
 
-        dataset = plain_samples_generator('d0_', 10)
+        dataset = plain_samples_generator("d0_", 10)
 
         samples = dataset[::2]
         g = GroupedSample(samples=samples)
@@ -32,8 +35,8 @@ class TestGroupedSamples(object):
             self._empty(key, g[key], len(g))
             assert isinstance(g.metaitem(key), type(samples[0].metaitem(key)))
 
-        g.rename('image', 'NEW_IMAGE')
-        assert 'image' not in g
+        g.rename("image", "NEW_IMAGE")
+        assert "image" not in g
 
         for key in list(g.keys()):
             del g[key]
@@ -41,7 +44,7 @@ class TestGroupedSamples(object):
         assert len(g.keys()) == 0
         assert len(g_copy.keys()) == 0
 
-        g['my_new_key'] = 112.3
+        g["my_new_key"] = 112.3
         assert len(g.keys()) == 1
 
         assert len(GroupedSample(samples=[])) == 0
@@ -49,10 +52,9 @@ class TestGroupedSamples(object):
 
 
 class TestFilesystemSample(object):
-
     def test_filesystem_sample(self, filesystem_datasets, tmp_path_factory):
 
-        dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
 
         reader = UnderfolderReader(folder=dataset_folder)
 
@@ -62,17 +64,17 @@ class TestFilesystemSample(object):
             assert isinstance(sample.metaitem(key), FilesystemItem)
 
         assert len(sample) > 0
-        assert isinstance(sample['image'], np.ndarray)
+        assert isinstance(sample["image"], np.ndarray)
         assert isinstance(sample, FileSystemSample)
 
-        sample.rename('image', '_NEW_IMAGE_')
-        assert 'image' not in sample
+        sample.rename("image", "_NEW_IMAGE_")
+        assert "image" not in sample
 
-        del sample['_NEW_IMAGE_']
+        del sample["_NEW_IMAGE_"]
 
     def test_flush(self, filesystem_datasets, tmp_path_factory):
 
-        dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
 
         reader = UnderfolderReader(folder=dataset_folder)
 
@@ -92,7 +94,7 @@ class TestFilesystemSample(object):
 
     def test_filesystem_sample_nonlazy(self, filesystem_datasets, tmp_path_factory):
 
-        dataset_folder = filesystem_datasets['minimnist_underfolder']['folder']
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
         reader = UnderfolderReader(folder=dataset_folder, lazy_samples=False)
 
     def test_update(self, filesystem_datasets, tmp_path_factory):

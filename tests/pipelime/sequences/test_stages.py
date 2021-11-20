@@ -1,4 +1,5 @@
 from choixe.spooks import Spook
+
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import PlainSample
 from pipelime.sequences.stages import (

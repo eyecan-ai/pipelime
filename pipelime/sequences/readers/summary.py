@@ -1,11 +1,11 @@
 from __future__ import annotations
-from pipelime.sequences.samples import SamplesSequence
 
 from typing import Any, Iterable, Sequence, Type
 
 import numpy as np
 
 from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.samples import SamplesSequence
 
 
 class ItemInfo:
@@ -109,8 +109,7 @@ class ItemInfoFactory:
         :type reader: BaseReader
         :param key: The query key to inspect
         :type key: str
-        :param k: The first k samples to inspect, this is done to avoid reading the entire
-        dataset and speedup the summary creation. Set k<1 to inspect every sample.
+        :param k: The first k samples to inspect, this is done to avoid reading the entire dataset and speedup the summary creation. Set `k<1` to inspect every sample.
         :type k: int
         :return: An ItemInfo object
         :rtype: ItemInfo
@@ -167,9 +166,7 @@ class ItemInfoFactory:
 
         :param reader: Input pipelime BaseReader
         :type reader: BaseReader
-        :param k:
-        :param k: The first k samples to inspect, this is done to avoid reading the entire
-        dataset and speedup the summary creation. Set k<1 to inspect every sample.
+        :param k: The first k samples to inspect, this is done to avoid reading the entire dataset and speedup the summary creation. Set to k < 1 to inspect every sample.
         :type k: int
         :return: The list of all ItemInfos
         :rtype: Sequence[ItemInfo]

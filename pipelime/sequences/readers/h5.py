@@ -4,7 +4,6 @@ from typing import Dict, Hashable, Sequence, Union
 import h5py
 from schema import Optional
 
-from choixe.spooks import Spook
 from pipelime.h5.toolkit import H5Database, H5ToolKit
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import MemoryItem, MetaItem, Sample

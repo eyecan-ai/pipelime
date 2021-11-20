@@ -1,18 +1,20 @@
 import click
 
-from pipelime.cli.underfolder.operations import operation_sum
-from pipelime.cli.underfolder.operations import operation_subsample
-from pipelime.cli.underfolder.operations import operation_shuffle
-from pipelime.cli.underfolder.operations import operation_split
-from pipelime.cli.underfolder.operations import operation_filterbyquery
-from pipelime.cli.underfolder.operations import operation_splitbyquery
-from pipelime.cli.underfolder.operations import operation_filterbyscript
-from pipelime.cli.underfolder.operations import operation_filterkeys
-from pipelime.cli.underfolder.operations import operation_orderby
-from pipelime.cli.underfolder.operations import operation_split_by_value
-from pipelime.cli.underfolder.operations import operation_groupby
-from pipelime.cli.underfolder.operations import operation_mix
-from pipelime.cli.underfolder.operations import summary
+from pipelime.cli.underfolder.operations import (
+    operation_filterbyquery,
+    operation_filterbyscript,
+    operation_filterkeys,
+    operation_groupby,
+    operation_mix,
+    operation_orderby,
+    operation_shuffle,
+    operation_split,
+    operation_split_by_value,
+    operation_splitbyquery,
+    operation_subsample,
+    operation_sum,
+    summary,
+)
 
 
 @click.group()
