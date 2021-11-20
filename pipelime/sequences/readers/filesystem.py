@@ -2,7 +2,6 @@ import multiprocessing
 from pathlib import Path
 from typing import Union
 
-import tqdm
 from loguru import logger
 from schema import Optional
 
@@ -46,15 +45,10 @@ class UnderfolderReader(BaseReader):
             pool = multiprocessing.Pool(
                 None if self._num_workers == -1 else self._num_workers
             )
-            samples = list(
-                tqdm.tqdm(
-                    pool.imap(self._read_sample, range(len(self._ids))),
-                    total=len(self._ids),
-                )
-            )
+            samples = list(pool.imap(self._read_sample, range(len(self._ids))))
         else:
             samples = []
-            for idx in tqdm.tqdm(range(len(self._ids))):
+            for idx in range(len(self._ids)):
                 samples.append(self._read_sample(idx))
 
         super().__init__(samples=samples)
