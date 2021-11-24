@@ -1,10 +1,11 @@
 import uuid
-from pipelime.filesystem.toolkit import FSToolkit
-from dataclasses import dataclass
-from collections.abc import MutableMapping
 from abc import abstractmethod
+from collections.abc import MutableMapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Hashable, Sequence
+
+from pipelime.filesystem.toolkit import FSToolkit
 
 
 @dataclass

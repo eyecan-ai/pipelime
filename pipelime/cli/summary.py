@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import click
 from rich.console import Console
 from rich.table import Table
 
 from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.sequences.readers.h5 import H5Reader
 from pipelime.sequences.readers.summary import ItemInfo, ReaderSummary, TypeInfo
 from pipelime.sequences.samples import SamplesSequence
 from pipelime.tools.bytes import DataCoding

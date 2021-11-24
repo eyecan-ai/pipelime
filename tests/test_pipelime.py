@@ -3,11 +3,9 @@
 """Tests for `pipelime` package."""
 
 import pytest
-
 from click.testing import CliRunner
 
-from pipelime import pipelime
-from pipelime import cli
+from pipelime import cli, pipelime
 
 
 @pytest.fixture
@@ -39,5 +37,13 @@ def test_content(response):
 
 def test_toy_dataset_small(toy_dataset_small):
 
-    for x in ['folder', 'data_folder', 'size', 'image_size', 'zfill', 'expected_keys', 'keypoints_format']:
+    for x in [
+        "folder",
+        "data_folder",
+        "size",
+        "image_size",
+        "zfill",
+        "expected_keys",
+        "keypoints_format",
+    ]:
         assert x in toy_dataset_small

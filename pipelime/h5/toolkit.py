@@ -1,15 +1,17 @@
+import pickle
 from io import BytesIO
+from typing import Optional
+
+import h5py
 import imageio
 import numpy as np
+
 from pipelime.tools.bytes import DataCoding
-from typing import Optional
-import h5py
-import pickle
 
 
 class H5Database(object):
-    ITEMS_BRANCH_NAME = 'items'
-    GLOBAL_BRANCH_NAME = 'globals'
+    ITEMS_BRANCH_NAME = "items"
+    GLOBAL_BRANCH_NAME = "globals"
 
     def __init__(self, filename, **kwargs):
         """Generic H5Database
@@ -67,7 +69,9 @@ class H5Database(object):
         """Opens related file"""
         if not self.is_open():
             self._handle = h5py.File(
-                self.filename, "r" if self.readonly else "a", swmr=self._swmr
+                self.filename,
+                "r" if self.readonly else "a",
+                swmr=(self._swmr and self.readonly),
             )
             if self.is_empty():
                 self.initialize()
@@ -104,7 +108,7 @@ class H5Database(object):
         return group
 
     def get_sample_group(self, key: str, force_create: bool = True) -> h5py.Group:
-        """ Fetches a Sample Group by key. It pre-prend 'items' branch name to desired key
+        """Fetches a Sample Group by key. It pre-prend 'items' branch name to desired key
         to compose the fulle key, like: /<ITEM_BRANCH_NAME>/key
 
         :param key: sample key
@@ -115,24 +119,24 @@ class H5Database(object):
         :rtype: h5py.Group
         """
 
-        group_key = f'/{self.ITEMS_BRANCH_NAME}/{key}'
+        group_key = f"/{self.ITEMS_BRANCH_NAME}/{key}"
         return self.get_group(group_key, force_create=force_create)
 
     def get_sample_root(self, force_create: bool = True) -> h5py.Group:
-        """ Fetches the Sample Group root
+        """Fetches the Sample Group root
 
         :param force_create: True to create group if not present, defaults to True
         :type force_create: bool, optional
         :return: fetched Group if any
         :rtype: h5py.Group
         """
-        return self.get_group(f'/{self.ITEMS_BRANCH_NAME}/', force_create=force_create)
+        return self.get_group(f"/{self.ITEMS_BRANCH_NAME}/", force_create=force_create)
 
     def get_global_group_name(self, key: str) -> str:
-        return f'/{self.GLOBAL_BRANCH_NAME}/{key}'
+        return f"/{self.GLOBAL_BRANCH_NAME}/{key}"
 
     def get_global_group(self, key: str, force_create: bool = True) -> h5py.Group:
-        """ Fetches a Global Group by key. It pre-prend 'global' branch name to desired key
+        """Fetches a Global Group by key. It pre-prend 'global' branch name to desired key
         to compose the fulle key, like: /<GLOBAL_BRANCH_NAME>/key
 
         :param key: sample key
@@ -155,11 +159,9 @@ class H5Database(object):
 
 
 class H5ToolKit:
-    ENCODING_STRING = '_encoding'
-    ENCODING_BINARY = 'pkl'
-    OPTIONS = {
-        'png': {'compress_level': 4}
-    }
+    ENCODING_STRING = "_encoding"
+    ENCODING_BINARY = "pkl"
+    OPTIONS = {"png": {"compress_level": 4}}
     ALLOWED_ENCODINGS = DataCoding.IMAGE_CODECS + [ENCODING_BINARY]
 
     @classmethod

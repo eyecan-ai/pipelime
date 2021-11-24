@@ -1,12 +1,12 @@
 from pathlib import Path
-from pipelime.h5.toolkit import H5Database, H5ToolKit
 from typing import Dict, Hashable, Sequence, Union
-from pipelime.factories import Bean, BeanFactory
-from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.samples import FileSystemSample, MemoryItem, MetaItem, Sample
-from pipelime.filesystem.toolkit import FSToolkit
-from schema import Optional
+
 import h5py
+from schema import Optional
+
+from pipelime.h5.toolkit import H5Database, H5ToolKit
+from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.samples import MemoryItem, MetaItem, Sample
 
 
 class H5Item(MetaItem):
@@ -19,7 +19,13 @@ class H5Item(MetaItem):
 
 
 class H5Sample(Sample):
-    def __init__(self, group: h5py.Group, lazy: bool = True, copy_global_items: bool = True, id: Hashable = None):
+    def __init__(
+        self,
+        group: h5py.Group,
+        lazy: bool = True,
+        copy_global_items: bool = True,
+        id: Hashable = None,
+    ):
         """Creates a H5Sample based on a key/filename map
 
         :param group: h5py Group
@@ -72,7 +78,9 @@ class H5Sample(Sample):
             del self._cached[key]
 
     def __iter__(self):
-        return iter(self._keys)  # iter(set.union(set(self._group.keys()), set(self._cached.keys())))
+        return iter(
+            self._keys
+        )  # iter(set.union(set(self._group.keys()), set(self._cached.keys())))
 
     def __len__(self):
         return len(self._keys)
@@ -102,12 +110,11 @@ class H5Sample(Sample):
 
 
 class H5ReaderTemplate(object):
-
     def __init__(
         self,
         extensions_map: Dict[str, any],
         root_files_keys: Sequence[str],
-        idx_length: int = 5
+        idx_length: int = 5,
     ):
         self.extensions_map = extensions_map
         self.root_files_keys = root_files_keys
@@ -115,9 +122,11 @@ class H5ReaderTemplate(object):
 
 
 class H5Reader(BaseReader):
-    DATA_SUBFOLDER = 'data'
+    DATA_SUBFOLDER = "data"
 
-    def __init__(self, filename: str, copy_root_files: bool = True, lazy_samples: bool = True) -> None:
+    def __init__(
+        self, filename: str, copy_root_files: bool = True, lazy_samples: bool = True
+    ) -> None:
 
         self._filename = Path(filename)
         self._copy_root_files = copy_root_files
@@ -132,13 +141,15 @@ class H5Reader(BaseReader):
 
         samples = []
         for idx in range(len(self._ids)):
-            group = self._h5database.get_sample_group(self._ids[idx], force_create=False)
+            group = self._h5database.get_sample_group(
+                self._ids[idx], force_create=False
+            )
 
             sample = H5Sample(
                 group=group,
                 copy_global_items=self._copy_root_files,
                 lazy=self._lazy_samples,
-                id=idx
+                id=idx,
             )
             samples.append(sample)
 
@@ -154,7 +165,7 @@ class H5Reader(BaseReader):
         return key in self._root_files_keys
 
     def get_reader_template(self) -> Union[H5ReaderTemplate, None]:
-        """ Retrieves the template of the h5 reader, i.e. a mapping
+        """Retrieves the template of the h5 reader, i.e. a mapping
         between sample_key/file_extension and a list of root files keys
 
         :raises TypeError: If first sample is not a H5Sample
@@ -165,7 +176,7 @@ class H5Reader(BaseReader):
         if len(self) > 0:
             sample = self[0]
             if not isinstance(sample, H5Sample):
-                raise TypeError(f'Anomalous sample type found: {type(sample)}')
+                raise TypeError(f"Anomalous sample type found: {type(sample)}")
 
             extensions_map = {}
             idx_length = len(str(sample.id))
@@ -176,38 +187,35 @@ class H5Reader(BaseReader):
             return H5ReaderTemplate(
                 extensions_map=extensions_map,
                 root_files_keys=list(self._root_files_keys),
-                idx_length=idx_length
+                idx_length=idx_length,
             )
         else:
             None
 
     def flush(self):
-        """ Clear cache for each internal FileSystemSample """
+        """Clear cache for each internal FileSystemSample"""
         for sample in self:
             sample.flush()
 
-    @ classmethod
+    @classmethod
     def bean_schema(cls) -> dict:
         return {
-            'filename': str,
-            Optional('copy_root_files'): bool,
-            Optional('lazy_samples'): bool,
+            "filename": str,
+            Optional("copy_root_files"): bool,
+            Optional("lazy_samples"): bool,
         }
 
-    @ classmethod
+    @classmethod
     def from_dict(cls, d: dict):
         return H5Reader(
-            filename=d.get('filename'),
-            copy_root_files=d.get('copy_root_files', True),
-            lazy_samples=d.get('lazy_samples', True)
+            filename=d.get("filename"),
+            copy_root_files=d.get("copy_root_files", True),
+            lazy_samples=d.get("lazy_samples", True),
         )
 
     def to_dict(self) -> dict:
         return {
-            'filename': str(self._filename),
-            'copy_root_files': self._copy_root_files,
-            'lazy_samples': self._lazy_samples,
+            "filename": str(self._filename),
+            "copy_root_files": self._copy_root_files,
+            "lazy_samples": self._lazy_samples,
         }
-
-
-BeanFactory.register_bean(H5Reader)

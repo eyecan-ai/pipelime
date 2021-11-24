@@ -1,24 +1,26 @@
-import typing
-import os
-from choixe.spooks import Spook
 import importlib.util
-from typing import Dict, Union, Sequence
+import os
+import typing
 from pathlib import Path
+from typing import Dict, Sequence, Union
+
 import click
-from schema import Or
 import yaml
-from pipelime import user_data_dir
 from choixe.configurations import XConfig
+from choixe.spooks import Spook
+from schema import Or
+
+from pipelime import user_data_dir
 
 
 class CwlNodesManager(object):
 
-    DEFAULT_CWL_EXTENSION = 'cwl'
-    DEFAULT_META_EXTENSION = 'yml'
+    DEFAULT_CWL_EXTENSION = "cwl"
+    DEFAULT_META_EXTENSION = "yml"
 
     @classmethod
     def nodes_folder(cls) -> Path:
-        """ Default nodes folder
+        """Default nodes folder
 
         :return: folder
         :rtype: Path
@@ -31,7 +33,7 @@ class CwlNodesManager(object):
 
     @classmethod
     def get_associated_meta_path(cls, p: Path) -> Path:
-        """ Gets cwl file associated metadata path
+        """Gets cwl file associated metadata path
 
         :param p: cwl file
         :type p: Path
@@ -39,11 +41,11 @@ class CwlNodesManager(object):
         :rtype: Path
         """
 
-        return p.parent / f'{p.stem}.{cls.DEFAULT_META_EXTENSION}'
+        return p.parent / f"{p.stem}.{cls.DEFAULT_META_EXTENSION}"
 
     @classmethod
     def is_valid_cwl_file(cls, p: Path) -> bool:
-        """ Checks for valid cwl file
+        """Checks for valid cwl file
 
         :param p: cwl file
         :type p: Path
@@ -54,8 +56,8 @@ class CwlNodesManager(object):
         return p.is_file() and cls.get_associated_meta_path(p).exists()
 
     @classmethod
-    def load_cwl_node(cls, p: Path) -> 'CwlNode':
-        """ Loads cwl node from path
+    def load_cwl_node(cls, p: Path) -> "CwlNode":
+        """Loads cwl node from path
 
         :return: loaded CwlNode
         :rtype: CwlNode
@@ -69,23 +71,25 @@ class CwlNodesManager(object):
         return None
 
     @classmethod
-    def available_nodes(cls, folder: Union[str, None] = None) -> Dict[str, 'CwlNode']:
-        """ Gets a map of stored CwlNodes
+    def available_nodes(cls, folder: Union[str, None] = None) -> Dict[str, "CwlNode"]:
+        """Gets a map of stored CwlNodes
 
         :return: stored nodes map [node_name: node]
         :rtype: Dict[str, 'CwlNode']
         """
 
         folder = Path(folder) if folder is not None else cls.nodes_folder()
-        cwls = folder.glob(f'*.{cls.DEFAULT_CWL_EXTENSION}')
+        cwls = folder.glob(f"*.{cls.DEFAULT_CWL_EXTENSION}")
         cwls = [x for x in cwls if cls.is_valid_cwl_file(x)]
         nodes = [cls.load_cwl_node(x) for x in cwls]
         nodes = {x.name: x for x in nodes}
         return nodes
 
     @classmethod
-    def get_node_by_name(cls, name: str, folder: Union[str, None] = None) -> Union['CwlNode', None]:
-        """ Gets a node with the given name
+    def get_node_by_name(
+        cls, name: str, folder: Union[str, None] = None
+    ) -> Union["CwlNode", None]:
+        """Gets a node with the given name
 
         :param name: node name
         :type name: str
@@ -105,8 +109,10 @@ class CwlNodesManager(object):
         return node
 
     @classmethod
-    def create_node(cls, name: str, cwl_template: 'CwlTemplate', folder: Union[str, None] = None) -> 'CwlNode':
-        """ Creates a node with input name and CwlTemplate
+    def create_node(
+        cls, name: str, cwl_template: "CwlTemplate", folder: Union[str, None] = None
+    ) -> "CwlNode":
+        """Creates a node with input name and CwlTemplate
 
         :param name: input node name
         :type name: str
@@ -125,21 +131,17 @@ class CwlNodesManager(object):
 
         folder = Path(folder) if folder is not None else cls.nodes_folder()
         folder.mkdir(parents=True, exist_ok=True)
-        cwl_filename = folder / f'{name}.{cls.DEFAULT_CWL_EXTENSION}'
-        meta_filename = folder / f'{name}.{cls.DEFAULT_META_EXTENSION}'
+        cwl_filename = folder / f"{name}.{cls.DEFAULT_CWL_EXTENSION}"
+        meta_filename = folder / f"{name}.{cls.DEFAULT_META_EXTENSION}"
 
         cwl_template.dumps(cwl_filename)
         XConfig.from_dict(d=cwl_template.serialize()).save_to(meta_filename)
 
-        return CwlNode(
-            name=name,
-            cwl_path=str(cwl_filename),
-            cwl_template=cwl_template
-        )
+        return CwlNode(name=name, cwl_path=str(cwl_filename), cwl_template=cwl_template)
 
     @classmethod
     def delete_node(cls, name: str, folder: Union[str, None] = None):
-        """ Deletes a node given the name
+        """Deletes a node given the name
 
         :param name: node to delete name
         :type name: str
@@ -153,15 +155,17 @@ class CwlNodesManager(object):
             raise RuntimeError(f'Node with name "{name}" not found')
 
         folder = Path(folder) if folder is not None else cls.nodes_folder()
-        cwl_filename = folder / f'{name}.{cls.DEFAULT_CWL_EXTENSION}'
-        meta_filename = folder / f'{name}.{cls.DEFAULT_META_EXTENSION}'
+        cwl_filename = folder / f"{name}.{cls.DEFAULT_CWL_EXTENSION}"
+        meta_filename = folder / f"{name}.{cls.DEFAULT_META_EXTENSION}"
 
         os.remove(cwl_filename)
         os.remove(meta_filename)
 
     @classmethod
-    def initialize_workflow(cls, names: Sequence[str], folder: Union[str, None] = None) -> 'CwlWorkflowTemplate':
-        """ Initializes a cwl worflow given a list of node names
+    def initialize_workflow(
+        cls, names: Sequence[str], folder: Union[str, None] = None
+    ) -> "CwlWorkflowTemplate":
+        """Initializes a cwl worflow given a list of node names
 
         :param names: names of the nodes to create the cwl workflow
         :type names: Sequence[str]
@@ -184,8 +188,10 @@ class CwlNodesManager(object):
         return workflow_template
 
     @classmethod
-    def fill_workflow(cls, workflow: 'CwlWorkflowTemplate', folder: Union[str, None] = None) -> 'CwlWorkflowTemplate':
-        """ Fills a cwl workflow adding the cwl path for each step
+    def fill_workflow(
+        cls, workflow: "CwlWorkflowTemplate", folder: Union[str, None] = None
+    ) -> "CwlWorkflowTemplate":
+        """Fills a cwl workflow adding the cwl path for each step
 
         :param workflow: thw cwl workflow to be filled
         :type workflow: CwlWorkflowTemplate
@@ -195,18 +201,22 @@ class CwlNodesManager(object):
         :rtype: CwlWorkflowTemplate
         """
 
-        for _, opts in workflow.template['steps'].items():
-            node_name = opts['run']
+        for _, opts in workflow.template["steps"].items():
+            node_name = opts["run"]
             node = cls.get_node_by_name(node_name, folder=folder)
-            opts['run'] = node.cwl_path
+            opts["run"] = node.cwl_path
 
         return workflow
 
 
 class CwlTemplate(Spook):
-
-    def __init__(self, script: str = None, alias: Sequence[str] = None, forwards: Sequence[str] = None):
-        """ Creates a cwl template from script containing click.Command
+    def __init__(
+        self,
+        script: str = None,
+        alias: Sequence[str] = None,
+        forwards: Sequence[str] = None,
+    ):
+        """Creates a cwl template from script containing click.Command
 
         :param script: the script, defaults to None
         :type script: str, optional
@@ -229,23 +239,23 @@ class CwlTemplate(Spook):
         if self._cmd is not None:
             self._fill()
 
-    @ classmethod
+    @classmethod
     def spook_schema(cls) -> typing.Union[None, dict]:
         return {
-            'script': Or(str, None),
-            'alias': Or([str], None),
-            'forwards': Or([str], None),
+            "script": Or(str, None),
+            "alias": Or([str], None),
+            "forwards": Or([str], None),
         }
 
-    @ classmethod
+    @classmethod
     def from_dict(cls, d: dict):
         return cls(**d)
 
     def to_dict(self) -> dict:
         return {
-            'script': self._script,
-            'alias': self._alias,
-            'forwards': self._forwards
+            "script": self._script,
+            "alias": self._alias,
+            "forwards": self._forwards,
         }
 
     @property
@@ -274,7 +284,7 @@ class CwlTemplate(Spook):
 
     @property
     def inputs(self):
-        return self._template.get('inputs', None)
+        return self._template.get("inputs", None)
 
     @property
     def inputs_keys(self):
@@ -284,7 +294,7 @@ class CwlTemplate(Spook):
 
     @property
     def outputs(self):
-        return self._template.get('outputs', None)
+        return self._template.get("outputs", None)
 
     @property
     def outputs_keys(self):
@@ -293,8 +303,10 @@ class CwlTemplate(Spook):
         return []
 
     @classmethod
-    def from_command(cls, command: click.Command, alias: list = None, forwards: list = None) -> 'CwlTemplate':
-        """ Creates a cwl template directly from click.Command
+    def from_command(
+        cls, command: click.Command, alias: list = None, forwards: list = None
+    ) -> "CwlTemplate":
+        """Creates a cwl template directly from click.Command
 
         :param command: the click command
         :type command: click.Command
@@ -312,8 +324,7 @@ class CwlTemplate(Spook):
         return cwl_template
 
     def _fill(self):
-        """ Fills the template
-        """
+        """Fills the template"""
 
         self._init_template()
         if self._alias is not None:
@@ -323,7 +334,7 @@ class CwlTemplate(Spook):
             self._fill_outputs(self._forwards)
 
     def _load_click_command(self, script: str) -> Union[click.Command, None]:
-        """ Loads a click.Command from file, it assumes
+        """Loads a click.Command from file, it assumes
         that the script contains only one command,
         if there are no commands it will return None
 
@@ -348,43 +359,42 @@ class CwlTemplate(Spook):
         return cmd
 
     def _init_template(self):
-        """ Initializes the cwl template for a CommandLineTool
-        """
+        """Initializes the cwl template for a CommandLineTool"""
 
-        self._template['cwlVersion'] = 'v1.0'
-        self._template['class'] = 'CommandLineTool'
-        self._template['doc'] = ''
-        self._template['baseCommand'] = ''
-        self._template['inputs'] = dict()
-        self._template['outputs'] = dict()
+        self._template["cwlVersion"] = "v1.0"
+        self._template["class"] = "CommandLineTool"
+        self._template["doc"] = ""
+        self._template["baseCommand"] = ""
+        self._template["inputs"] = dict()
+        self._template["outputs"] = dict()
 
     def _fill_command(self, commands: list):
-        """ Fills the cwl template with the commands informations
+        """Fills the cwl template with the commands informations
 
         :param commands: the commands needed to call the script
         :type commands: list
         """
 
-        self._template['baseCommand'] = commands
+        self._template["baseCommand"] = commands
 
     def _fill_inputs(self, cmd: click.Command):
-        """ Fills the cwl template with input informations
+        """Fills the cwl template with input informations
 
         :param cmd: the click command
         :type cmd: click.Command
         """
 
-        self._template['doc'] = cmd.help
+        self._template["doc"] = cmd.help
         for param in cmd.params:
             param: click.Option
             cwl_param = dict()
-            cwl_param['doc'] = param.help
+            cwl_param["doc"] = param.help
             cwl_type = self._convert_type(param)
             cwl_param.update(cwl_type)
-            self._template['inputs'][param.name] = cwl_param
+            self._template["inputs"][param.name] = cwl_param
 
     def _convert_type(self, param: click.Option) -> dict:
-        """ Converts a click type into a cwl type
+        """Converts a click type into a cwl type
 
         :param param: the click option
         :type param: click.Option
@@ -393,97 +403,111 @@ class CwlTemplate(Spook):
         """
 
         cwl_types = dict()
-        cwl_types['type'] = []
+        cwl_types["type"] = []
         if not param.required:
-            cwl_types['type'].append('null')
+            cwl_types["type"].append("null")
 
         if not param.multiple and param.nargs == 1:
-            if isinstance(param.type, click.types.StringParamType) or isinstance(param.type, click.Choice):
-                cwl_type = 'string'
+            if isinstance(param.type, click.types.StringParamType) or isinstance(
+                param.type, click.Choice
+            ):
+                cwl_type = "string"
             elif isinstance(param.type, click.types.IntParamType):
-                cwl_type = 'int'
+                cwl_type = "int"
             elif isinstance(param.type, click.types.FloatParamType):
-                cwl_type = 'float'
+                cwl_type = "float"
             elif isinstance(param.type, click.types.BoolParamType):
-                cwl_type = 'boolean'
+                cwl_type = "boolean"
             elif isinstance(param.type, click.Tuple):
-                cwl_type = 'string'
+                cwl_type = "string"
 
-        elif (not param.multiple and param.nargs > 1) or (param.multiple and param.nargs == 1):
+        elif (not param.multiple and param.nargs > 1) or (
+            param.multiple and param.nargs == 1
+        ):
             cwl_type = dict()
-            cwl_type['type'] = 'array'
+            cwl_type["type"] = "array"
 
-            if isinstance(param.type, click.types.StringParamType) or isinstance(param.type, click.Choice):
-                cwl_type['items'] = 'string'
+            if isinstance(param.type, click.types.StringParamType) or isinstance(
+                param.type, click.Choice
+            ):
+                cwl_type["items"] = "string"
             elif isinstance(param.type, click.types.IntParamType):
-                cwl_type['items'] = 'int'
+                cwl_type["items"] = "int"
             elif isinstance(param.type, click.types.FloatParamType):
-                cwl_type['items'] = 'float'
+                cwl_type["items"] = "float"
             elif isinstance(param.type, click.types.BoolParamType):
-                cwl_type['items'] = 'boolean'
+                cwl_type["items"] = "boolean"
             elif isinstance(param.type, click.Tuple):
-                cwl_type['items'] = 'string'
+                cwl_type["items"] = "string"
 
         # can't have bool with nargs > 1
         elif param.multiple and param.nargs > 1:
             cwl_type = dict()
-            cwl_type['type'] = 'array'
+            cwl_type["type"] = "array"
 
-            if isinstance(param.type, click.types.StringParamType) or isinstance(param.type, click.Choice):
-                cwl_type['items'] = dict()
-                cwl_type['items']['type'] = 'array'
-                cwl_type['items']['items'] = 'string'
+            if isinstance(param.type, click.types.StringParamType) or isinstance(
+                param.type, click.Choice
+            ):
+                cwl_type["items"] = dict()
+                cwl_type["items"]["type"] = "array"
+                cwl_type["items"]["items"] = "string"
             elif isinstance(param.type, click.types.IntParamType):
-                cwl_type['items'] = dict()
-                cwl_type['items']['type'] = 'array'
-                cwl_type['items']['items'] = 'int'
+                cwl_type["items"] = dict()
+                cwl_type["items"]["type"] = "array"
+                cwl_type["items"]["items"] = "int"
             elif isinstance(param.type, click.types.FloatParamType):
-                cwl_type['items'] = dict()
-                cwl_type['items']['type'] = 'array'
-                cwl_type['items']['items'] = 'float'
+                cwl_type["items"] = dict()
+                cwl_type["items"]["type"] = "array"
+                cwl_type["items"]["items"] = "float"
             elif isinstance(param.type, click.Tuple):
-                cwl_type['items'] = dict()
-                cwl_type['items']['type'] = 'array'
-                cwl_type['items']['items'] = 'string'
+                cwl_type["items"] = dict()
+                cwl_type["items"]["type"] = "array"
+                cwl_type["items"]["items"] = "string"
 
-        cwl_types['type'].append(cwl_type)
+        cwl_types["type"].append(cwl_type)
 
         if not param.multiple:
             if not param.required and param.default is not None:
-                cwl_types['default'] = param.default
-            cwl_types['inputBinding'] = dict()
-            cwl_types['inputBinding']['prefix'] = param.opts[0]
+                cwl_types["default"] = param.default
+            cwl_types["inputBinding"] = dict()
+            cwl_types["inputBinding"]["prefix"] = param.opts[0]
         elif param.multiple:
             if not param.required and param.default is not None:
-                cwl_types['type'][-1]['default'] = param.default
-            cwl_types['type'][-1]['inputBinding'] = dict()
-            cwl_types['type'][-1]['inputBinding']['prefix'] = param.opts[0]
+                cwl_types["type"][-1]["default"] = param.default
+            cwl_types["type"][-1]["inputBinding"] = dict()
+            cwl_types["type"][-1]["inputBinding"]["prefix"] = param.opts[0]
 
         return cwl_types
 
     def _fill_outputs(self, forwards: list):
-        """ Fills the cwl template with outputs informations
+        """Fills the cwl template with outputs informations
 
         :param forwards: the input parameters to forward to output
         :type forwards: list
         """
 
         for fw in forwards:
-            output_name = f'_{fw}'
-            self._template['outputs'][output_name] = dict()
-            output_type = self._template['inputs'][fw]['type']
+            output_name = f"_{fw}"
+            self._template["outputs"][output_name] = dict()
+            output_type = self._template["inputs"][fw]["type"]
             output_type = output_type[-1]
             if isinstance(output_type, str):
-                self._template['outputs'][output_name]['type'] = output_type
+                self._template["outputs"][output_name]["type"] = output_type
             elif isinstance(output_type, dict):
-                self._template['outputs'][output_name]['type'] = dict()
-                self._template['outputs'][output_name]['type']['type'] = output_type['type']
-                self._template['outputs'][output_name]['type']['items'] = output_type['items']
-            self._template['outputs'][output_name]['outputBinding'] = dict()
-            self._template['outputs'][output_name]['outputBinding']['outputEval'] = f'$(inputs.{fw})'
+                self._template["outputs"][output_name]["type"] = dict()
+                self._template["outputs"][output_name]["type"]["type"] = output_type[
+                    "type"
+                ]
+                self._template["outputs"][output_name]["type"]["items"] = output_type[
+                    "items"
+                ]
+            self._template["outputs"][output_name]["outputBinding"] = dict()
+            self._template["outputs"][output_name]["outputBinding"][
+                "outputEval"
+            ] = f"$(inputs.{fw})"
 
     def dumps(self, path: str):
-        """ Dumps the cwl template to target file
+        """Dumps the cwl template to target file
 
         :param path: the output complete filename
         :type path: str
@@ -493,18 +517,17 @@ class CwlTemplate(Spook):
             def ignore_aliases(self, data):
                 return True
 
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             yaml.dump(self._template, f, Dumper=NoAliasDumper, sort_keys=False)
         # reads and writes again to add the first line
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             lines = f.readlines()
-        lines.insert(0, '#!/usr/bin/env cwl-runner\n')
-        with open(path, 'w') as f:
+        lines.insert(0, "#!/usr/bin/env cwl-runner\n")
+        with open(path, "w") as f:
             f.writelines(lines)
 
 
 class CwlNode:
-
     def __init__(self, name: str, cwl_path: str, cwl_template: CwlTemplate) -> None:
         self._name = name
         self._cwl_path = cwl_path
@@ -529,9 +552,8 @@ class CwlNode:
 
 
 class CwlWorkflowTemplate(object):
-
     def __init__(self, nodes: Sequence[CwlNode] = None):
-        """ Creates a cwl workflow template from list of CwlNode
+        """Creates a cwl workflow template from list of CwlNode
 
         :param nodes: steps of the workflow
         :type nodes: Sequence[CwlNode]
@@ -548,8 +570,8 @@ class CwlWorkflowTemplate(object):
         return self._template
 
     @classmethod
-    def from_file(cls, filename: str) -> 'CwlWorkflowTemplate':
-        """ Creates a cwl workflow template from a file
+    def from_file(cls, filename: str) -> "CwlWorkflowTemplate":
+        """Creates a cwl workflow template from a file
 
         :param filename: the file template
         :type filename: str
@@ -557,7 +579,7 @@ class CwlWorkflowTemplate(object):
         :rtype: CwlWorkflowTemplate
         """
 
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             template = yaml.safe_load(f)
 
         workflow_template = CwlWorkflowTemplate()
@@ -565,30 +587,28 @@ class CwlWorkflowTemplate(object):
         return workflow_template
 
     def _fill(self):
-        """ Fills the template
-        """
+        """Fills the template"""
 
         self._init_template()
         self._fill_steps(self._nodes)
 
     def _init_template(self):
-        """ Initializes the cwl workflow template for a CommandLineTool
-        """
+        """Initializes the cwl workflow template for a CommandLineTool"""
 
-        self._template['cwlVersion'] = 'v1.0'
-        self._template['class'] = 'Workflow'
-        self._template['requirements'] = {
-            'StepInputExpressionRequirement': dict(),
-            'InlineJavascriptRequirement': dict(),
-            'MultipleInputFeatureRequirement': dict(),
-            'ScatterFeatureRequirement': dict()
+        self._template["cwlVersion"] = "v1.0"
+        self._template["class"] = "Workflow"
+        self._template["requirements"] = {
+            "StepInputExpressionRequirement": dict(),
+            "InlineJavascriptRequirement": dict(),
+            "MultipleInputFeatureRequirement": dict(),
+            "ScatterFeatureRequirement": dict(),
         }
-        self._template['inputs'] = dict()
-        self._template['outputs'] = list()
-        self._template['steps'] = dict()
+        self._template["inputs"] = dict()
+        self._template["outputs"] = list()
+        self._template["steps"] = dict()
 
     def _fill_steps(self, steps: Sequence[CwlNode]):
-        """ Fills the cwl workflow template with steps informations
+        """Fills the cwl workflow template with steps informations
 
         :param steps: the steos of the workflow
         :type steps: Sequence[CwlNode]
@@ -599,19 +619,21 @@ class CwlWorkflowTemplate(object):
 
         for step in steps:
             cwl_step = dict()
-            cwl_step['run'] = step.name
-            cwl_step['in'] = {k: '' for k in step.cwl_template.inputs_keys}
-            cwl_step['out'] = step.cwl_template.outputs_keys
-            step_name = f'{step.name}{counter[step.name]}'
-            self._template['steps'][step_name] = cwl_step
+            cwl_step["run"] = step.name
+            cwl_step["in"] = {k: "" for k in step.cwl_template.inputs_keys}
+            cwl_step["out"] = step.cwl_template.outputs_keys
+            step_name = f"{step.name}{counter[step.name]}"
+            self._template["steps"][step_name] = cwl_step
             counter[step.name] += 1
 
             # fill worfkflow inputs based on step inputs
             for input_name, input_opt in step.cwl_template.inputs.items():
-                self._template['inputs'][f'{step_name}_{input_name}'] = input_opt['type']
+                self._template["inputs"][f"{step_name}_{input_name}"] = input_opt[
+                    "type"
+                ]
 
     def dumps(self, path: str):
-        """ Dumps the cwl workflow template to target file
+        """Dumps the cwl workflow template to target file
 
         :param path: the output complete filename
         :type path: str
@@ -621,11 +643,11 @@ class CwlWorkflowTemplate(object):
             def ignore_aliases(self, data):
                 return True
 
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             yaml.dump(self._template, f, Dumper=NoAliasDumper, sort_keys=False)
         # reads and writes again to add the first line
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             lines = f.readlines()
-        lines.insert(0, '#!/usr/bin/env cwl-runner\n')
-        with open(path, 'w') as f:
+        lines.insert(0, "#!/usr/bin/env cwl-runner\n")
+        with open(path, "w") as f:
             f.writelines(lines)

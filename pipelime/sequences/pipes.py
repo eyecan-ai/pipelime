@@ -1,20 +1,18 @@
+import tempfile
+from typing import Hashable, Sequence, Union
 
+import networkx as nx
+from choixe.spooks import Spook
+from schema import Or
 
+from pipelime.sequences.operations import SequenceOperation
 from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.samples import SamplesSequence
 from pipelime.sequences.writers.base import BaseWriter
 from pipelime.tools.idgenerators import IdGeneratorUUID
-import tempfile
-
-from pipelime.factories import Bean, BeanFactory
-import networkx as nx
-from schema import Or
-from typing import Hashable, Sequence, Union
-from pipelime.sequences.operations import SequenceOperation
-from pipelime.sequences.samples import SamplesSequence
 
 
 class PlaceholderDataNode(object):
-
     def __init__(self, name: str) -> None:
         self.name = name
 
@@ -29,12 +27,11 @@ class PlaceholderDataNode(object):
 
 
 class PipeNode(object):
-
     def __init__(
-            self,
-            id: Hashable,
-            input_data: Union[str, list, dict],
-            output_data: Union[str, list, dict]
+        self,
+        id: Hashable,
+        input_data: Union[str, list, dict],
+        output_data: Union[str, list, dict],
     ) -> None:
 
         self._id = id
@@ -65,21 +62,19 @@ class PipeNode(object):
         elif isinstance(v, dict):
             return list(v.values())
         else:
-            raise NotImplementedError(f'{type(v)}')
+            raise NotImplementedError(f"{type(v)}")
 
     def __repr__(self) -> str:
         return str(self.id)
 
 
-@BeanFactory.make_serializable
-class OperationNode(PipeNode, Bean):
-
+class OperationNode(PipeNode, Spook):
     def __init__(
-            self,
-            id: Hashable,
-            input_data: Union[str, list, dict],
-            output_data: Union[str, list, dict],
-            operation: SequenceOperation
+        self,
+        id: Hashable,
+        input_data: Union[str, list, dict],
+        output_data: Union[str, list, dict],
+        operation: SequenceOperation,
     ) -> None:
 
         super().__init__(id=id, input_data=input_data, output_data=output_data)
@@ -92,37 +87,30 @@ class OperationNode(PipeNode, Bean):
     @classmethod
     def bean_schema(cls) -> dict:
         return {
-            'input_data': Or(str, list, dict),
-            'output_data': Or(str, list, dict),
-            'operation': dict
+            "input_data": Or(str, list, dict),
+            "output_data": Or(str, list, dict),
+            "operation": dict,
         }
 
     @classmethod
     def from_dict(cls, d: dict):
         return OperationNode(
             id=IdGeneratorUUID().generate(),
-            input_data=d['input_data'],
-            output_data=d['output_data'],
-            operation=BeanFactory.create(d['operation'])
+            input_data=d["input_data"],
+            output_data=d["output_data"],
+            operation=Spook.create(d["operation"]),
         )
 
     def to_dict(self):
         return {
-            'input_data': self._input_data,
-            'output_data': self._output_data,
-            'operation': self.operation.serialize()
+            "input_data": self._input_data,
+            "output_data": self._output_data,
+            "operation": self.operation.serialize(),
         }
 
 
-@BeanFactory.make_serializable
-class ReaderNode(PipeNode, Bean):
-
-    def __init__(
-            self,
-            id: Hashable,
-            output_data: str,
-            reader: BaseReader
-    ) -> None:
+class ReaderNode(PipeNode, Spook):
+    def __init__(self, id: Hashable, output_data: str, reader: BaseReader) -> None:
 
         super().__init__(id=id, input_data=None, output_data=output_data)
         self._reader = reader
@@ -133,35 +121,22 @@ class ReaderNode(PipeNode, Bean):
 
     @classmethod
     def bean_schema(cls) -> dict:
-        return {
-            'output_data': Or(None, str, list, dict),
-            'reader': dict
-        }
+        return {"output_data": Or(None, str, list, dict), "reader": dict}
 
     @classmethod
     def from_dict(cls, d: dict):
         return ReaderNode(
             id=IdGeneratorUUID().generate(),
-            output_data=d['output_data'],
-            reader=BeanFactory.create(d['reader'])
+            output_data=d["output_data"],
+            reader=Spook.create(d["reader"]),
         )
 
     def to_dict(self):
-        return {
-            'output_data': self._output_data,
-            'reader': self.reader.serialize()
-        }
+        return {"output_data": self._output_data, "reader": self.reader.serialize()}
 
 
-@BeanFactory.make_serializable
-class WriterNode(PipeNode, Bean):
-
-    def __init__(
-            self,
-            id: Hashable,
-            input_data: str,
-            writer: BaseWriter
-    ) -> None:
+class WriterNode(PipeNode, Spook):
+    def __init__(self, id: Hashable, input_data: str, writer: BaseWriter) -> None:
 
         super().__init__(id=id, output_data=None, input_data=input_data)
         self._writer = writer
@@ -172,29 +147,21 @@ class WriterNode(PipeNode, Bean):
 
     @classmethod
     def bean_schema(cls) -> dict:
-        return {
-            'input_data': Or(None, str, list, dict),
-            'writer': dict
-        }
+        return {"input_data": Or(None, str, list, dict), "writer": dict}
 
     @classmethod
     def from_dict(cls, d: dict):
         return WriterNode(
             id=IdGeneratorUUID().generate(),
-            input_data=d['input_data'],
-            writer=BeanFactory.create(d['writer'])
+            input_data=d["input_data"],
+            writer=Spook.create(d["writer"]),
         )
 
     def to_dict(self):
-        return {
-            'input_data': self._input_data,
-            'writer': self.writer.serialize()
-        }
+        return {"input_data": self._input_data, "writer": self.writer.serialize()}
 
 
-@BeanFactory.make_serializable
-class NodeGraph(Bean):
-
+class NodeGraph(Spook):
     def __init__(self, nodes: Sequence[PipeNode]):
         self._nodes = nodes
         self._nodes_map = {}
@@ -202,8 +169,14 @@ class NodeGraph(Bean):
 
         for node in self._nodes:
             node: PipeNode
-            [self._graph.add_edge(PlaceholderDataNode(x), node) for x in node.input_data(as_list=True)]
-            [self._graph.add_edge(node, PlaceholderDataNode(x)) for x in node.output_data(as_list=True)]
+            [
+                self._graph.add_edge(PlaceholderDataNode(x), node)
+                for x in node.input_data(as_list=True)
+            ]
+            [
+                self._graph.add_edge(node, PlaceholderDataNode(x))
+                for x in node.output_data(as_list=True)
+            ]
             self._nodes_map[node.id] = node
 
         self._data_cache = {}
@@ -228,7 +201,9 @@ class NodeGraph(Bean):
                 data = self._cache_to_node(node, self._data_cache)
                 node.writer(data)
 
-    def _cache_to_node(self, node: PipeNode, cache: dict) -> Union[SamplesSequence, list, dict]:
+    def _cache_to_node(
+        self, node: PipeNode, cache: dict
+    ) -> Union[SamplesSequence, list, dict]:
         v = node.input_data(as_list=False)
         if v is None:
             return None
@@ -239,9 +214,11 @@ class NodeGraph(Bean):
         elif isinstance(v, dict):
             return {k: cache[v] for k, v in v.items()}
         else:
-            raise NotImplementedError(f'{type(v)}')
+            raise NotImplementedError(f"{type(v)}")
 
-    def _node_to_cache(self, data: Union[SamplesSequence, list, dict], node: PipeNode, cache: dict):
+    def _node_to_cache(
+        self, data: Union[SamplesSequence, list, dict], node: PipeNode, cache: dict
+    ):
         v = node.output_data(as_list=False)
         if v is None:
             pass
@@ -254,54 +231,61 @@ class NodeGraph(Bean):
             for k, name in v.items():
                 cache[name] = data[k]
         else:
-            raise NotImplementedError(f'{type(v)}')
+            raise NotImplementedError(f"{type(v)}")
 
     @classmethod
     def bean_schema(cls) -> dict:
-        return {
-            'nodes': list
-        }
+        return {"nodes": list}
 
     @classmethod
     def from_dict(cls, d: dict):
-        nodes = [BeanFactory.create(c) for c in d['nodes']]
+        nodes = [Spook.create(c) for c in d["nodes"]]
         return NodeGraph(nodes=nodes)
 
     def to_dict(self):
-        return {
-            'nodes': [x.serialize() for x in self._nodes]
-        }
+        return {"nodes": [x.serialize() for x in self._nodes]}
 
     def draw_to_file(self, filename: str = None):
 
         try:
             from networkx.drawing.nx_agraph import to_agraph
+
             A = to_agraph(self._graph)
             for i, node in enumerate(A.iternodes()):
                 print(i, node)
                 if node in self._nodes_map:
                     ref = self._nodes_map[node]
                     if isinstance(ref, OperationNode):
-                        node.attr['label'] = self._nodes_map[node].operation.__class__.__name__
-                        node.attr['style'] = 'filled'
-                        node.attr['fillcolor'] = '#ffd54f'
-                        node.attr['shape'] = 'box'
+                        node.attr["label"] = self._nodes_map[
+                            node
+                        ].operation.__class__.__name__
+                        node.attr["style"] = "filled"
+                        node.attr["fillcolor"] = "#ffd54f"
+                        node.attr["shape"] = "box"
                     elif isinstance(ref, ReaderNode):
-                        node.attr['label'] = self._nodes_map[node].reader.__class__.__name__
-                        node.attr['style'] = 'filled'
-                        node.attr['fillcolor'] = '#009688'
-                        node.attr['shape'] = 'box'
+                        node.attr["label"] = self._nodes_map[
+                            node
+                        ].reader.__class__.__name__
+                        node.attr["style"] = "filled"
+                        node.attr["fillcolor"] = "#009688"
+                        node.attr["shape"] = "box"
                     elif isinstance(ref, WriterNode):
-                        node.attr['label'] = self._nodes_map[node].writer.__class__.__name__
-                        node.attr['style'] = 'filled'
-                        node.attr['fillcolor'] = '#9c27b0'
-                        node.attr['shape'] = 'box'
+                        node.attr["label"] = self._nodes_map[
+                            node
+                        ].writer.__class__.__name__
+                        node.attr["style"] = "filled"
+                        node.attr["fillcolor"] = "#9c27b0"
+                        node.attr["shape"] = "box"
 
                 else:
-                    node.attr['shape'] = 'circle'
+                    node.attr["shape"] = "circle"
 
-            A.layout('dot')
-            fname = f'{tempfile.NamedTemporaryFile().name}.png' if filename is None else filename
+            A.layout("dot")
+            fname = (
+                f"{tempfile.NamedTemporaryFile().name}.png"
+                if filename is None
+                else filename
+            )
             A.draw(fname)
             return A, fname
 

@@ -1,22 +1,22 @@
-import typing
-from pipelime.sequences.readers.base import BaseReader
-from pipelime.sequences.readers.filesystem import UnderfolderReader
-from rich.progress import track
-from pipelime.filesystem.toolkit import FSToolkit
+import multiprocessing
+import os
 import re
+import shutil
 from pathlib import Path
-from pipelime.factories import BeanFactory
-from pipelime.sequences.writers.base import BaseWriter
+
+from choixe.spooks import Spook
+from rich.progress import track
+from schema import Optional, Or
+
+from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import (
-    FileSystemSample,
     FilesystemItem,
+    FileSystemSample,
     Sample,
     SamplesSequence,
 )
-from schema import Or, Optional
-import shutil
-import os
-import multiprocessing
+from pipelime.sequences.writers.base import BaseWriter
 
 
 class UnderfolderWriter(BaseWriter):
@@ -32,7 +32,7 @@ class UnderfolderWriter(BaseWriter):
         copy_files: bool = True,
         use_symlinks: bool = False,
         force_copy_keys: list = None,
-        num_workers: int = 0  # typing is here because 'schema.Optional' conflicts
+        num_workers: int = 0,  # typing is here because 'schema.Optional' conflicts
     ) -> None:
         """UnderfolderWriter for an input SamplesSequence
 
@@ -129,7 +129,9 @@ class UnderfolderWriter(BaseWriter):
         if self._num_workers > 0 or self._num_workers == -1:
             manager = multiprocessing.Manager()
             self._saved_root_keys = manager.dict()
-            pool = multiprocessing.Pool(processes=None if self._num_workers == -1 else self._num_workers)
+            pool = multiprocessing.Pool(
+                processes=None if self._num_workers == -1 else self._num_workers
+            )
             list(track(pool.imap_unordered(self._process_sample, x), total=len(x)))
         else:
             self._saved_root_keys = {}
@@ -148,7 +150,9 @@ class UnderfolderWriter(BaseWriter):
         copy_item = False
         if self._copy_files and isinstance(sample, FileSystemSample):
             item = sample.metaitem(key)
-            if (not sample.is_cached(key) or key in self._force_copy_keys) and isinstance(item, FilesystemItem):
+            if (
+                not sample.is_cached(key) or key in self._force_copy_keys
+            ) and isinstance(item, FilesystemItem):
                 path = item.source()
                 if path.suffix == output_file.suffix:
                     copy_item = True
@@ -184,6 +188,3 @@ class UnderfolderWriter(BaseWriter):
             "extensions_map": self._extensions_map,
             "zfill": self._zfill,
         }
-
-
-BeanFactory.register_bean(UnderfolderWriter)

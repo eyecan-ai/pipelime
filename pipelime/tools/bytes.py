@@ -1,8 +1,9 @@
 from io import BytesIO
-import imageio
-import numpy as np
 from pathlib import Path
 from typing import Tuple
+
+import imageio
+import numpy as np
 
 
 class DataCoding(object):
@@ -96,7 +97,9 @@ class DataCoding(object):
             return None
 
     @classmethod
-    def numpy_image_to_bytes_buffer(cls, array: np.ndarray, data_encoding: str) -> bytes:
+    def numpy_image_to_bytes_buffer(
+        cls, array: np.ndarray, data_encoding: str
+    ) -> bytes:
         """Converts image stored as numpy array into bytes buffer with custom data encoding
 
         :param array: source image numpy array
@@ -117,7 +120,9 @@ class DataCoding(object):
             return None
 
     @classmethod
-    def numpy_array_to_bytes(cls, array: np.ndarray, data_encoding: str = "npy") -> bytes:
+    def numpy_array_to_bytes(
+        cls, array: np.ndarray, data_encoding: str = "npy"
+    ) -> bytes:
         """Converts array data stored as numpy array into bytes with custom data encoding
 
         :param array: source generic numpy array
