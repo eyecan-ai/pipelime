@@ -1,25 +1,22 @@
-from pathlib import Path
 import imghdr
-import pickle
-from pipelime.tools.bytes import DataCoding
-from typing import Union
-import numpy as np
-import imageio
-import yaml
 import json
+import pickle
+import warnings
 from collections import defaultdict
+from pathlib import Path
+from typing import Union
+
+import imageio
+import numpy as np
+import yaml
+
+from pipelime.tools.bytes import DataCoding
 
 
 class FSToolkit(object):
 
-    INSTALLED_LIBRARIES = {
-        'exr': False,
-    }
- 
     # Default imageio options for each image format
-    OPTIONS = {
-        'png': {'compress_level': 4},
-    }
+    OPTIONS = {"png": {"compress_level": 4}}
 
     # Declare TREE structure
     @classmethod
@@ -42,7 +39,7 @@ class FSToolkit(object):
 
         keys_tree = cls.tree()
         folder = Path(folder)
-        files = list(sorted(folder.glob('*')))
+        files = list(sorted(folder.glob("*")))
         for f in files:
             f: Path
 
@@ -51,10 +48,10 @@ class FSToolkit(object):
 
             name = f.stem
 
-            if name.startswith('.'):
+            if name.startswith("."):
                 continue
 
-            chunks = name.split('_', maxsplit=1)
+            chunks = name.split("_", maxsplit=1)
             if len(chunks) == 1:
                 continue
 
@@ -77,22 +74,29 @@ class FSToolkit(object):
     @classmethod
     def is_metadata_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
-        return ext in ['yml', 'json', 'toml', 'tml']
+        return ext in ["yml", "json", "toml", "tml"]
 
     @classmethod
     def is_image_file(cls, filename: str) -> bool:
         return imghdr.what(filename) is not None
 
     @classmethod
+    def _numpy_load_txt(cls, filename: str) -> np.ndarray:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "loadtxt")
+            data = np.loadtxt(filename)
+        return data
+
+    @classmethod
     def is_numpy_array_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
-        if ext in ['txt', 'data']:
+        if ext in ["txt", "data"]:
             try:
-                np.loadtxt(filename)
+                cls._numpy_load_txt(filename)
                 return True
             except Exception:
                 return False
-        if ext in ['npy', 'npz']:
+        if ext in ["npy", "npz"]:
             try:
                 np.load(filename)
                 return True
@@ -103,19 +107,17 @@ class FSToolkit(object):
     @classmethod
     def is_picke_file(cls, filename: str):
         ext = cls.get_file_extension(filename)
-        return ext == 'pkl'
+        return ext == "pkl"
 
     @classmethod
     def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
-        """ Load data from file based on its extension
+        """Load data from file based on its extension
 
         :param filename: target filename
         :type filename: str
         :return: Loaded data as array or dict. May return NONE
         :rtype: Union[None, np.ndarray, dict]
         """
-
-        cls._check_libraries()
 
         extension = cls.get_file_extension(filename)
         data = None
@@ -124,27 +126,26 @@ class FSToolkit(object):
             data = np.array(imageio.imread(filename))
 
         elif cls.is_numpy_array_file(filename):
-            if extension in ['txt']:
-                data = np.loadtxt(filename)
-            elif extension in ['npy', 'npz']:
+            if extension in ["txt"]:
+                data = cls._numpy_load_txt(filename)
+            elif extension in ["npy", "npz"]:
                 data = np.load(filename)
             if data is not None:
                 data = np.atleast_2d(data)
 
         elif cls.is_metadata_file(filename):
-            if extension in ['yml']:
-                data = yaml.safe_load(open(filename, 'r'))
-            elif extension in ['json']:
+            if extension in ["yml"]:
+                data = yaml.safe_load(open(filename, "r"))
+            elif extension in ["json"]:
                 data = json.load(open(filename))
         elif cls.is_picke_file(filename):
-            data = pickle.load(open(filename, 'rb'))
+            data = pickle.load(open(filename, "rb"))
         else:
-            raise NotImplementedError(f'Unknown file extension: {filename}')
+            raise NotImplementedError(f"Unknown file extension: {filename}")
         return data
 
     @classmethod
     def store_data(cls, filename: str, data: any):
-        cls._check_libraries()
 
         extension = cls.get_file_extension(filename)
         if DataCoding.is_image_extension(extension):
@@ -155,34 +156,11 @@ class FSToolkit(object):
         elif DataCoding.is_numpy_extension(extension):
             np.save(filename, data)
         elif DataCoding.is_metadata_extension(extension):
-            if extension in ['yml']:
-                yaml.safe_dump(data, open(filename, 'w'))
-            elif extension in ['json']:
-                json.dump(data, open(filename, 'w'))
+            if extension in ["yml"]:
+                yaml.safe_dump(data, open(filename, "w"))
+            elif extension in ["json"]:
+                json.dump(data, open(filename, "w"))
         elif DataCoding.is_pickle_extension(extension):
-            pickle.dump(data, open(filename, 'wb'))
+            pickle.dump(data, open(filename, "wb"))
         else:
-            raise NotImplementedError(f'Unknown file extension: {filename}')
-
-    @classmethod
-    def _check_libraries(cls):
-        """ Check if required libraries are installed,
-        if missing it install them
-        """
-
-        for k, v in cls.INSTALLED_LIBRARIES.items():
-            if not v:
-                cls._install_library(k)
-                cls.INSTALLED_LIBRARIES[k] = True
-
-    @classmethod
-    def _install_library(cls, lib: str):
-        """ Install a specified library
-
-        :param lib: library to install
-        :type lib: str
-        """
-
-        # Install EXR support for ImageIO
-        if lib == 'exr':
-            imageio.plugins.freeimage.download()
+            raise NotImplementedError(f"Unknown file extension: {filename}")

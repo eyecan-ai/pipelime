@@ -1,10 +1,8 @@
-
-import cv2
 import albumentations as A
+import cv2
 
 
 class PadIfNeededV2(A.PadIfNeeded):
-
     def __init__(
         self,
         min_height=1024,
@@ -24,7 +22,7 @@ class PadIfNeededV2(A.PadIfNeeded):
             value=value,
             mask_value=mask_value,
             always_apply=always_apply,
-            p=p
+            p=p,
         )
         self.row_align = row_align
         self.col_align = col_align
@@ -45,7 +43,7 @@ class PadIfNeededV2(A.PadIfNeeded):
                 h_pad_top = self.min_height - rows
                 h_pad_bottom = 0
             else:
-                raise ValueError(f'Invalid value \"{self.row_align}\" for row_align')
+                raise ValueError(f'Invalid value "{self.row_align}" for row_align')
         else:
             h_pad_top = 0
             h_pad_bottom = 0
@@ -61,15 +59,28 @@ class PadIfNeededV2(A.PadIfNeeded):
                 w_pad_left = self.min_width - cols
                 w_pad_right = 0
             else:
-                raise ValueError(f"Invalid value \"{self.col_align}\" for col_align")
+                raise ValueError(f'Invalid value "{self.col_align}" for col_align')
         else:
             w_pad_left = 0
             w_pad_right = 0
 
         params.update(
-            {"pad_top": h_pad_top, "pad_bottom": h_pad_bottom, "pad_left": w_pad_left, "pad_right": w_pad_right}
+            {
+                "pad_top": h_pad_top,
+                "pad_bottom": h_pad_bottom,
+                "pad_left": w_pad_left,
+                "pad_right": w_pad_right,
+            }
         )
         return params
 
     def get_transform_init_args_names(self):
-        return ("min_height", "min_width", "border_mode", "value", "mask_value", "row_align", "col_align")
+        return (
+            "min_height",
+            "min_width",
+            "border_mode",
+            "value",
+            "mask_value",
+            "row_align",
+            "col_align",
+        )

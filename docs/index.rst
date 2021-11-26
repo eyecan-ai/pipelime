@@ -9,8 +9,6 @@ Welcome to pipelime's documentation!
    installation
    usage
    modules
-   contributing
-   history
 
 Indices and tables
 ==================

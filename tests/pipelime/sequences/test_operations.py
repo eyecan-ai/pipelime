@@ -1,26 +1,45 @@
-import pydash
-from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 import functools
 import hashlib
-from typing import Dict, Sequence
+from typing import Dict, Optional, Sequence
+
+import pydash
 import pytest
 import rich
-from pipelime.sequences.samples import SamplesSequence
+from choixe.spooks import Spook
+
 from pipelime.sequences.operations import (
-    OperationDict2List, OperationFilterByQuery, OperationFilterByScript, OperationFilterKeys, OperationGroupBy,
-    OperationIdentity, OperationOrderBy, OperationPort, OperationResetIndices, OperationShuffle,
-    OperationSplitByQuery, OperationSplits, OperationSubsample,
-    OperationSum, SequenceOperation
+    MappableOperation,
+    OperationDict2List,
+    OperationFilterByQuery,
+    OperationFilterByScript,
+    OperationFilterKeys,
+    OperationGroupBy,
+    OperationIdentity,
+    OperationMix,
+    OperationOrderBy,
+    OperationPort,
+    OperationResetIndices,
+    OperationShuffle,
+    OperationSplitByQuery,
+    OperationSplitByValue,
+    OperationSplits,
+    OperationStage,
+    OperationSubsample,
+    OperationSum,
+    SequenceOperation,
 )
+from pipelime.sequences.samples import Sample, SamplesSequence
+from pipelime.sequences.stages import StageRemap
+from pipelime.tools.idgenerators import IdGeneratorInteger, IdGeneratorUUID
 
-from pipelime.factories import BeanFactory
 
-
-def _plug_test(op: SequenceOperation):
-    """ Test what a generic SequenceOperation should do
+def _plug_test(op: SequenceOperation, check_serialization: bool = True):
+    """Test what a generic SequenceOperation should do
 
     :param op: input SequenceOperation
     :type op: SequenceOperation
+    :param check_serialization: True to also check serialization/deserialization
+    :type check_serialization: bool
     """
 
     assert isinstance(op, SequenceOperation)
@@ -29,32 +48,26 @@ def _plug_test(op: SequenceOperation):
     assert op.input_port().match(op.input_port())
     assert op.output_port().match(op.output_port())
 
-    reop = op.from_dict(op.to_dict())
-    assert isinstance(reop, SequenceOperation)
-    assert isinstance(op.bean_schema(), dict)
-    op.print()
+    if check_serialization:
+        reop = op.from_dict(op.to_dict())
+        assert isinstance(reop, SequenceOperation)
+        schema = op.spook_schema()
+        assert isinstance(schema, dict) or schema is None
+        op.print()
 
-    factored = BeanFactory.create(op.serialize())
-    assert isinstance(factored, SequenceOperation)
+        factored = Spook.create(op.serialize())
+        assert isinstance(factored, SequenceOperation)
 
 
 class TestOperationSum(object):
-
     def test_sum(self, plain_samples_sequence_generator):
 
-        pairs = [
-            (32, 5),
-            (32, 1),
-            (8, 32),
-            (1, 24),
-            (0, 64),
-            (48, 0)
-        ]
+        pairs = [(32, 5), (32, 1), (8, 32), (1, 24), (0, 64), (48, 0)]
 
         for N, D in pairs:
             datasets = []
             for idx in range(D):
-                datasets.append(plain_samples_sequence_generator('d{idx}_', N))
+                datasets.append(plain_samples_sequence_generator("d{idx}_", N))
 
             op = OperationSum()
             _plug_test(op)
@@ -70,7 +83,6 @@ class TestOperationSum(object):
 
 
 class TestOperationSubsample(object):
-
     def test_subsample(self, plain_samples_sequence_generator):
 
         sizes = [32, 10, 128, 16, 1]
@@ -78,7 +90,7 @@ class TestOperationSubsample(object):
 
         for F in factors:
             for N in sizes:
-                dataset = plain_samples_sequence_generator('d0_', N)
+                dataset = plain_samples_sequence_generator("d0_", N)
 
                 op = OperationSubsample(factor=F)
                 _plug_test(op)
@@ -103,13 +115,12 @@ class TestOperationSubsample(object):
 
 
 class TestOperationIdentity(object):
-
     def test_subsample(self, plain_samples_sequence_generator):
 
         sizes = [32, 10, 128, 16, 1]
 
         for N in sizes:
-            dataset = plain_samples_sequence_generator('d0_', N)
+            dataset = plain_samples_sequence_generator("d0_", N)
 
             op = OperationIdentity()
             _plug_test(op)
@@ -120,17 +131,16 @@ class TestOperationIdentity(object):
 
 
 class TestOperationShuffle(object):
-
     def _sign(self, dataset: SamplesSequence):
-        names = [x['idx'] for x in dataset.samples]
-        return hashlib.md5(bytes('_'.join(names), encoding='utf-8')).hexdigest()
+        names = [x["idx"] for x in dataset.samples]
+        return hashlib.md5(bytes("_".join(names), encoding="utf-8")).hexdigest()
 
     def test_shuffle(self, plain_samples_sequence_generator):
 
         sizes = [100, 10, 128, 20]
 
         for N in sizes:
-            dataset = plain_samples_sequence_generator('d0_', N)
+            dataset = plain_samples_sequence_generator("d0_", N)
 
             sign = self._sign(dataset)
 
@@ -140,7 +150,9 @@ class TestOperationShuffle(object):
             out = op(dataset)
             out_sign = self._sign(out)
 
-            assert sign != out_sign, 'for a series of unfortunate events did the two hashes collide?'
+            assert (
+                sign != out_sign
+            ), "for a series of unfortunate events did the two hashes collide?"
 
             rich.print(sign, "!=", out_sign)
 
@@ -148,17 +160,13 @@ class TestOperationShuffle(object):
 
 
 class TestOperationResetIndices(object):
-
     def test_reset(self, plain_samples_sequence_generator):
 
-        generators = [
-            IdGeneratorUUID(),
-            IdGeneratorInteger()
-        ]
+        generators = [IdGeneratorUUID(), IdGeneratorInteger()]
         N = 32
         for generator in generators:
-            dataset = plain_samples_sequence_generator('d0_', N)
-            dataset_clone = plain_samples_sequence_generator('d0_', N)
+            dataset = plain_samples_sequence_generator("d0_", N)
+            dataset_clone = plain_samples_sequence_generator("d0_", N)
 
             op = OperationResetIndices(generator=generator)
             _plug_test(op)
@@ -171,29 +179,37 @@ class TestOperationResetIndices(object):
 
 
 class TestOperationOrderBy(object):
-
     def _sign(self, dataset: SamplesSequence):
-        names = [x['idx'] for x in dataset.samples]
-        return hashlib.md5(bytes('_'.join(names), encoding='utf-8')).hexdigest()
+        names = [x["idx"] for x in dataset.samples]
+        return hashlib.md5(bytes("_".join(names), encoding="utf-8")).hexdigest()
 
     def test_orderby(self, plain_samples_sequence_generator):
 
         N = 32
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         order_items = [
-            {'keys': ['reverse_number'], 'different': True},
-            {'keys': ['+reverse_number'], 'different': True},
-            {'keys': ['-reverse_number'], 'different': False},
-            {'keys': ['-reverse_number', 'metadata.deep.groupby_field'], 'different': False},
-            {'keys': ['metadata.deep.groupby_field', '-reverse_number'], 'different': False},
-            {'keys': ['metadata.deep.groupby_field', 'reverse_number'], 'different': True},
-            {'keys': ['-metadata.deep.groupby_field'], 'different': True},
+            {"keys": ["reverse_number"], "different": True},
+            {"keys": ["+reverse_number"], "different": True},
+            {"keys": ["-reverse_number"], "different": False},
+            {
+                "keys": ["-reverse_number", "metadata.deep.groupby_field"],
+                "different": False,
+            },
+            {
+                "keys": ["metadata.deep.groupby_field", "-reverse_number"],
+                "different": False,
+            },
+            {
+                "keys": ["metadata.deep.groupby_field", "reverse_number"],
+                "different": True,
+            },
+            {"keys": ["-metadata.deep.groupby_field"], "different": True},
         ]
 
         for order_item in order_items:
-            order_keys = order_item['keys']
-            should_be_different = order_item['different']
+            order_keys = order_item["keys"]
+            should_be_different = order_item["different"]
 
             op = OperationOrderBy(order_keys=order_keys)
             _plug_test(op)
@@ -217,26 +233,25 @@ class TestOperationOrderBy(object):
 
 
 class TestOperationSplits(object):
-
     def test_splits(self, plain_samples_sequence_generator):
 
         N = 128
         splits_cfgs = [
-            {'split_map': {'train': 0.5, 'test': 0.2, 'val': 0.3}, 'good': True},
-            {'split_map': {'a': 0.4, 'b': 0.2, 'c': 0.2, 'd': 0.2}, 'good': True},
-            {'split_map': {'a': 0.8, 'b': 0.}, 'good': True},
-            {'split_map': {'a': 1.0}, 'good': True},
-            {'split_map': {'a': 0.7}, 'good': True},
-            {'split_map': {'a': 1.7}, 'good': False},
-            {'split_map': {}, 'good': False},
+            {"split_map": {"train": 0.5, "test": 0.2, "val": 0.3}, "good": True},
+            {"split_map": {"a": 0.4, "b": 0.2, "c": 0.2, "d": 0.2}, "good": True},
+            {"split_map": {"a": 0.8, "b": 0.0}, "good": True},
+            {"split_map": {"a": 1.0}, "good": True},
+            {"split_map": {"a": 0.7}, "good": True},
+            {"split_map": {"a": 1.7}, "good": False},
+            {"split_map": {}, "good": False},
         ]
 
         for cfg in splits_cfgs:
 
-            good = cfg['good']
-            split_map = cfg['split_map']
+            good = cfg["good"]
+            split_map = cfg["split_map"]
             expected_splits = len(split_map)
-            dataset = plain_samples_sequence_generator('d0_', N)
+            dataset = plain_samples_sequence_generator("d0_", N)
 
             if good:
                 op = OperationSplits(split_map=split_map)
@@ -255,7 +270,7 @@ class TestOperationSplits(object):
 
                 idx_maps: Dict[str, set] = {}
                 for k, d in out_dict.items():
-                    idxs = set([x['idx'] for x in d])
+                    idxs = set([x["idx"] for x in d])
                     idx_maps[k] = idxs
 
                 for k0, _ in idx_maps.items():
@@ -271,7 +286,6 @@ class TestOperationSplits(object):
 
 
 class TestOperationDict2List(object):
-
     def test_shuffle(self, plain_samples_sequence_generator):
 
         pairs = [
@@ -286,7 +300,7 @@ class TestOperationDict2List(object):
             datasets = []
             datasets_map = {}
             for idx in range(D):
-                d = plain_samples_sequence_generator('d{idx}_', N)
+                d = plain_samples_sequence_generator("d{idx}_", N)
                 datasets.append(d)
                 datasets_map[str(idx)] = d
 
@@ -303,24 +317,25 @@ class TestOperationDict2List(object):
 
 
 class TestOperationFilterByQuery(object):
-
     def test_filter_by_query(self, plain_samples_sequence_generator):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         queries_items = [
-            {'query': '`metadata.name` CONTAINS "d0_"', 'expected': N},
-            {'query': '`metadata.name` CONTAINS "@IMPOSSIBLE@!S_TRING12"', 'expected': 0},
-            {'query': f'`metadata.N` < {N/2}', 'expected': N / 2},
-            {'query': '`metadata.name` like "d?_*"', 'expected': N},
-
+            {"query": '`metadata.name` CONTAINS "d0_"', "expected": N},
+            {
+                "query": '`metadata.name` CONTAINS "@IMPOSSIBLE@!S_TRING12"',
+                "expected": 0,
+            },
+            {"query": f"`metadata.N` < {N/2}", "expected": N / 2},
+            {"query": '`metadata.name` like "d?_*"', "expected": N},
         ]
 
         for item in queries_items:
-            query = item['query']
-            expected = item['expected']
-            op = OperationFilterByQuery(query=query)
+            query = item["query"]
+            expected = item["expected"]
+            op = OperationFilterByQuery(query=query, num_workers=-1)
             _plug_test(op)
 
             out = op(dataset)
@@ -329,23 +344,24 @@ class TestOperationFilterByQuery(object):
 
 
 class TestOperationSplitByQuery(object):
-
     def test_split_by_query(self, plain_samples_sequence_generator):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         queries_items = [
-            {'query': '`metadata.name` CONTAINS "d0_"', 'expected': [N, 0]},
-            {'query': '`metadata.name` CONTAINS "@IMPOSSIBLE@!S_TRING12"', 'expected': [0, N]},
-            {'query': f'`metadata.N` < {N/2}', 'expected': [N / 2, N / 2]},
-            {'query': '`metadata.name` like "d?_*"', 'expected': [N, 0]},
-
+            {"query": '`metadata.name` CONTAINS "d0_"', "expected": [N, 0]},
+            {
+                "query": '`metadata.name` CONTAINS "@IMPOSSIBLE@!S_TRING12"',
+                "expected": [0, N],
+            },
+            {"query": f"`metadata.N` < {N/2}", "expected": [N / 2, N / 2]},
+            {"query": '`metadata.name` like "d?_*"', "expected": [N, 0]},
         ]
 
         for item in queries_items:
-            query = item['query']
-            expecteds = item['expected']
+            query = item["query"]
+            expecteds = item["expected"]
             op = OperationSplitByQuery(query=query)
             _plug_test(op)
 
@@ -361,25 +377,44 @@ class TestOperationSplitByQuery(object):
             assert sumup == sumup_exp
 
 
-class TestOperationFilterKeys(object):
+class TestOperationSplitByValue:
+    def test_split_by_value(self, plain_samples_sequence_generator):
+        N = 20
+        G = 5
+        key = "metadata.deep.groupby_field"
+        dataset = plain_samples_sequence_generator("d0_", N, group_each=G)
+        op = OperationSplitByValue(key)
+        _plug_test(op)
+        out = op(dataset)
 
+        assert len(out) == N // G
+        total = 0
+        for split in out:
+            total += len(split)
+            target = pydash.get(split[0], key)
+            for sample in split:
+                assert pydash.get(sample, key) == target
+        assert total == len(dataset)
+
+
+class TestOperationFilterKeys(object):
     def test_filter_keys(self, plain_samples_sequence_generator):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         keys_to_filter = [
-            {'keys': ['idx'], 'negate': False},
-            {'keys': ['idx'], 'negate': True},
-            {'keys': ['number', 'data0'], 'negate': False},
-            {'keys': ['number', 'data0'], 'negate': True},
-            {'keys': [], 'negate': False},
+            {"keys": ["idx"], "negate": False},
+            {"keys": ["idx"], "negate": True},
+            {"keys": ["number", "data0"], "negate": False},
+            {"keys": ["number", "data0"], "negate": True},
+            {"keys": [], "negate": False},
         ]
 
         for item in keys_to_filter:
-            keys = item['keys']
-            negate = item['negate']
-            op = OperationFilterKeys(keys=keys, negate=negate)
+            keys = item["keys"]
+            negate = item["negate"]
+            op = OperationFilterKeys(keys=keys, negate=negate, num_workers=-1)
             _plug_test(op)
             out = op(dataset)
 
@@ -394,22 +429,21 @@ class TestOperationFilterKeys(object):
 
 
 class TestOperationGroupBy(object):
-
     def test_group_by(self, plain_samples_sequence_generator):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N, heavy_data=False)
+        dataset = plain_samples_sequence_generator("d0_", N, heavy_data=False)
 
         fields_items = [
-            {'field': '`metadata.deep.groupby_field`', 'valid': True},
-            {'field': '`metadata.even`', 'valid': True},
-            {'field': '`odd`', 'valid': True},
-            {'field': '`z`', 'valid': False},
+            {"field": "`metadata.deep.groupby_field`", "valid": True},
+            {"field": "`metadata.even`", "valid": True},
+            {"field": "`odd`", "valid": True},
+            {"field": "`z`", "valid": False},
         ]
 
         for item in fields_items:
-            field = item['field']
-            valid = item['valid']
+            field = item["field"]
+            valid = item["valid"]
 
             for ungrouped in [True, False]:
                 op = OperationGroupBy(field=field, ungrouped=ungrouped)
@@ -440,23 +474,22 @@ class TestOperationGroupBy(object):
 
 
 class TestOperationFilterByScript(object):
-
     def test_filter_by_script(self, plain_samples_sequence_generator, tmpdir):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         # Bad filename
         with pytest.raises(Exception):
-            op = OperationFilterByScript(path='/tmp/script_IMPOSSIBLE_NAME@@!!')
+            op = OperationFilterByScript(path="/tmp/script_IMPOSSIBLE_NAME@@!!")
 
-        func = ''
+        func = ""
         func += "import numpy as np\n"
         func += "def check_sample(sample, sequence):\n"
         func += " return np.array(sample['number']) % 2 == 0\n"
 
-        script_path = tmpdir.join('custom_script.py')
-        with open(script_path, 'w') as f:
+        script_path = tmpdir.join("custom_script.py")
+        with open(script_path, "w") as f:
             f.write(func)
 
         op = OperationFilterByScript(path_or_func=str(script_path))
@@ -468,14 +501,84 @@ class TestOperationFilterByScript(object):
     def test_filter_by_script_onthefly(self, plain_samples_sequence_generator, tmpdir):
 
         N = 128
-        dataset = plain_samples_sequence_generator('d0_', N)
+        dataset = plain_samples_sequence_generator("d0_", N)
 
         def check_sample_onthefly(sample, sequence):
             import numpy as np
-            return np.array(sample['number']) % 2 == 0
+
+            return np.array(sample["number"]) % 2 == 0
 
         op = OperationFilterByScript(path_or_func=check_sample_onthefly)
         _plug_test(op)
         out = op(dataset)
 
         assert len(out) < len(dataset)
+
+
+class TestMappableOperation(object):
+    class OperationPlusOne(MappableOperation):
+        def __init__(self, key: str, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._key = key
+
+        def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+            sample = sample.copy()
+            sample[self._key] += 1
+            return sample
+
+    class OperationLessThan10(MappableOperation):
+        def __init__(self, key: str, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._key = key
+
+        def apply_to_sample(self, sample: Sample) -> Optional[Sample]:
+            cond = sample[self._key] < 10
+            return sample if cond else None
+
+    @pytest.mark.parametrize(
+        ("pb", "workers"), ((False, 0), (True, 0), (False, 5), (True, 5), (True, -1))
+    )
+    def test_mappable_operation(self, plain_samples_sequence_generator, pb, workers):
+        N = 32
+        key = "number"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+        op = self.OperationPlusOne(key, progress_bar=pb, num_workers=workers)
+
+        out = op(dataset)
+        _plug_test(op, check_serialization=False)
+
+        expected_numbers = [x[key] + 1 for x in dataset]
+        out_numbers = [x[key] for x in out]
+
+        assert isinstance(out, SamplesSequence)
+        assert N == len(out)
+        for x, y in zip(expected_numbers, out_numbers):
+            assert x == y, (expected_numbers, out_numbers)
+
+        op = self.OperationLessThan10(key)
+        out = op(dataset)
+
+        assert len(out) == 10
+
+
+class TestOperationStage(object):
+    @pytest.mark.parametrize(
+        ("pb", "workers"), ((False, 0), (True, 0), (False, 5), (True, 5), (True, -1))
+    )
+    def test_operation_stage(self, plain_samples_sequence_generator, pb, workers):
+        N = 32
+        key = "number"
+        key_2 = "number_2"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+        stage = StageRemap({key: key_2})
+        op = OperationStage(stage, progress_bar=pb, num_workers=workers)
+        _plug_test(op, check_serialization=False)
+        out = op(dataset)
+
+        assert isinstance(out, SamplesSequence)
+        assert N == len(out)
+        for x in out:
+            assert key_2 in x
+            assert key not in x

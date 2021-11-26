@@ -1,15 +1,11 @@
-
+import albumentations as A
 from choixe.configurations import XConfig
 from schema import Optional, Schema
-import albumentations as A
 
 
 class AugmentationsFactory(object):
 
-    AUGMENTATIONS_CFG_SCHEMA = Schema({
-        Optional('__version__'): str,
-        'transform': dict
-    })
+    AUGMENTATIONS_CFG_SCHEMA = Schema({Optional("__version__"): str, "transform": dict})
 
     @classmethod
     def build_from_file(cls, filename: str):
