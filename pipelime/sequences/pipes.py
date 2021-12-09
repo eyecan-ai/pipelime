@@ -289,5 +289,6 @@ class NodeGraph(Spook):
             A.draw(fname)
             return A, fname
 
-        except ImportError:
+        except ImportError as e:
+            print(e)
             return None, None
