@@ -7,8 +7,8 @@ The Underfolder Stream has the following architecture:
      ┌───────►                   │  │             │
      │       │ UnderfolderReader ├──►             ├──────► get_data
 ┌────┴────┐  │                   │  │             │
-│  Disk   │  └───────────────────┘  │  Dataset    │
-│ ------  │                         │  Stream     │
+│  Disk   │  └───────────────────┘  │ Underfolder │
+│ ------  │                         │ Stream      │
 │ ------  │  ┌───────────────────┐  │             │
 └────▲────┘  │                   │  │             ◄─────── set_data
      │       │ UnderfolderWriter ◄──┤             │
