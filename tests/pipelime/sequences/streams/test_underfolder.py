@@ -13,22 +13,21 @@ from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
 
 class TestUnderfolderStreams:
-
     def _create_dataset(sample_underfolder_minimnist, tmp_path):
         folder = tmp_path / "dataset"
-        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
         return folder
 
     def test_stream_empty(self, sample_underfolder_empty):
 
-        view = UnderfolderStream(sample_underfolder_empty['folder'])
+        view = UnderfolderStream(sample_underfolder_empty["folder"])
         assert len(view) == 0
 
         with pytest.raises(ValueError):
             manifest = view.manifest()
 
     def test_stream_read(self, sample_underfolder_minimnist, tmp_path):
-        folder = sample_underfolder_minimnist['folder']
+        folder = sample_underfolder_minimnist["folder"]
 
         dataset = UnderfolderReader(folder=folder)
         view = UnderfolderStream(folder)
@@ -80,7 +79,7 @@ class TestUnderfolderStreams:
 
     def test_stream_write(self, sample_underfolder_minimnist, tmp_path):
         folder = tmp_path / "dataset"
-        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
         print("folder:", folder)
         dataset = UnderfolderReader(folder=folder)
         view = UnderfolderStream(folder)
@@ -102,7 +101,7 @@ class TestUnderfolderStreams:
 
             image = np.random.rand(28, 28, 3)
             image_bytes = io.BytesIO()
-            imageio.imwrite(image_bytes, image, format='jpg')
+            imageio.imwrite(image_bytes, image, format="jpg")
             view.set_data(sample_id, "new_image", image_bytes, "jpg")
 
         view.flush()
@@ -120,7 +119,7 @@ class TestUnderfolderStreams:
 
     def test_stream_notallowed_keys(self, sample_underfolder_minimnist, tmp_path):
         folder = tmp_path / "dataset"
-        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
 
         allowed_keys = ["image", "points"]
         view = UnderfolderStream(folder, allowed_keys=allowed_keys)
@@ -145,12 +144,12 @@ class TestUnderfolderStreams:
 
             image = np.random.rand(28, 28, 3)
             image_bytes = io.BytesIO()
-            imageio.imwrite(image_bytes, image, format='jpg')
+            imageio.imwrite(image_bytes, image, format="jpg")
             view.set_data(sample_id, "image", image_bytes, "jpg")
 
     def test_stream_write_format(self, sample_underfolder_minimnist, tmp_path):
         folder = tmp_path / "dataset"
-        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
         print("folder:", folder)
         view = UnderfolderStream(folder)
 
@@ -173,10 +172,13 @@ class TestUnderfolderStreams:
         # Write with specification, overwriting default extension multiple times
         ##############################
         for file_format in ["json", "yml", "pkl"]:
-            view.add_extensions_map({'last_metadata': file_format})
+            view.add_extensions_map({"last_metadata": file_format})
             for sample_id in range(len(view)):
                 view.set_data(
-                    sample_id, "last_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
+                    sample_id,
+                    "last_metadata",
+                    {"data": [1, 2, 3.0], "flag": True},
+                    "dict",
                 )
 
             dataset = UnderfolderReader(folder=folder)
@@ -186,3 +188,23 @@ class TestUnderfolderStreams:
                 filepath = Path(sample.filesmap["last_metadata"])
                 assert filepath.suffix.replace(".", "") == file_format
                 assert sample["last_metadata"]["flag"]
+
+    def test_stream_write_rootkeys(self, sample_underfolder_minimnist, tmp_path):
+        folder = tmp_path / "dataset"
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
+        print("folder:", folder)
+        view = UnderfolderStream(folder)
+
+        view.add_root_files_keys(["new_metadata"])
+        ##############################
+        # Write without further specification means DEFAULT FILE EXTENSION
+        ##############################
+        for sample_id in range(len(view)):
+            view.set_data(
+                sample_id, "new_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
+            )
+            break
+
+        dataset = UnderfolderReader(folder=folder)
+        for sample in dataset:
+            assert "new_metadata" in sample
