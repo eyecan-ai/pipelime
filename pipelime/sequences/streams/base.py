@@ -3,9 +3,9 @@ from typing import Sequence, Tuple
 from pathlib import Path
 
 import imageio
-from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.sequences.writers.filesystem import UnderfolderWriter
-from pipelime.sequences.samples import Sample, SamplesSequence
+from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.writers.base import BaseWriter
+from pipelime.sequences.samples import Sample
 import numpy as np
 import cv2
 import io
@@ -122,7 +122,16 @@ class ItemConverter:
 
 class DatasetStream:
     def __init__(self) -> None:
-        pass
+        self._reader: BaseReader = None
+        self._writer: BaseWriter = None
+
+    @property
+    def reader(self) -> BaseReader:
+        return self._reader
+
+    @property
+    def writer(self) -> BaseWriter:
+        return self._writer
 
     @abstractmethod
     def __len__(self):

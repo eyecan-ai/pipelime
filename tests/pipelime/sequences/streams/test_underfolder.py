@@ -1,6 +1,6 @@
 import imageio
 from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.sequences.samples import Sample
+from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
 from pipelime.sequences.streams.base import ItemConverter
 from pipelime.sequences.streams.underfolder import UnderfolderStream
 import io
@@ -103,6 +103,10 @@ class TestUnderfolderStreams:
             view.set_data(sample_id, "new_image", image_bytes, "jpg")
 
         view.flush()
+        for sample in view.reader:
+            assert isinstance(sample, FileSystemSample)
+            for key in sample:
+                assert not sample.is_cached(key)
 
         dataset = UnderfolderReader(folder=folder)
         for sample in dataset:

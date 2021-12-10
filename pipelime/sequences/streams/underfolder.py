@@ -9,22 +9,22 @@ class UnderfolderStream(DatasetStream):
     def __init__(self, folder: str, allowed_keys: Optional[Sequence[str]] = None) -> None:
         super().__init__()
         self._folder = folder
-        self._dataset = UnderfolderReader(folder=folder)
-        self._dataset.flush()
+        self._reader = UnderfolderReader(folder=folder)
+        self._reader.flush()
         self._allowed_keys = allowed_keys
         self._writer = None
-        if len(self._dataset) > 0:
+        if len(self._reader) > 0:
             self._writer = UnderfolderWriter(
                 folder=folder,
-                root_files_keys=self._dataset.get_reader_template().root_files_keys,
-                extensions_map=self._dataset.get_reader_template().extensions_map,
+                root_files_keys=self._reader.get_reader_template().root_files_keys,
+                extensions_map=self._reader.get_reader_template().extensions_map,
             )
 
     def flush(self):
-        return self._dataset.flush()
+        return self._reader.flush()
 
     def __len__(self):
-        return len(self._dataset)
+        return len(self._reader)
 
     def manifest(self) -> dict:
         """Returns the manifest of the dataset with infos about size and
@@ -34,8 +34,8 @@ class UnderfolderStream(DatasetStream):
         :return: The manifest of the dataset.
         :rtype: dict
         """
-        if len(self._dataset) > 0:
-            sample = self._dataset[0]
+        if len(self._reader) > 0:
+            sample = self._reader[0]
             keys = list(sample.keys())
             return {
                 "size": len(self),
@@ -53,8 +53,8 @@ class UnderfolderStream(DatasetStream):
         :return: The sample with the given id.
         :rtype: Sample
         """
-        if sample_id < len(self._dataset):
-            return self._dataset[sample_id]
+        if sample_id < len(self._reader):
+            return self._reader[sample_id]
         else:
             raise ValueError(f"Sample id '{sample_id}' out of range")
 
