@@ -9,8 +9,14 @@ import shutil
 import numpy as np
 
 
-class TestDatasetView:
-    def test_datasetview_empty(self, sample_underfolder_empty):
+class TestUnderfolderStreams:
+
+    def _create_dataset(sample_underfolder_minimnist, tmp_path):
+        folder = tmp_path / "dataset"
+        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        return folder
+
+    def test_stream_empty(self, sample_underfolder_empty):
 
         view = UnderfolderStream(sample_underfolder_empty['folder'])
         assert len(view) == 0
@@ -18,7 +24,7 @@ class TestDatasetView:
         with pytest.raises(ValueError):
             manifest = view.manifest()
 
-    def test_datasetview(self, sample_underfolder_minimnist, tmp_path):
+    def test_stream_read(self, sample_underfolder_minimnist, tmp_path):
         folder = sample_underfolder_minimnist['folder']
 
         dataset = UnderfolderReader(folder=folder)
@@ -69,7 +75,7 @@ class TestDatasetView:
             with pytest.raises(ValueError):
                 view.get_item(sample_id, key)
 
-    def test_datasetview_write(self, sample_underfolder_minimnist, tmp_path):
+    def test_stream_write(self, sample_underfolder_minimnist, tmp_path):
         folder = tmp_path / "dataset"
         shutil.copytree(sample_underfolder_minimnist['folder'], folder)
         print("folder:", folder)
@@ -104,3 +110,33 @@ class TestDatasetView:
             assert "new_matrix" in sample
             assert "new_points" in sample
             assert "new_image" in sample
+
+    def test_stream_notallowed_keys(self, sample_underfolder_minimnist, tmp_path):
+        folder = tmp_path / "dataset"
+        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+
+        allowed_keys = ["image", "points"]
+        view = UnderfolderStream(folder, allowed_keys=allowed_keys)
+        assert len(view) > 0
+
+        for sample_id in range(len(view)):
+
+            with pytest.raises(ValueError):
+                view.set_data(
+                    sample_id, "metadata", {"data": [1, 2, 3.0], "gino": True}, "dict"
+                )
+
+            with pytest.raises(ValueError):
+                view.set_data(sample_id, "matrix", {"data": [1, 2, 3.0]}, "matrix")
+
+            view.set_data(
+                sample_id,
+                "points",
+                {"data": [1, 2, 3.0, 4, 5, 6]},
+                "matrix",
+            )
+
+            image = np.random.rand(28, 28, 3)
+            image_bytes = io.BytesIO()
+            imageio.imwrite(image_bytes, image, format='jpg')
+            view.set_data(sample_id, "image", image_bytes, "jpg")

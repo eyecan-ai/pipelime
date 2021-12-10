@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Sequence, Tuple
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.streams.base import DatasetStream, ItemConverter
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
@@ -6,11 +6,12 @@ from pipelime.sequences.samples import Sample, SamplesSequence
 
 
 class UnderfolderStream(DatasetStream):
-    def __init__(self, folder: str) -> None:
+    def __init__(self, folder: str, allowed_keys: Optional[Sequence[str]] = None) -> None:
         super().__init__()
         self._folder = folder
         self._dataset = UnderfolderReader(folder=folder)
         self._dataset.flush()
+        self._allowed_keys = allowed_keys
         self._writer = None
         if len(self._dataset) > 0:
             self._writer = UnderfolderWriter(
@@ -106,6 +107,9 @@ class UnderfolderStream(DatasetStream):
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """
+
+        if self._allowed_keys is not None and item not in self._allowed_keys:
+            raise ValueError(f"Item '{item}' not allowed")
 
         if self._writer is not None:
             sample = self.get_sample(sample_id)
