@@ -1,6 +1,7 @@
 import uuid
 from itertools import product
 from pathlib import Path
+import os
 
 import numpy as np
 from choixe.spooks import Spook
@@ -310,3 +311,26 @@ class TestUnderfolderReaderMultiprocessing(object):
                 sample = reader[sample_id]
                 resample = re_reader[sample_id]
                 assert sample["metadata"]["id"] == resample["metadata"]["id"]
+
+class TestUnderfolderWriterSymlinks(object):
+    def test_symlinks_not_broken(self, toy_dataset_small, tmpdir_factory):
+        folder = toy_dataset_small["folder"]
+
+        os.chdir(folder.parent)
+        folder = folder.name
+
+        reader = UnderfolderReader(folder=folder)
+        writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
+        writer = UnderfolderWriter(
+            folder=writer_folder,
+            copy_files=True,
+            use_symlinks=True,
+        )
+        writer(reader)
+
+        # check for broken symlinks
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        for sample in re_reader:
+            for k, v in sample.filesmap.items():
+                path = Path(v)
+                assert path.is_file()
