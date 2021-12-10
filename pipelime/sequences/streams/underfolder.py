@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.streams.base import DatasetStream, ItemConverter
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
@@ -6,7 +6,16 @@ from pipelime.sequences.samples import Sample, SamplesSequence
 
 
 class UnderfolderStream(DatasetStream):
+
     def __init__(self, folder: str, allowed_keys: Optional[Sequence[str]] = None) -> None:
+        """ Creates an UnderfolderStream object that reads and writes samples from and to
+        the given Underfolder format dataset
+
+        :param folder: the Undefolder folder
+        :type folder: str
+        :param allowed_keys: list of allowed keys the user can modify , defaults to None
+        :type allowed_keys: Optional[Sequence[str]], optional
+        """
         super().__init__()
         self._folder = folder
         self._reader = UnderfolderReader(folder=folder)
@@ -14,11 +23,45 @@ class UnderfolderStream(DatasetStream):
         self._allowed_keys = allowed_keys
         self._writer = None
         if len(self._reader) > 0:
-            self._writer = UnderfolderWriter(
-                folder=folder,
-                root_files_keys=self._reader.get_reader_template().root_files_keys,
-                extensions_map=self._reader.get_reader_template().extensions_map,
-            )
+            self._reload_writer()
+
+    def _reload_writer(
+            self,
+            additional_root_files_keys: Optional[Sequence[str]] = None,
+            additional_extensions_map: Optional[Dict[str, str]] = None
+    ) -> None:
+
+        root_files_keys = self._reader.get_reader_template().root_files_keys
+        extensions_map = self._reader.get_reader_template().extensions_map
+
+        if additional_root_files_keys is not None:
+            root_files_keys = root_files_keys + additional_root_files_keys
+
+        if additional_extensions_map is not None:
+            extensions_map.update(additional_extensions_map)
+
+        self._writer = UnderfolderWriter(
+            folder=self._folder,
+            root_files_keys=root_files_keys,
+            extensions_map=extensions_map,
+            remove_duplicates=True
+        )
+
+    def add_root_files_keys(self, root_files_keys: Sequence[str]) -> None:
+        """ Adds the root files keys of the dataset.
+
+        :param root_files_keys: The root files keys of the dataset.
+        :type root_files_keys: Sequence[str]
+        """
+        self._reload_writer(additional_root_files_keys=root_files_keys)
+
+    def add_extensions_map(self, extensions_map: Dict[str, str]) -> None:
+        """ Adds the extensions map of the dataset.
+
+        :param extensions_map: The extensions map of the dataset.
+        :type extensions_map: Dict[str, str]
+        """
+        self._reload_writer(additional_extensions_map=extensions_map)
 
     def flush(self):
         return self._reader.flush()
@@ -104,6 +147,7 @@ class UnderfolderStream(DatasetStream):
         :type data: any
         :param format: The format of the data.
         :type format: str
+        :raises ValueError: If the item key is not allowed to be modified.
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """

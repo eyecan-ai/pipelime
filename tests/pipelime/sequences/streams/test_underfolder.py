@@ -1,3 +1,4 @@
+from pathlib import Path
 import imageio
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
@@ -7,6 +8,8 @@ import io
 import pytest
 import shutil
 import numpy as np
+
+from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
 
 class TestUnderfolderStreams:
@@ -87,7 +90,7 @@ class TestUnderfolderStreams:
         for sample_id in range(len(view)):
 
             view.set_data(
-                sample_id, "new_metadata", {"data": [1, 2, 3.0], "gino": True}, "dict"
+                sample_id, "new_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
             )
             view.set_data(sample_id, "new_matrix", {"data": [1, 2, 3.0]}, "matrix")
             view.set_data(
@@ -127,7 +130,7 @@ class TestUnderfolderStreams:
 
             with pytest.raises(ValueError):
                 view.set_data(
-                    sample_id, "metadata", {"data": [1, 2, 3.0], "gino": True}, "dict"
+                    sample_id, "metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
                 )
 
             with pytest.raises(ValueError):
@@ -144,3 +147,42 @@ class TestUnderfolderStreams:
             image_bytes = io.BytesIO()
             imageio.imwrite(image_bytes, image, format='jpg')
             view.set_data(sample_id, "image", image_bytes, "jpg")
+
+    def test_stream_write_format(self, sample_underfolder_minimnist, tmp_path):
+        folder = tmp_path / "dataset"
+        shutil.copytree(sample_underfolder_minimnist['folder'], folder)
+        print("folder:", folder)
+        view = UnderfolderStream(folder)
+
+        ##############################
+        # Write without further specification means DEFAULT FILE EXTENSION
+        ##############################
+        for sample_id in range(len(view)):
+            view.set_data(
+                sample_id, "new_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
+            )
+
+        dataset = UnderfolderReader(folder=folder)
+        for sample in dataset:
+            assert isinstance(sample, FileSystemSample)
+            filepath = Path(sample.filesmap["new_metadata"])
+            default_extension = UnderfolderWriter.DEFAULT_EXTENSION
+            assert filepath.suffix.replace(".", "") == default_extension
+
+        ##############################
+        # Write with specification, overwriting default extension multiple times
+        ##############################
+        for file_format in ["json", "yml", "pkl"]:
+            view.add_extensions_map({'last_metadata': file_format})
+            for sample_id in range(len(view)):
+                view.set_data(
+                    sample_id, "last_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
+                )
+
+            dataset = UnderfolderReader(folder=folder)
+            for sample in dataset:
+                assert "last_metadata" in sample
+                assert isinstance(sample, FileSystemSample)
+                filepath = Path(sample.filesmap["last_metadata"])
+                assert filepath.suffix.replace(".", "") == file_format
+                assert sample["last_metadata"]["flag"]

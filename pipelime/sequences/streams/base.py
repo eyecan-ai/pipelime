@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 from pathlib import Path
 
 import imageio
@@ -138,6 +138,22 @@ class DatasetStream:
         pass
 
     def flush(self):
+        pass
+
+    def add_root_files_keys(self, root_files_keys: Sequence[str]) -> None:
+        """ Adds the root files keys of the dataset.
+
+        :param root_files_keys: The root files keys of the dataset.
+        :type root_files_keys: Sequence[str]
+        """
+        pass
+
+    def add_extensions_map(self, extensions_map: Dict[str, str]) -> None:
+        """ Adds the extensions map of the dataset.
+
+        :param extensions_map: The extensions map of the dataset.
+        :type extensions_map: Dict[str, str]
+        """
         pass
 
     @abstractmethod
