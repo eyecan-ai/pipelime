@@ -1,7 +1,7 @@
 import click
 
 
-@click.command("underfolder_to_h5", help="Sum input underfolders")
+@click.command("underfolder_to_h5", help="Converts Underfolder to H5")
 @click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
 @click.option("-o", "--output_filename", required=True, type=str, help="Output H5 File")
 @click.option(
