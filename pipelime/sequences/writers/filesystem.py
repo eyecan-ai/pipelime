@@ -3,10 +3,11 @@ import os
 import re
 import shutil
 from pathlib import Path
+from typing import Dict, Sequence, Optional
 
 from choixe.spooks import Spook
 from rich.progress import track
-from schema import Optional, Or
+from schema import Or
 
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.base import BaseReader
@@ -26,12 +27,13 @@ class UnderfolderWriter(BaseWriter):
     def __init__(
         self,
         folder: str,
-        root_files_keys: list = None,
-        extensions_map: dict = None,
+        root_files_keys: Optional[Sequence[str]] = None,
+        extensions_map: Optional[Dict[str, str]] = None,
         zfill: int = 5,
         copy_files: bool = True,
         use_symlinks: bool = False,
-        force_copy_keys: list = None,
+        force_copy_keys: Optional[Sequence[str]] = None,
+        remove_duplicates: bool = False,
         num_workers: int = 0,  # typing is here because 'schema.Optional' conflicts
     ) -> None:
         """UnderfolderWriter for an input SamplesSequence
@@ -40,10 +42,10 @@ class UnderfolderWriter(BaseWriter):
         :type folder: str
         :param root_files_keys: list of keys to write as underfolder root files (only the first element
         encountered will be stored as root file, the others will be discarded), defaults to None
-        :type root_files_keys: list, optional
+        :type root_files_keys: Optional[Sequence[str]]
         :param extensions_map: dictionary of regex/extension to retrieve extension for each key matching
         the corresponding regex. Unmatched keys will be stored as PICKLE object file, defaults to None
-        :type extensions_map: dict, optional
+        :type extensions_map: Optional[Dict[str, str]]
         :param zfill: Length of zero padding in case of integer sample indices, defaults to 5
         :type zfill: int, optional
         :param copy_files: TRUE to copy FileSystemSample directly if not cached before, defaults to True
@@ -53,7 +55,9 @@ class UnderfolderWriter(BaseWriter):
         :param force_copy_keys: A list of string keys that will be copied/symlinked regardless of their
         cached/modified state (all changes will be lost), if they contain file system items.
         This is useful in case you want to quickly write an item that you know for certain it was not modified, even if it was cached.
-        :type force_copy_keys: list, optional
+        :type force_copy_keys: Optional[Sequence[str]]
+        :param remove_duplicates: if TRUE, will check for duplicates (same item with different extension) in the destination folder and delete them before storing, defaults to False
+        :type remove_duplicates: bool, optional
         :param num_workers: if 0 disable multiprocessing, if -1 use Multiprocessing pool with all available processors, if > 0 use Multiprocessing using as many processes
         :type num_workers: int, optional
         """
@@ -65,6 +69,7 @@ class UnderfolderWriter(BaseWriter):
         self._zfill = zfill
         self._copy_files = copy_files
         self._use_symlinks = use_symlinks
+        self._remove_duplicates = remove_duplicates
         self._num_workers = num_workers
 
         if force_copy_keys is None:
@@ -86,10 +91,8 @@ class UnderfolderWriter(BaseWriter):
 
     def _build_item_extension(self, key: str):
         extension = UnderfolderWriter.DEFAULT_EXTENSION
-        for r, ext in self._extensions_map.items():
-            if re.match(r, key) is not None:
-                extension = ext
-                break
+        if key in self._extensions_map:
+            extension = self._extensions_map[key]
         return extension
 
     def _is_root_key(self, key: str):
@@ -148,6 +151,13 @@ class UnderfolderWriter(BaseWriter):
 
     def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
         copy_item = False
+
+        if self._remove_duplicates:
+            duplicates = list(output_file.parent.glob(f"{output_file.stem}.*"))
+            for f in duplicates:
+                if f.suffix != output_file.suffix:
+                    f.unlink()
+
         if self._copy_files and isinstance(sample, FileSystemSample):
             item = sample.metaitem(key)
             if (

@@ -112,6 +112,11 @@ def filesystem_datasets(data_folder):
                     "should_pass": False,
                 },
             },
+        },
+        "empty_underfolder": {
+            "folder": Path(data_folder) / "datasets" / "underfolder_empty",
+            "type": "Undefolder",
+            "schemas": {},
         }
     }
 
@@ -119,6 +124,11 @@ def filesystem_datasets(data_folder):
 @pytest.fixture(scope="session")
 def sample_underfolder_minimnist(filesystem_datasets):
     return filesystem_datasets["minimnist_underfolder"]
+
+
+@pytest.fixture(scope="session")
+def sample_underfolder_empty(filesystem_datasets):
+    return filesystem_datasets["empty_underfolder"]
 
 
 @pytest.fixture(scope="session")

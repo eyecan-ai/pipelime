@@ -78,8 +78,8 @@ class TestOperationSum(object):
                 assert isinstance(out, SamplesSequence)
                 assert N * D == len(out)
             else:
-                with pytest.raises(AssertionError):
-                    out = op(datasets)
+                assert op.input_port().is_valid_data(datasets)
+                out = op(datasets)
 
 
 class TestOperationSubsample(object):
