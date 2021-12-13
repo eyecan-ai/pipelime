@@ -1,7 +1,5 @@
 from pathlib import Path
 from pipelime.sequences.readers.filesystem import UnderfolderReader
-import imageio
-
 from pipelime.sequences.samples import FileSystemSample
 import shutil
 from pipelime.converters.subfolders2underfolder import Subfolders2Underfolder

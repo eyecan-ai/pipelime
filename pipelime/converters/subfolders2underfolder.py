@@ -12,7 +12,19 @@ class Subfolders2Underfolder(UnderfolderConverter):
     CHAR_TO_REPLACE = ["/", "\\", ":", "*", "?", '"', "<", ">", "|", "-"]
 
     def __init__(self, folder: str, images_extension: str = "png") -> None:
-        """Converts a subfolder tree structure, containing images, to a single Underfolder
+        """Converts a subfolder tree structure, containing images, to a single Underfolder.
+        Subfolder structure should be like
+
+        root
+        - subfolder1
+            - subfolder2
+                - subfolder3
+                    - image1.png
+                    - image2.png
+                - image3.png
+            - image4.png
+
+        Category for image2 will be 'subfolder1_subfolder2_subfolder3'. An so on...
 
         :param folder: root folder
         :type folder: str
