@@ -21,7 +21,7 @@ class UnderfolderReader(BaseReader):
         num_workers: int = 0,
     ) -> None:
 
-        self._folder = Path(folder)
+        self._folder = Path(folder).resolve()
         self._copy_root_files = copy_root_files
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         self._lazy_samples = lazy_samples
