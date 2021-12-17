@@ -1,8 +1,8 @@
 """Top-level package for pipelime."""
 
 __author__ = "eyecan"
-__email__ = 'daniele.degregorio@eyecan.ai'
-__version__ = '0.1.1'
+__email__ = "daniele.degregorio@eyecan.ai"
+__version__ = "0.1.2"
 
 
 # Import transforms in order to register classes for serialization
