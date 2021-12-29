@@ -3,7 +3,7 @@ from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.sequences.operations import OperationFilterByQuery, OperationSubsample
 
-folder = '/Users/daniele/Downloads/lego_dataset/lego_00'
+folder = "/Users/daniele/Downloads/lego_dataset/lego_00"
 d = UnderfolderReader(folder=folder, copy_root_files=True)
 print(len(d))
 
@@ -14,16 +14,16 @@ d = op2(op(d))
 print(len(d))
 
 extensions_map = {
-    '.*image.*': 'jpg',
-    '.*mask.*': 'png',
-    '.*pose.*|.*keypoint.*': 'txt',
-    '.*metadata.*|.*camera.*|.*charuco.*': 'yml',
+    ".*image.*": "jpg",
+    ".*mask.*": "png",
+    ".*pose.*|.*keypoint.*": "txt",
+    ".*metadata.*|.*camera.*|.*charuco.*": "yml",
 }
 
 w = UnderfolderWriter(
-    folder='/tmp/gino',
-    root_files_keys=['.*camera.*|.*charuco.*|.*keypoints.*'],
-    extensions_map=None
+    folder="/tmp/gino",
+    root_files_keys=[".*camera.*|.*charuco.*|.*keypoints.*"],
+    extensions_map=None,
 )
 w(d)
 

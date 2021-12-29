@@ -1,23 +1,17 @@
-
-
 import rich
 from pipelime.lib import AddOp, PlainSample, SamplesSequence, SequenceOpFactory
 from choixe.configurations import XConfig
 
 pipe = {
-    'input': {
-        'X': None
-    },
-    'modules': [
+    "input": {"X": None},
+    "modules": [
         {
-            'input': 'X',
-            'output': ['GOOD', 'BAD'],
-            'op': {
-                'type': 'SplitByQueryOp',
-                'options': {
-                    'query': '`metadata.label` == 0'
-                }
-            }
+            "input": "X",
+            "output": ["GOOD", "BAD"],
+            "op": {
+                "type": "SplitByQueryOp",
+                "options": {"query": "`metadata.label` == 0"},
+            },
         },
         # {
         #     'input': 'BAD',
@@ -121,24 +115,34 @@ pipe = {
         #         }
         #     }
         # }
-    ]
+    ],
 }
 
 cfg = XConfig.from_dict(pipe)
-cfg.save_to('/tmp/cfgs/gino.yml')
+cfg.save_to("/tmp/cfgs/gino.yml")
 
-pipe = XConfig(filename='/tmp/cfgs/gino.yml')
+pipe = XConfig(filename="/tmp/cfgs/gino.yml")
 rich.print(SequenceOpFactory.FACTORY_MAP)
 
 N = 10
-samples_a = [PlainSample(data={'idx': idx, 'metadata': {'idx': idx, 'name': str(idx), 'label': 0}}) for idx in range(N)]
-samples_b = [PlainSample(data={'idx': idx, 'metadata': {'idx': idx, 'name': str(idx), 'label': 1}}) for idx in range(N)]
+samples_a = [
+    PlainSample(
+        data={"idx": idx, "metadata": {"idx": idx, "name": str(idx), "label": 0}}
+    )
+    for idx in range(N)
+]
+samples_b = [
+    PlainSample(
+        data={"idx": idx, "metadata": {"idx": idx, "name": str(idx), "label": 1}}
+    )
+    for idx in range(N)
+]
 samples = samples_a + samples_b
 
 dataset = SamplesSequence(samples=samples)
 
 
-pipe['input']['X'] = dataset
+pipe["input"]["X"] = dataset
 
 data_map = {}
 
@@ -172,13 +176,13 @@ def push_output(o, data):
             data_map[name] = data[k]
 
 
-for name, d in pipe['input'].items():
+for name, d in pipe["input"].items():
     data_map[name] = d
 
-for m in pipe['modules']:
-    i = m['input']
-    o = m['output']
-    op = SequenceOpFactory.create(m['op'])
+for m in pipe["modules"]:
+    i = m["input"]
+    o = m["output"]
+    op = SequenceOpFactory.create(m["op"])
 
     try:
         check_input(i)

@@ -1,5 +1,17 @@
 from numpy.lib.utils import source
-from pipelime.lib import AddOp, Dict2ListOp, FileSystemSample, FilterByQueryOp, PlainSample, Sample, SamplesSequence, ShuffleOp, SplitByQueryOp, SplitsOp, SubsampleOp
+from pipelime.lib import (
+    AddOp,
+    Dict2ListOp,
+    FileSystemSample,
+    FilterByQueryOp,
+    PlainSample,
+    Sample,
+    SamplesSequence,
+    ShuffleOp,
+    SplitByQueryOp,
+    SplitsOp,
+    SubsampleOp,
+)
 import sys
 from memory_profiler import profile
 from pathlib import Path
@@ -9,68 +21,49 @@ from pathlib import Path
 
 def my_func():
 
-    dataset_folder = Path('/home/daniele/Desktop/experiments/2021-01-28.PlaygroundDatasets/lego_00')
+    dataset_folder = Path(
+        "/home/daniele/Desktop/experiments/2021-01-28.PlaygroundDatasets/lego_00"
+    )
     fmap = {
-        'image': dataset_folder / 'data/00000_image.jpg',
-        'xray': dataset_folder / 'data/00000_xray.png',
-        'metadata': dataset_folder / 'data/00000_metadata.yml',
-        'pose': dataset_folder / 'data/00000_pose.txt'
+        "image": dataset_folder / "data/00000_image.jpg",
+        "xray": dataset_folder / "data/00000_xray.png",
+        "metadata": dataset_folder / "data/00000_metadata.yml",
+        "pose": dataset_folder / "data/00000_pose.txt",
     }
 
     # s = FileSystemSample(data_map=fmap, preload=True)
     # s = PlainSample(data={'a': 2})
-    samples = [PlainSample(data={'idx': idx, 'metadata': {'idx': idx, 'name': str(idx)}}) for idx in range(25)]
+    samples = [
+        PlainSample(data={"idx": idx, "metadata": {"idx": idx, "name": str(idx)}})
+        for idx in range(25)
+    ]
     # samples = [FileSystemSample(data_map=fmap) for idx in range(250)]
     d = SamplesSequence(samples=samples)
 
-    op = AddOp.build_from_dict({
-        'type': 'AddOp',
-        'options': {}
-    })
+    op = AddOp.build_from_dict({"type": "AddOp", "options": {}})
 
-    op_sub = SubsampleOp.build_from_dict({
-        'type': 'SubsampleOp',
-        'options': {
-            'factor': 0.5
+    op_sub = SubsampleOp.build_from_dict(
+        {"type": "SubsampleOp", "options": {"factor": 0.5}}
+    )
+
+    op_shuf = ShuffleOp.build_from_dict({"type": "ShuffleOp", "options": {"seed": -1}})
+
+    op_splits = SplitsOp.build_from_dict(
+        {
+            "type": "SplitsOp",
+            "options": {"split_map": {"train": 0.5, "val": 0.25, "test": 0.25}},
         }
-    })
+    )
 
-    op_shuf = ShuffleOp.build_from_dict({
-        'type': 'ShuffleOp',
-        'options': {
-            'seed': -1
-        }
-    })
+    op_d2l = Dict2ListOp.build_from_dict({"type": "Dict2ListOp", "options": {}})
 
-    op_splits = SplitsOp.build_from_dict({
-        'type': 'SplitsOp',
-        'options': {
-            'split_map': {
-                'train': 0.5,
-                'val': 0.25,
-                'test': 0.25
-            }
-        }
-    })
+    op_query = FilterByQueryOp.build_from_dict(
+        {"type": "FilterByQueryOp", "options": {"query": "`metadata.idx` < 5"}}
+    )
 
-    op_d2l = Dict2ListOp.build_from_dict({
-        'type': 'Dict2ListOp',
-        'options': {}
-    })
-
-    op_query = FilterByQueryOp.build_from_dict({
-        'type': 'FilterByQueryOp',
-        'options': {
-            'query': "`metadata.idx` < 5"
-        }
-    })
-
-    op_query2 = SplitByQueryOp.build_from_dict({
-        'type': 'SplitByQueryOp',
-        'options': {
-            'query': "`metadata.idx` < 5"
-        }
-    })
+    op_query2 = SplitByQueryOp.build_from_dict(
+        {"type": "SplitByQueryOp", "options": {"query": "`metadata.idx` < 5"}}
+    )
 
     d = op([d, d, d])
     d = op_shuf(d)
@@ -128,5 +121,5 @@ def my_func():
     # print(len(d_sum))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     my_func()

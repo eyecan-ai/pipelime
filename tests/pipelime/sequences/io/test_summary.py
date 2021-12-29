@@ -2,6 +2,7 @@ from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.readers.summary import ReaderSummary, TypeInfo
 import numpy as np
 
+
 class TestSummary:
     def test_summary(self, toy_dataset_small):
         path = toy_dataset_small["folder"]
@@ -18,9 +19,10 @@ class TestSummary:
         key = sorted(all_keys)[0]
         assert iteminfo.name == key
         assert iteminfo.count == len(reader)
-        assert np.ndarray in iteminfo.typeinfo.types 
+        assert np.ndarray in iteminfo.typeinfo.types
         assert iteminfo.root_item == (key in root_keys)
         assert iteminfo.encoding == "npy"
+
 
 class TestTypeInfo:
     def test_typeinfo(self):

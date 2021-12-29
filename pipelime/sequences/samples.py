@@ -4,7 +4,7 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Hashable, Sequence
-
+import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
 
@@ -57,6 +57,10 @@ class Sample(MutableMapping):
 
     @abstractmethod
     def metaitem(self, key: any) -> MetaItem:
+        pass
+
+    @abstractmethod
+    def merge(self, other: "Sample") -> "Sample":
         pass
 
     @property
@@ -115,6 +119,15 @@ class GroupedSample(Sample):
     def __repr__(self) -> str:
         return str(self._samples)
 
+    def merge(self, other: "GroupedSample") -> "GroupedSample":
+        # raise NotImplementedError(f'Merging of grouped samples is not implemented yet')
+        samples = self._samples
+        others_samples = other._samples
+        if len(samples) != len(others_samples):
+            raise ValueError("Cannot merge samples with different lengths")
+        merged_samples = [x.merge(y) for x, y in zip(samples, others_samples)]
+        return GroupedSample(samples=merged_samples)
+
     def copy(self):
         return GroupedSample(samples=self._samples)
 
@@ -157,6 +170,11 @@ class PlainSample(Sample):
 
     def __repr__(self) -> str:
         return str(self._data)
+
+    def merge(self, other: "PlainSample") -> "PlainSample":
+        new_data = self._data.copy()
+        new_data.update(other._data.copy())
+        return PlainSample(data=new_data, id=self.id)
 
     def copy(self):
         return PlainSample(data=self._data.copy(), id=self.id)
@@ -216,7 +234,18 @@ class FileSystemSample(Sample):
         return iter(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
 
     def __len__(self):
-        return len(self._filesmap)
+        return len(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
+
+    def merge(self, other: "FileSystemSample") -> "FileSystemSample":
+        new_filesmap = self._filesmap.copy()
+        new_cache = self._cached.copy()
+
+        new_filesmap.update(other._filesmap)
+        new_cache.update(other._cached)
+
+        newsample = FileSystemSample(new_filesmap, id=self.id)
+        newsample._cached = new_cache
+        return newsample
 
     def copy(self):
         newsample = FileSystemSample(self._filesmap, id=self.id)
@@ -297,3 +326,20 @@ class SamplesSequence(Sequence):
         :rtype: int
         """
         return len(str(len(self)))
+
+    def merge(self, other: "SamplesSequence") -> "SamplesSequence":
+        new_samples = [x.merge(y) for x, y in zip(self, other)]
+        return SamplesSequence(samples=new_samples)
+
+    @classmethod
+    def merge_sequences(
+        cls, sequences: Sequence["SamplesSequence"]
+    ) -> "SamplesSequence":
+        """Merges multiple sequences into one
+
+        :param sequences: sequences to merge
+        :type sequences: SamplesSequence
+        :return: merged sequence
+        :rtype: SamplesSequence
+        """
+        return functools.reduce(lambda x, y: x.merge(y), sequences)

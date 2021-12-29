@@ -1,5 +1,3 @@
-
-
 import hashlib
 import random
 import os
@@ -18,16 +16,10 @@ def sample_dataset(namespace: str, N: int):
     samples = []
     for i in range(N):
         data = {
-            'idx': f'{namespace}{i}',
-            'number': i,
-            'fraction': i / 1000.,
-            'metadata': {
-                'name': f'{namespace}{i}',
-                'N': i,
-                'deep': {
-                    'super_deep': 0
-                }
-            }
+            "idx": f"{namespace}{i}",
+            "number": i,
+            "fraction": i / 1000.0,
+            "metadata": {"name": f"{namespace}{i}", "N": i, "deep": {"super_deep": 0}},
         }
         samples.append(PlainSample(data=data))
 
@@ -37,7 +29,12 @@ def sample_dataset(namespace: str, N: int):
 class PipeNode(object):
     ID_COUNTER = 0
 
-    def __init__(self, input_ports: Union[str, list, dict], output_ports: Union[str, list, dict], node: dict) -> None:
+    def __init__(
+        self,
+        input_ports: Union[str, list, dict],
+        output_ports: Union[str, list, dict],
+        node: dict,
+    ) -> None:
         self.id = PipeNode.ID_COUNTER
         PipeNode.ID_COUNTER += 1
         self.input_ports = input_ports
@@ -60,14 +57,13 @@ class PipeNode(object):
         elif isinstance(v, dict):
             return list(v.values())
         else:
-            raise NotImplementedError(f'{type(v)}')
+            raise NotImplementedError(f"{type(v)}")
 
     def __repr__(self) -> str:
         return str(self.id)
 
 
 class DataNode(object):
-
     def __init__(self, name: str) -> None:
         self.name = name
 
@@ -82,26 +78,17 @@ class DataNode(object):
 
 
 pipe = {
-    'input': {
-        'GOOD': None,
-        'BAD': None
-    },
-    'modules': [
+    "input": {"GOOD": None, "BAD": None},
+    "modules": [
         {
-            'input': None,
-            'output': 'GOOD',
-            'node': {
-                'type': 'Source',
-                'data': sample_dataset('good_', 100)
-            }
+            "input": None,
+            "output": "GOOD",
+            "node": {"type": "Source", "data": sample_dataset("good_", 100)},
         },
         {
-            'input': None,
-            'output': 'BAD',
-            'node': {
-                'type': 'Source',
-                'data': sample_dataset('bad_', 100)
-            }
+            "input": None,
+            "output": "BAD",
+            "node": {"type": "Source", "data": sample_dataset("bad_", 100)},
         },
         # {
         #     'input': None,
@@ -112,88 +99,48 @@ pipe = {
         #     }
         # },
         {
-            'input': 'BAD',
-            'output': {
-                'a': 'BAD_0',
-                'b': 'BAD_1'
+            "input": "BAD",
+            "output": {"a": "BAD_0", "b": "BAD_1"},
+            "node": {
+                "type": "SplitsOp",
+                "options": {"split_map": {"a": 0.5, "b": 0.5}},
             },
-            'node': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
-            }
         },
         {
-            'input': 'GOOD',
-            'output': {
-                'a': 'GOOD_0',
-                'b': 'GOOD_1'
+            "input": "GOOD",
+            "output": {"a": "GOOD_0", "b": "GOOD_1"},
+            "node": {
+                "type": "SplitsOp",
+                "options": {"split_map": {"a": 0.5, "b": 0.5}},
             },
-            'node': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
-            }
         },
         {
-            'input': ['BAD_0', 'GOOD_0'],
-            'output': 'train',
-            'node': {
-                'type': 'AddOp',
-                'options': {}
-            }
+            "input": ["BAD_0", "GOOD_0"],
+            "output": "train",
+            "node": {"type": "AddOp", "options": {}},
         },
         {
-            'input': ['BAD_1', 'GOOD_1'],  # 'SUPER'],
-            'output': 'testval',
-            'node': {
-                'type': 'AddOp',
-                'options': {}
-            }
+            "input": ["BAD_1", "GOOD_1"],  # 'SUPER'],
+            "output": "testval",
+            "node": {"type": "AddOp", "options": {}},
         },
         {
-            'input': 'testval',
-            'output': '_t',
-            'node': {
-                'type': 'ShuffleOp',
-                'options': {
-                    'seed': -1
-                }
-            }
+            "input": "testval",
+            "output": "_t",
+            "node": {"type": "ShuffleOp", "options": {"seed": -1}},
         },
         {
-            'input': '_t',
-            'output': '_t2',
-            'node': {
-                'type': 'SubsampleOp',
-                'options': {
-                    'factor': 2
-                }
-            }
+            "input": "_t",
+            "output": "_t2",
+            "node": {"type": "SubsampleOp", "options": {"factor": 2}},
         },
         {
-            'input': '_t2',
-            'output': {
-                'a': 'test',
-                'b': 'val'
+            "input": "_t2",
+            "output": {"a": "test", "b": "val"},
+            "node": {
+                "type": "SplitsOp",
+                "options": {"split_map": {"a": 0.5, "b": 0.5}},
             },
-            'node': {
-                'type': 'SplitsOp',
-                'options': {
-                    'split_map': {
-                        'a': 0.5,
-                        'b': 0.5
-                    }
-                }
-            }
         },
         # {
         #     'input': 's',
@@ -223,22 +170,18 @@ pipe = {
         #         }
         #     }
         # }
-    ]
+    ],
 }
 
 
 g = nx.DiGraph()
 
-modules = pipe['modules']
+modules = pipe["modules"]
 random.shuffle(modules)
 nodes = []
-for m in pipe['modules']:
+for m in pipe["modules"]:
 
-    node = PipeNode(
-        input_ports=m['input'],
-        output_ports=m['output'],
-        node=m['node']
-    )
+    node = PipeNode(input_ports=m["input"], output_ports=m["output"], node=m["node"])
     nodes.append(node)
 
     print("NODE", node.id, node.in_ports(), node.out_ports())
@@ -249,6 +192,7 @@ for m in pipe['modules']:
 
 # nx.draw_spring(g, with_labels=True)
 # plt.show()
+
 
 def prepare_in_data(node: PipeNode, cache: dict):
     v = node.input_ports
@@ -261,10 +205,12 @@ def prepare_in_data(node: PipeNode, cache: dict):
     elif isinstance(v, dict):
         return {k: cache[v] for k, v in v.items()}
     else:
-        raise NotImplementedError(f'{type(v)}')
+        raise NotImplementedError(f"{type(v)}")
 
 
-def prepare_out_data(o: Union[SamplesSequence, list, dict], node: PipeNode, cache: dict):
+def prepare_out_data(
+    o: Union[SamplesSequence, list, dict], node: PipeNode, cache: dict
+):
     v = node.output_ports
     if v is None:
         pass
@@ -277,7 +223,7 @@ def prepare_out_data(o: Union[SamplesSequence, list, dict], node: PipeNode, cach
         for k, name in v.items():
             cache[name] = o[k]
     else:
-        raise NotImplementedError(f'{type(v)}')
+        raise NotImplementedError(f"{type(v)}")
 
 
 _cache = {}
@@ -287,13 +233,13 @@ A = nx.topological_sort(g)
 for a in A:
     print("N: ", a)
     if isinstance(a, PipeNode):
-        if a.node['type'] != 'Source':
+        if a.node["type"] != "Source":
             op = SequenceOpFactory.create(a.node)
             data = prepare_in_data(a, _cache)
             out = op(data)
             prepare_out_data(out, a, _cache)
         else:
-            _cache[a.output_ports] = a.node['data']
+            _cache[a.output_ports] = a.node["data"]
 
 
 for k, v in _cache.items():
@@ -301,8 +247,8 @@ for k, v in _cache.items():
 
 A = to_agraph(g)
 print(A)
-A.layout('dot')
-fname = f'{tempfile.NamedTemporaryFile().name}.png'
+A.layout("dot")
+fname = f"{tempfile.NamedTemporaryFile().name}.png"
 print(fname)
 A.draw(fname)
-os.system(f'open {fname}')
+os.system(f"open {fname}")

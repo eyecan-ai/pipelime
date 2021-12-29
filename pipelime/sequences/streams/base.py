@@ -141,7 +141,7 @@ class DatasetStream:
         pass
 
     def add_root_files_keys(self, root_files_keys: Sequence[str]) -> None:
-        """ Adds the root files keys of the dataset.
+        """Adds the root files keys of the dataset.
 
         :param root_files_keys: The root files keys of the dataset.
         :type root_files_keys: Sequence[str]
@@ -149,7 +149,7 @@ class DatasetStream:
         pass
 
     def add_extensions_map(self, extensions_map: Dict[str, str]) -> None:
-        """ Adds the extensions map of the dataset.
+        """Adds the extensions map of the dataset.
 
         :param extensions_map: The extensions map of the dataset.
         :type extensions_map: Dict[str, str]
@@ -211,7 +211,7 @@ class DatasetStream:
     def set_data(
         self, sample_id: int, item: str, data: any, format: str
     ) -> Tuple[any, str]:
-        """ Sets the sample's item with the given name in the given format.
+        """Sets the sample's item with the given name in the given format.
 
         :param sample_id: The id of the sample.
         :type sample_id: int

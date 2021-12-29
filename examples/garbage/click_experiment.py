@@ -15,16 +15,18 @@ class CLICommandInvoker(click.Command):
         command = ctx.command.name
         print("Invoking ", ctx)
 
-        ctx.command = click.option('-p', '--pino', required=True, help='HELLOE')(ctx.command)
+        ctx.command = click.option("-p", "--pino", required=True, help="HELLOE")(
+            ctx.command
+        )
         ret = super(CLICommandInvoker, self).invoke(ctx)
         return ret
 
 
-@click.command('ciao', help='This is command', cls=CLICommandInvoker)
-@click.option('-o', '--mouse')
+@click.command("ciao", help="This is command", cls=CLICommandInvoker)
+@click.option("-o", "--mouse")
 def ciao(**kwargs):
     print("Done", kwargs)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ciao()

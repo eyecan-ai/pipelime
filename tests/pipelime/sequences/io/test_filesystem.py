@@ -312,6 +312,7 @@ class TestUnderfolderReaderMultiprocessing(object):
                 resample = re_reader[sample_id]
                 assert sample["metadata"]["id"] == resample["metadata"]["id"]
 
+
 class TestUnderfolderWriterSymlinks(object):
     def test_symlinks_not_broken(self, toy_dataset_small, tmpdir_factory):
         folder = toy_dataset_small["folder"]

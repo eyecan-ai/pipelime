@@ -395,7 +395,7 @@ class OperationSplits(SequenceOperation, Spook):
         chunks = []
         current_index = 0
         for s in sizes:
-            _samples = x.samples[current_index: current_index + s]
+            _samples = x.samples[current_index : current_index + s]
             chunks.append(SamplesSequence(samples=_samples))
             current_index += s
         return tuple(chunks)
