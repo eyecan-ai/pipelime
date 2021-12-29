@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.sequences.readers.filesystem import UnderfolderReader
 
 
 class ToyDatasetGenerator(object):
@@ -140,9 +141,12 @@ class ToyDatasetGenerator(object):
         image_size: int = 256,
         zfill: int = 5,
         suffix: str = "",
+        as_undefolder: bool = False,
     ):
 
         output_folder = Path(output_folder)
+        if as_undefolder:
+            output_folder = output_folder / UnderfolderReader.DATA_SUBFOLDER
         output_folder.mkdir(parents=True, exist_ok=True)
 
         generator = ToyDatasetGenerator()

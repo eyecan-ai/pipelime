@@ -8,10 +8,13 @@ from schema import Optional
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample
+import functools
 
 
 class UnderfolderReader(BaseReader):
     DATA_SUBFOLDER = "data"
+    PRIVATE_KEY_QUALIFIER = "_"
+    PRIVATE_KEY_UNDERFOLDER_LINKS = "underfolder_links"
 
     def __init__(
         self,
@@ -31,14 +34,50 @@ class UnderfolderReader(BaseReader):
         # builds tree from subfolder with underscore notation
         self._tree = FSToolkit.tree_from_underscore_notation_files(self._datafolder)
         self._ids = list(sorted(self._tree.keys()))
+
+        # extract all root files
         self._root_files = [x for x in Path(self._folder).glob("*") if x.is_file()]
+
+        # purge hidden files from root files
         self._root_files = [x for x in self._root_files if not x.name.startswith(".")]
+
+        # extract private root files among root files
+        self._private_root_files = list(
+            filter(
+                lambda x: x.name.startswith(self.PRIVATE_KEY_QUALIFIER),
+                self._root_files,
+            )
+        )
+
+        # purge private root files from root files
+        self._root_files = list(
+            filter(
+                lambda x: not x.name.startswith(self.PRIVATE_KEY_QUALIFIER),
+                self._root_files,
+            )
+        )
+
+        # build public root data
         self._root_data = {}
         self._root_files_keys = set()
         for f in self._root_files:
             self._root_files_keys.add(f.stem)
-            self._root_data[f.stem] = str(f)  # FSToolkit.load_data(f)
+            self._root_data[f.stem] = str(f)
 
+        # build private root data
+        self._root_private_files_keys = set()
+        self._root_private_data = {}
+        for f in self._private_root_files:
+            self._root_private_files_keys.add(
+                f.stem.replace(self.PRIVATE_KEY_QUALIFIER, "", 1)
+            )
+            self._root_private_data[
+                f.stem.replace(self.PRIVATE_KEY_QUALIFIER, "", 1)
+            ] = str(
+                f
+            )  # FSToolkit.load_data(f)
+
+        # Load samples
         if self._num_workers == -1 or self._num_workers > 0:
             if self._lazy_samples:
                 logger.warning(f"Multiprocessing with Lazy Samples are useless!")
@@ -50,6 +89,26 @@ class UnderfolderReader(BaseReader):
             samples = []
             for idx in range(len(self._ids)):
                 samples.append(self._read_sample(idx))
+
+        # Manage private keys
+        if self.PRIVATE_KEY_UNDERFOLDER_LINKS in self._root_private_data:
+            underfolder_links = FSToolkit.load_data(
+                self._root_private_data[self.PRIVATE_KEY_UNDERFOLDER_LINKS]
+            )
+            for link in underfolder_links:
+                if Path(link).exists():
+                    linked_reader = UnderfolderReader(
+                        folder=link,
+                        copy_root_files=copy_root_files,
+                        lazy_samples=lazy_samples,
+                        num_workers=num_workers,
+                    )
+                    if len(linked_reader) != len(samples):
+                        raise ValueError(
+                            f"Linked reader has a different number of samples ({len(linked_reader)}) than the current reader ({len(samples)})"
+                        )
+
+                    samples = [x.merge(y) for x, y in zip(linked_reader, samples)]
 
         super().__init__(samples=samples)
 
@@ -64,6 +123,9 @@ class UnderfolderReader(BaseReader):
 
     def is_root_key(self, key: str):
         return key in self._root_files_keys
+
+    def is_root_private_key(self, key: str):
+        return key in self._root_private_files_keys
 
     def get_reader_template(self) -> Union[ReaderTemplate, None]:
         """Retrieves the template of the underfolder reader, i.e. a mapping
@@ -125,3 +187,31 @@ class UnderfolderReader(BaseReader):
 
     def to_dict(self) -> dict:
         return {"folder": str(self._folder), "copy_root_files": self._copy_root_files}
+
+    @classmethod
+    def link_underfolders(cls, source_folder: str, target_folder: str):
+        """Links two Underfolder adding target_folder to links in source_folder
+
+        :param source_folder: Underfolder folder where to add links
+        :type source_folder: str
+        :param target_folder: Underfolder folder to add
+        :type target_folder: str
+        """
+
+        source_folder = Path(source_folder)
+        source_reader = UnderfolderReader(folder=source_folder, lazy_samples=True)
+
+        # Builds private key filename
+        key = cls.PRIVATE_KEY_UNDERFOLDER_LINKS
+        private_key_file = source_folder / f"{cls.PRIVATE_KEY_QUALIFIER}{key}.yml"
+
+        # Create private key file if not present
+        if not source_reader.is_root_private_key(key):
+            FSToolkit.store_data(private_key_file, [])
+
+        # Loads private key data
+        prev_links = FSToolkit.load_data(private_key_file)
+
+        # Update private key data
+        prev_links.append(target_folder)
+        FSToolkit.store_data(private_key_file, prev_links)
