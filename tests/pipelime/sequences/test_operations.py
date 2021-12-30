@@ -1,6 +1,7 @@
 import functools
 import hashlib
 from typing import Dict, Optional, Sequence
+import uuid
 
 import pydash
 import pytest
@@ -167,6 +168,12 @@ class TestOperationResetIndices(object):
         for generator in generators:
             dataset = plain_samples_sequence_generator("d0_", N)
             dataset_clone = plain_samples_sequence_generator("d0_", N)
+
+            # Generate common uuid for samples ensuring they are the same
+            for sample_index, _ in enumerate(dataset):
+                common_id = str(uuid.uuid1())
+                dataset[sample_index].id = common_id
+                dataset_clone[sample_index].id = common_id
 
             op = OperationResetIndices(generator=generator)
             _plug_test(op)

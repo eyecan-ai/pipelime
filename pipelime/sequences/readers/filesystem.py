@@ -108,6 +108,9 @@ class UnderfolderReader(BaseReader):
                             f"Linked reader has a different number of samples ({len(linked_reader)}) than the current reader ({len(samples)})"
                         )
 
+                    self._root_data.update(linked_reader._root_data)
+                    self._root_files_keys.update(linked_reader._root_files_keys)
+
                     samples = [x.merge(y) for x, y in zip(linked_reader, samples)]
 
         super().__init__(samples=samples)

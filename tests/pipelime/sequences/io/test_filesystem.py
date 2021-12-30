@@ -5,6 +5,7 @@ import os
 
 import numpy as np
 from choixe.spooks import Spook
+import rich
 
 from pipelime.sequences.operations import OperationFilterKeys
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
@@ -335,3 +336,65 @@ class TestUnderfolderWriterSymlinks(object):
             for k, v in sample.filesmap.items():
                 path = Path(v)
                 assert path.is_file()
+
+
+class TestUnderfolderLinking(object):
+    def test_linking(self, tmpdir, plain_samples_sequence_generator):
+
+        samples = plain_samples_sequence_generator("gino", 10)
+
+        assert len(samples) > 0
+        keys = list(samples[0].keys())
+        root_keys = [f"{k}_root" for k in keys]
+
+        for sample in samples:
+            for rkey in root_keys:
+                sample[rkey] = sample[rkey.replace("_root", "")]
+
+        subsamples = {}
+        writers = {}
+        subfolders = {}
+
+        for key, root_key in zip(keys, root_keys):
+            subsamples[key] = OperationFilterKeys([key, root_key])(samples)
+            subfolders[key] = Path(tmpdir.mkdir(key))
+            writers[key] = UnderfolderWriter(
+                folder=subfolders[key], root_files_keys=root_keys
+            )
+            writers[key](subsamples[key])
+            rich.print(key, "Writing", subfolders[key])
+
+        import networkx as nx
+        import matplotlib.pyplot as plt
+
+        g = nx.full_rary_tree(3, len(keys))
+        for u, v, a in g.edges(data=True):
+            key_source = keys[u]
+            key_target = keys[v]
+            folder_source = str(subfolders[key_source])
+            folder_target = str(subfolders[key_target])
+            UnderfolderReader.link_underfolders(folder_source, folder_target)
+            print(u, v, keys[u], keys[v])
+
+        root_reader = UnderfolderReader(folder=subfolders[keys[0]])
+        assert len(root_reader) > 0
+
+        merged_folder = Path(tmpdir.mkdir("_merged"))
+        writer = UnderfolderWriter(folder=merged_folder, root_files_keys=root_keys)
+        writer(root_reader)
+
+        rich.print("Merged output to", merged_folder)
+
+        for key in keys:
+            assert not root_reader.is_root_key(key)
+
+        for rkey in root_keys:
+            assert root_reader.is_root_key(rkey)
+
+        # Checks for merged keys consistecy
+        ref_sample = root_reader[0]
+        loaded_keys = set(list(ref_sample.keys()))
+        assert loaded_keys == set(keys) | set(root_keys)
+
+        # nx.draw(g, with_labels=True)
+        # plt.show()
