@@ -9,11 +9,12 @@ import networkx as nx
 from pipelime.sequences.operations import OperationFilterKeys
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.readers.filesystem import (
+    UnderfolderLinksPlugin,
     UnderfolderReader,
-    UnderfolderReaderLinks,
 )
 from pipelime.sequences.samples import FilesystemItem, FileSystemSample, Sample
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
+import pytest
 
 
 def _plug_test(reader: BaseReader):
@@ -376,7 +377,7 @@ class TestUnderfolderLinking(object):
             key_target = keys[v]
             folder_source = str(subfolders[key_source])
             folder_target = str(subfolders[key_target])
-            UnderfolderReaderLinks.link_underfolders(folder_source, folder_target)
+            UnderfolderLinksPlugin.link_underfolders(folder_source, folder_target)
             print(u, v, keys[u], keys[v])
 
         # Creates the reader of the Root Underfolder
@@ -408,3 +409,17 @@ class TestUnderfolderLinking(object):
             assert sample["reverse_number"] == N - sample["number"]
             assert sample["metadata"]["even"] == (sample["number"] % 2 == 0)
             assert sample["metadata"]["N"] == sample["number"]
+
+        # Connect a Leaf to the root underfolder in order to build a cycle
+        dg = nx.to_directed(g)
+        leafs = [
+            x for x in dg.nodes() if dg.out_degree(x) == 1 and dg.in_degree(x) == 1
+        ]
+        assert len(leafs) > 0
+        folder_source = str(subfolders[keys[leafs[0]]])
+        folder_target = str(subfolders[keys[0]])
+        UnderfolderLinksPlugin.link_underfolders(folder_source, folder_target)
+
+        # Checks for cycle when UnderfolderReader is called
+        with pytest.raises(RuntimeError):
+            UnderfolderReader(folder=subfolders[keys[0]])

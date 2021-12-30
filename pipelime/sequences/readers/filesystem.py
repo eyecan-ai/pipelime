@@ -1,14 +1,13 @@
 import multiprocessing
 from pathlib import Path
-from typing import Union
+from typing import Dict, Union
 
 from loguru import logger
-from schema import Optional
-
+import networkx as nx
+from typing import Optional
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample
-import functools
 
 
 class UnderfolderReader(BaseReader):
@@ -22,7 +21,22 @@ class UnderfolderReader(BaseReader):
         copy_root_files: bool = True,
         lazy_samples: bool = True,
         num_workers: int = 0,
+        enable_plugins: bool = True,
     ) -> None:
+        """Initialize a new underfolder reader
+
+        :param folder: Path to the root folder
+        :type folder: str
+        :param copy_root_files: TRUE to propagate root files to samples, defaults to True
+        :type copy_root_files: bool, optional
+        :param lazy_samples: TRUE to load only files skeleton and not data within , defaults to True
+        :type lazy_samples: bool, optional
+        :param num_workers: num workers for multiprocessing data loading , defaults to 0
+        :type num_workers: int, optional
+        :param enable_plugins:  TRUE to enable plugins activation, defaults to True
+        :type enable_plugins: bool, optional
+        :raises FileNotFoundError: [description]
+        """
 
         self._folder = Path(folder).resolve()
         self._copy_root_files = copy_root_files
@@ -95,32 +109,10 @@ class UnderfolderReader(BaseReader):
             for idx in range(len(self._ids)):
                 samples.append(self._read_sample(idx))
 
-        ########################################################################
-        # Manage private keys
-        ########################################################################
-        if self.PRIVATE_KEY_UNDERFOLDER_LINKS in self._root_private_data:
-            underfolder_links = FSToolkit.load_data(
-                self._root_private_data[self.PRIVATE_KEY_UNDERFOLDER_LINKS]
-            )
-            for link in underfolder_links:
-                if Path(link).exists():
-                    linked_reader = UnderfolderReader(
-                        folder=link,
-                        copy_root_files=copy_root_files,
-                        lazy_samples=lazy_samples,
-                        num_workers=num_workers,
-                    )
-                    if len(linked_reader) != len(samples):
-                        raise ValueError(
-                            f"Linked reader has a different number of samples ({len(linked_reader)}) than the current reader ({len(samples)})"
-                        )
-
-                    self._root_data.update(linked_reader._root_data)
-                    self._root_files_keys.update(linked_reader._root_files_keys)
-
-                    samples = [x.merge(y) for x, y in zip(linked_reader, samples)]
-
         super().__init__(samples=samples)
+
+        ## Spawn plugins
+        self._plugins_map = UnderfolderPlugins.parse(self) if enable_plugins else {}
 
     def _read_sample(self, idx: int):
         data = dict(self._tree[self._ids[idx]])
@@ -130,6 +122,38 @@ class UnderfolderReader(BaseReader):
         return FileSystemSample(
             data_map=data, lazy=self._lazy_samples, id=self._ids[idx]
         )
+
+    @property
+    def plugins_map(self) -> Dict[str, "UnderfolderPlugin"]:
+        return self._plugins_map
+
+    @property
+    def folder(self) -> Path:
+        return self._folder
+
+    @property
+    def lazy_samples(self) -> bool:
+        return self._lazy_samples
+
+    @property
+    def copy_root_files(self) -> bool:
+        return self._copy_root_files
+
+    @property
+    def num_workers(self) -> int:
+        return self._num_workers
+
+    @property
+    def root_data(self) -> dict:
+        return self._root_data
+
+    @property
+    def root_files_keys(self) -> dict:
+        return self._root_files_keys
+
+    @property
+    def root_private_data(self):
+        return self._root_private_data
 
     def is_root_key(self, key: str):
         return key in self._root_files_keys
@@ -199,10 +223,77 @@ class UnderfolderReader(BaseReader):
         return {"folder": str(self._folder), "copy_root_files": self._copy_root_files}
 
 
-class UnderfolderReaderLinks:
+class UnderfolderPlugin:
+    PLUGIN_NAME = ""
+
+    def apply(self, reader: UnderfolderReader, plugin_data: any):
+        """Generic method to apply a plugin to a reader
+
+        :param reader: UnderfolderReader to apply the plugin to
+        :type reader: UnderfolderReader
+        :param plugin_data: Plugin data, can be any data loadable by FSToolkit
+        :type plugin_data: any
+        """
+        pass
+
+
+class UnderfolderLinksPlugin(UnderfolderPlugin):
+    PLUGIN_NAME = "underfolder_links"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._links_graph = None
+
+    @property
+    def links_graph(self) -> nx.Graph:
+        return self._links_graph
+
+    def apply(self, reader: UnderfolderReader, plugin_data: any):
+        self._links_graph = self.build_links_graph(reader.folder)
+        underfolder_links: dict = plugin_data
+        for link in underfolder_links:
+            if Path(link).exists():
+                linked_reader = UnderfolderReader(
+                    folder=link,
+                    copy_root_files=reader.copy_root_files,
+                    lazy_samples=reader.lazy_samples,
+                    num_workers=reader.num_workers,
+                )
+                if len(linked_reader) != len(reader.samples):
+                    raise ValueError(
+                        f"Linked reader has a different number of samples ({len(linked_reader)}) than the current reader ({len(samples)})"
+                    )
+
+                reader.root_data.update(linked_reader.root_data)
+                reader.root_files_keys.update(linked_reader.root_files_keys)
+                reader.samples = [
+                    x.merge(y) for x, y in zip(linked_reader, reader.samples)
+                ]
+
     @classmethod
-    def build_links_graph(cls, source_folder: str):
-        source_reader = UnderfolderReader(folder=source_folder, lazy_samples=True)
+    def build_links_graph(cls, source_folder: str, graph: Optional[nx.DiGraph] = None):
+        source_reader = UnderfolderReader(
+            folder=source_folder, lazy_samples=True, enable_plugins=False
+        )
+        if graph is None:
+            graph = nx.DiGraph()
+
+        if cls.PLUGIN_NAME in source_reader.root_private_data:
+            links = FSToolkit.load_data(
+                source_reader.root_private_data[cls.PLUGIN_NAME]
+            )
+            for link in links:
+                graph.add_edge(source_folder, link)
+                cls.build_links_graph(link, graph)
+
+        loops = []
+        try:
+            loops = nx.find_cycle(graph)
+        except:
+            pass
+        if len(loops) > 0:
+            raise RuntimeError("Cycle detected in the Underfolder links graph")
+        return graph
 
     @classmethod
     def link_underfolders(cls, source_folder: str, target_folder: str):
@@ -234,3 +325,19 @@ class UnderfolderReaderLinks:
         # Update private key data
         prev_links.append(target_folder)
         FSToolkit.store_data(private_key_file, prev_links)
+
+
+class UnderfolderPlugins:
+
+    PLUGINS_MAP = {UnderfolderLinksPlugin.PLUGIN_NAME: UnderfolderLinksPlugin}
+
+    @classmethod
+    def parse(cls, reader: UnderfolderReader) -> Dict[str, UnderfolderPlugin]:
+        plugins_map = {}
+        for key in reader.root_private_data:
+            if key in cls.PLUGINS_MAP:
+                plugin = cls.PLUGINS_MAP[key]()
+                plugin.apply(reader, FSToolkit.load_data(reader.root_private_data[key]))
+                plugins_map[key] = plugin
+
+        return plugins_map

@@ -292,6 +292,10 @@ class SamplesSequence(Sequence):
     def samples(self):
         return self._samples
 
+    @samples.setter
+    def samples(self, samples: Sequence[Sample]):
+        self._samples = samples
+
     def __len__(self) -> int:
         return len(self._samples)
 

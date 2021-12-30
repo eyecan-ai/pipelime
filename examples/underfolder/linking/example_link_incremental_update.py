@@ -1,4 +1,7 @@
-from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.sequences.readers.filesystem import (
+    UnderfolderLinksPlugin,
+    UnderfolderReader,
+)
 import rich
 import tempfile
 from pathlib import Path
@@ -37,7 +40,7 @@ for version in versions:
     rich.print("Writing", version, new_folder)
 
     # Here the link is created
-    UnderfolderReader.link_underfolders(str(new_folder), str(last_folder))
+    UnderfolderLinksPlugin.link_underfolders(str(new_folder), str(last_folder))
 
     # update pointers
     last_folder = new_folder
