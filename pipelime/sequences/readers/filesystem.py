@@ -29,45 +29,50 @@ class UnderfolderReader(BaseReader):
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         self._lazy_samples = lazy_samples
         self._num_workers = num_workers
-        assert self._datafolder.exists(), f'No data folder found: "{self._datafolder}"'
+
+        # Checks for valid folder
+        if not self._datafolder.exists():
+            raise FileNotFoundError(
+                f"It seems not a valid Underfolder, folder {self._datafolder} not found"
+            )
 
         # builds tree from subfolder with underscore notation
         self._tree = FSToolkit.tree_from_underscore_notation_files(self._datafolder)
         self._ids = list(sorted(self._tree.keys()))
 
         # extract all root files
-        self._root_files = [x for x in Path(self._folder).glob("*") if x.is_file()]
+        root_files = [x for x in Path(self._folder).glob("*") if x.is_file()]
 
         # purge hidden files from root files
-        self._root_files = [x for x in self._root_files if not x.name.startswith(".")]
+        root_files = [x for x in root_files if not x.name.startswith(".")]
 
         # extract private root files among root files
-        self._private_root_files = list(
+        private_root_files = list(
             filter(
                 lambda x: x.name.startswith(self.PRIVATE_KEY_QUALIFIER),
-                self._root_files,
+                root_files,
             )
         )
 
         # purge private root files from root files
-        self._root_files = list(
+        root_files = list(
             filter(
                 lambda x: not x.name.startswith(self.PRIVATE_KEY_QUALIFIER),
-                self._root_files,
+                root_files,
             )
         )
 
         # build public root data
         self._root_data = {}
         self._root_files_keys = set()
-        for f in self._root_files:
+        for f in root_files:
             self._root_files_keys.add(f.stem)
             self._root_data[f.stem] = str(f)
 
         # build private root data
         self._root_private_files_keys = set()
         self._root_private_data = {}
-        for f in self._private_root_files:
+        for f in private_root_files:
             self._root_private_files_keys.add(
                 f.stem.replace(self.PRIVATE_KEY_QUALIFIER, "", 1)
             )
@@ -90,7 +95,9 @@ class UnderfolderReader(BaseReader):
             for idx in range(len(self._ids)):
                 samples.append(self._read_sample(idx))
 
+        ########################################################################
         # Manage private keys
+        ########################################################################
         if self.PRIVATE_KEY_UNDERFOLDER_LINKS in self._root_private_data:
             underfolder_links = FSToolkit.load_data(
                 self._root_private_data[self.PRIVATE_KEY_UNDERFOLDER_LINKS]
@@ -191,6 +198,12 @@ class UnderfolderReader(BaseReader):
     def to_dict(self) -> dict:
         return {"folder": str(self._folder), "copy_root_files": self._copy_root_files}
 
+
+class UnderfolderReaderLinks:
+    @classmethod
+    def build_links_graph(cls, source_folder: str):
+        source_reader = UnderfolderReader(folder=source_folder, lazy_samples=True)
+
     @classmethod
     def link_underfolders(cls, source_folder: str, target_folder: str):
         """Links two Underfolder adding target_folder to links in source_folder
@@ -203,10 +216,13 @@ class UnderfolderReader(BaseReader):
 
         source_folder = Path(source_folder)
         source_reader = UnderfolderReader(folder=source_folder, lazy_samples=True)
+        target_reader = UnderfolderReader(folder=target_folder, lazy_samples=True)
 
         # Builds private key filename
-        key = cls.PRIVATE_KEY_UNDERFOLDER_LINKS
-        private_key_file = source_folder / f"{cls.PRIVATE_KEY_QUALIFIER}{key}.yml"
+        key = UnderfolderReader.PRIVATE_KEY_UNDERFOLDER_LINKS
+        private_key_file = (
+            source_folder / f"{UnderfolderReader.PRIVATE_KEY_QUALIFIER}{key}.yml"
+        )
 
         # Create private key file if not present
         if not source_reader.is_root_private_key(key):

@@ -179,7 +179,6 @@ class H5Reader(BaseReader):
         self._copy_root_files = copy_root_files
         self._lazy_samples = lazy_samples
 
-        # builds tree from subfolder with underscore notation
         self._h5database = H5Database(filename=self._filename, readonly=True)
         self._h5database.open()
 
