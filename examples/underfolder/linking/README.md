@@ -21,12 +21,11 @@ In this specific case the plugin data is a plain list of folders of other Underf
 
 ## example_link_incremental_update.py
 
-In this example is shown how to create use links to create *incremenal update* of the samples. If, for example, you have a stage parsing samples with adds some content to them
-(*e.g.* a labeling GUI adding labels to the samples) and you want to use this content in the next stage, you can use the links to create incremental update of the samples, instead of overwriting previous underfolder or copying it to the next stage.
+In this example is shown how to use links to create *incremenal update* of the samples. If, for example, you have a stage which transform a sample into another one (*e.g.* a labeling GUI adding labels to the samples, an AI model adding prediction etc..) and you want to use this content in the next stage, you can use the links to create incremental update of the dataset, instead of overwriting previous underfolder or copying it to the next stage.
 
 The example read an Underfolder, add some keys to each sample, and stores
 only the added content as a new Underfolder with a link to the previous one. Creating an 
-**UnderfolderReader** on this last Underfolder will load a single dataset with all data 
+**UnderfolderReader** on the last folder will load a single dataset with all data 
 together.
 
 ```
