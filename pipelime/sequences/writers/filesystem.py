@@ -135,10 +135,16 @@ class UnderfolderWriter(BaseWriter):
             pool = multiprocessing.Pool(
                 processes=None if self._num_workers == -1 else self._num_workers
             )
-            list(track(pool.imap_unordered(self._process_sample, x), total=len(x)))
+            list(
+                track(
+                    pool.imap_unordered(self._process_sample, x),
+                    total=len(x),
+                    description="Writing Underfolder",
+                )
+            )
         else:
             self._saved_root_keys = {}
-            for sample in track(x):
+            for sample in track(x, description="Writing Underfolder"):
                 self._process_sample(sample)
 
     def _copy_filesystem_item(self, output_file: Path, item: FilesystemItem) -> None:

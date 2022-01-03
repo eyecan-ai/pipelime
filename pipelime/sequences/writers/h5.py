@@ -89,7 +89,7 @@ class H5Writer(BaseWriter):
                         global_links[key] = h5py.SoftLink(group[key].name)
             break
 
-        for sample in track(x):
+        for sample in track(x, description="Writing H5"):
             basename = self._build_sample_basename(sample)
 
             for key in sample.keys():
