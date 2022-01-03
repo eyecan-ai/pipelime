@@ -126,6 +126,7 @@ class TestH5Sample(object):
                 sample: H5Sample
                 for key in sample.keys():
                     temp = sample[key]
+                    assert temp is not None
                     assert sample.is_cached(key)
 
             reader.flush()
@@ -147,6 +148,7 @@ class TestH5Sample(object):
                 keys = list(sample.keys())[:2]
                 for key in keys:
                     temp = sample[key]
+                    assert temp is not None
                     assert sample.is_cached(key)
 
                 sample_copy = sample.copy()

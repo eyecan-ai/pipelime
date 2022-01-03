@@ -39,7 +39,7 @@ class TestTypeInfo:
         b = TypeInfo(np.ndarray, shape=[100, 100], dtype="uint8")
         c = a + b
         assert c.types == {np.ndarray}
-        assert c.shape == None
+        assert c.shape is None
         assert c.dtype == "uint8"
 
         # None shape
@@ -47,7 +47,7 @@ class TestTypeInfo:
         b = TypeInfo(np.ndarray, shape=[200, 100, 100], dtype="uint8")
         c = a + b
         assert c.types == {np.ndarray}
-        assert c.shape == None
+        assert c.shape is None
         assert c.dtype == "uint8"
 
         # Incompatible dtypes
@@ -55,13 +55,13 @@ class TestTypeInfo:
         b = TypeInfo(np.ndarray, shape=None, dtype="uint8")
         c = a + b
         assert c.types == {np.ndarray}
-        assert c.shape == None
-        assert c.dtype == None
+        assert c.shape is None
+        assert c.dtype is None
 
         # Incompatible types
         a = TypeInfo(list, shape=None, dtype="uint8")
         b = TypeInfo(np.ndarray, shape=[200, 100, 100], dtype="uint8")
         c = a + b
         assert c.types == {np.ndarray, list}
-        assert c.shape == None
+        assert c.shape is None
         assert c.dtype == "uint8"

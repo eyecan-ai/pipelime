@@ -84,6 +84,7 @@ class TestFilesystemSample(object):
             for key in sample.keys():
                 temp = sample[key]
                 assert sample.is_cached(key)
+                assert temp is not None
 
         reader.flush()
 
@@ -95,7 +96,7 @@ class TestFilesystemSample(object):
     def test_filesystem_sample_nonlazy(self, filesystem_datasets, tmp_path_factory):
 
         dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
-        reader = UnderfolderReader(folder=dataset_folder, lazy_samples=False)
+        UnderfolderReader(folder=dataset_folder, lazy_samples=False)
 
     def test_update(self, filesystem_datasets, tmp_path_factory):
         dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]

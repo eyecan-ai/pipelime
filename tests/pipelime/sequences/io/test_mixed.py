@@ -65,6 +65,7 @@ class TestH5Underfolder:
         folder = toy_dataset_small["folder"]
         keys = toy_dataset_small["expected_keys"]
         root_keys = toy_dataset_small["root_keys"]
+        print(keys, root_keys)
 
         underfolder_reader = UnderfolderReader(folder=folder, copy_root_files=True)
 

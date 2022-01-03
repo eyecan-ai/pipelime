@@ -103,13 +103,16 @@ class ItemInfoFactory:
 
     @classmethod
     def build_item_info(cls, reader: BaseReader, key: str, k: int) -> ItemInfo:
-        """Instantiates an ItemInfo object from the first k items whose key match the input key.
+        """Instantiates an ItemInfo object from the first k items whose key match the
+        input key.
 
         :param reader: Input pipelime reader
         :type reader: BaseReader
         :param key: The query key to inspect
         :type key: str
-        :param k: The first k samples to inspect, this is done to avoid reading the entire dataset and speedup the summary creation. Set `k<1` to inspect every sample.
+        :param k: The first k samples to inspect, this is done to avoid reading the
+        entire dataset and speedup the summary creation. Set `k<1` to inspect every
+        sample.
         :type k: int
         :return: An ItemInfo object
         :rtype: ItemInfo
@@ -166,7 +169,9 @@ class ItemInfoFactory:
 
         :param reader: Input pipelime BaseReader
         :type reader: BaseReader
-        :param k: The first k samples to inspect, this is done to avoid reading the entire dataset and speedup the summary creation. Set to k < 1 to inspect every sample.
+        :param k: The first k samples to inspect, this is done to avoid reading the
+        entire dataset and speedup the summary creation. Set to k < 1 to inspect
+        every sample.
         :type k: int
         :return: The list of all ItemInfos
         :rtype: Sequence[ItemInfo]

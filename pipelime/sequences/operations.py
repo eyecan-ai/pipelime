@@ -753,7 +753,7 @@ class OperationFilterByScript(SequenceOperation, Spook):
                 assert self._check_sample is not None
             else:
                 logger.warning(
-                    f"The input script function is empty! Operation performs no checks!"
+                    "The input script function is empty! Operation performs no checks!"
                 )
 
             self._serializable = True
@@ -762,7 +762,7 @@ class OperationFilterByScript(SequenceOperation, Spook):
             self._check_sample = path_or_func
             self._serializable = False
         else:
-            raise NotImplementedError(f"Only str|Callable are allowed as input script ")
+            raise NotImplementedError("Only str|Callable are allowed as input script ")
 
     def input_port(self):
         return OperationPort(SamplesSequence)

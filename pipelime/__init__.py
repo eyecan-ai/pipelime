@@ -15,5 +15,4 @@ import pipelime
 
 
 def user_data_dir() -> Path:
-    # TODO: esurface and eyecan: move strings as package dunder
     return Path(AppDirs(appname=pipelime.__name__, appauthor=__author__).user_data_dir)

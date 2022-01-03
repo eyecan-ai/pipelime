@@ -1,6 +1,4 @@
 from click.testing import CliRunner
-
-from pipelime.cli.underfolder.operations import operation_split
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 
 
@@ -139,7 +137,7 @@ class TestCLIUnderfolderOperationFilterByQuery:
         from pipelime.cli.underfolder.operations import operation_filterbyquery
 
         input_folder = sample_underfolder_minimnist["folder"]
-        input_dataset = UnderfolderReader(folder=input_folder)
+        UnderfolderReader(folder=input_folder)
 
         query = "`metadata.double` <= 10.0 AND `metadata.half` <= 2.5"
         # Samples whose double is <= 10 adn half <= 2.5 are  6! Check it!
@@ -205,7 +203,7 @@ class TestCLIUnderfolderOperationFilterByScript:
         from pipelime.cli.underfolder.operations import operation_filterbyscript
 
         input_folder = sample_underfolder_minimnist["folder"]
-        input_dataset = UnderfolderReader(folder=input_folder)
+        UnderfolderReader(folder=input_folder)
 
         # script
         func = ""

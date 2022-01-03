@@ -84,7 +84,8 @@ def operation_mix(input_folders, output_folder):
             output_dataset = op_mix(datasets)
         except AssertionError as e:
             raise ClickException(
-                "Input underfolders must have the same length and their item sets must be disjoint."
+                "Input underfolders must have the same length and their item sets must "
+                f"be disjoint: {e}"
             )
 
         root_files = []
@@ -473,7 +474,6 @@ def operation_groupby(input_folder, key, output_folder):
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
-    template = dataset.get_reader_template()
 
     # operations
     op_filterbyquery = OperationGroupBy(field=key)

@@ -136,7 +136,7 @@ class TestUnderfolderReaderWriterTemplating(object):
 
         folder = toy_dataset_small["folder"]
         keys = toy_dataset_small["expected_keys"]
-        root_keys = toy_dataset_small["root_keys"]
+        # root_keys = toy_dataset_small["root_keys"]
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
         op = OperationFilterKeys(keys=keys[0], negate=False)
@@ -156,7 +156,7 @@ class TestUnderfolderReaderWriterTemplating(object):
     def test_writer_copy_correct_extension(self, toy_dataset_small, tmpdir_factory):
 
         folder = toy_dataset_small["folder"]
-        keys = toy_dataset_small["expected_keys"]
+        # keys = toy_dataset_small["expected_keys"]
 
         for lazy_samples, copy_files, use_symlinks in product([True, False], repeat=3):
             reader = UnderfolderReader(folder=folder, lazy_samples=lazy_samples)
@@ -197,8 +197,8 @@ class TestUnderfolderReaderWriterConsistency(object):
         # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
         folder = toy_dataset_small["folder"]
-        keys = toy_dataset_small["expected_keys"]
-        root_keys = toy_dataset_small["root_keys"]
+        # keys = toy_dataset_small["expected_keys"]
+        # root_keys = toy_dataset_small["root_keys"]
 
         combo_items = [
             {"copy_files": True, "use_symlinks": False},
@@ -210,7 +210,7 @@ class TestUnderfolderReaderWriterConsistency(object):
         for combo in combo_items:
 
             reader = UnderfolderReader(folder=folder, copy_root_files=True)
-            template = reader.get_reader_template()
+            reader.get_reader_template()
 
             print("\nCombo", combo)
             writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
@@ -223,7 +223,7 @@ class TestUnderfolderReaderWriterConsistency(object):
             writer(reader)
 
             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
-            re_template = re_reader.get_reader_template()
+            re_reader.get_reader_template()
 
             for idx in range(len(re_reader)):
                 data = reader[idx]["image"]
@@ -261,7 +261,6 @@ class TestUnderfolderWriterForceCopy(object):
 class TestUnderfolderWriterMultiprocessing(object):
     def test_reader_writer_force_copy(self, toy_dataset_small, tmpdir_factory):
         folder = toy_dataset_small["folder"]
-        image_key = "image"
 
         reader = UnderfolderReader(folder=folder, copy_root_files=True)
 
@@ -280,6 +279,7 @@ class TestUnderfolderWriterMultiprocessing(object):
 
             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
             re_sample = re_reader[0]
+            assert isinstance(re_sample, Sample)
             assert len(reader) == len(re_reader)
             for sample_id in range(len(re_reader)):
                 sample = reader[sample_id]
@@ -290,7 +290,7 @@ class TestUnderfolderWriterMultiprocessing(object):
 class TestUnderfolderReaderMultiprocessing(object):
     def test_reader_writer_force_copy(self, toy_dataset_small, tmpdir_factory):
         folder = toy_dataset_small["folder"]
-        image_key = "image"
+        # image_key = "image"
 
         workers_options = [1, 0, 1, 2, 3, 4]
 
@@ -310,6 +310,7 @@ class TestUnderfolderReaderMultiprocessing(object):
 
             re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
             re_sample = re_reader[0]
+            assert isinstance(re_sample, Sample)
             assert len(reader) == len(re_reader)
             for sample_id in range(len(re_reader)):
                 sample = reader[sample_id]

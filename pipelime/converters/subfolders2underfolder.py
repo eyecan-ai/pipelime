@@ -4,7 +4,6 @@ from pathlib import Path
 from pipelime.converters.base import UnderfolderConverter
 from pipelime.sequences.samples import FileSystemSample, SamplesSequence
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
-import itertools
 import re
 
 
