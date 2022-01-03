@@ -117,7 +117,7 @@ def filesystem_datasets(data_folder):
             "folder": Path(data_folder) / "datasets" / "underfolder_empty",
             "type": "Undefolder",
             "schemas": {},
-        }
+        },
     }
 
 

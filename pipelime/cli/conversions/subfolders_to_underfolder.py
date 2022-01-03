@@ -13,12 +13,39 @@ import click
     type=str,
     help="Image extension to include in conversion",
 )
-def subfolders_to_underfolder(input_folder: str, output_folder: str, extension: str):
+@click.option(
+    "-s",
+    "--use_symlinks",
+    required=False,
+    type=bool,
+    default=False,
+    help="Use symlinks instead of copying files",
+)
+@click.option(
+    "-w",
+    "--num_workers",
+    required=False,
+    type=int,
+    default=0,
+    help="Number of workers to use",
+)
+def subfolders_to_underfolder(
+    input_folder: str,
+    output_folder: str,
+    extension: str,
+    use_symlinks: bool,
+    num_workers: int,
+):
 
     import rich
 
     from pipelime.converters.subfolders2underfolder import Subfolders2Underfolder
 
-    converter = Subfolders2Underfolder(folder=input_folder, images_extension=extension)
+    converter = Subfolders2Underfolder(
+        folder=input_folder,
+        images_extension=extension,
+        use_symlinks=use_symlinks,
+        num_workers=num_workers,
+    )
     converter.convert(output_folder)
     rich.print("Underfolder Writer output to:", output_folder)

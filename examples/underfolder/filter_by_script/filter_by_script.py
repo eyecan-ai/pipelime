@@ -5,10 +5,12 @@ from pipelime.sequences.operations import OperationFilterByScript
 import rich
 
 
-@click.command('filter_by_script', help='Filter UnderfolderReader by external script')
-@click.option('-d', '--dataset', required=True, type=str, help='Input Dataset')
-@click.option('-o', '--output', required=True, type=str, help='Output Dataset folder')
-@click.option('-s', '--script', default='external_script.py', type=str, help='Filtering Script')
+@click.command("filter_by_script", help="Filter UnderfolderReader by external script")
+@click.option("-d", "--dataset", required=True, type=str, help="Input Dataset")
+@click.option("-o", "--output", required=True, type=str, help="Output Dataset folder")
+@click.option(
+    "-s", "--script", default="external_script.py", type=str, help="Filtering Script"
+)
 def filter_by_script(dataset, output, script):
 
     reader = UnderfolderReader(folder=dataset)
@@ -22,12 +24,12 @@ def filter_by_script(dataset, output, script):
         extensions_map=reader_template.extensions_map,
         zfill=reader_template.idx_length,
         copy_files=True,
-        use_symlinks=False
+        use_symlinks=False,
     )
     out = op(reader)
     writer(out)
     rich.print(f"Removed [red]{len(out) - len(reader)}[/red] samples!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     filter_by_script()

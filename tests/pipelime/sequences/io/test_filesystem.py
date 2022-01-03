@@ -2,15 +2,19 @@ import uuid
 from itertools import product
 from pathlib import Path
 import os
-
 import numpy as np
 from choixe.spooks import Spook
-
+import rich
+import networkx as nx
 from pipelime.sequences.operations import OperationFilterKeys
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
-from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.sequences.readers.filesystem import (
+    UnderfolderLinksPlugin,
+    UnderfolderReader,
+)
 from pipelime.sequences.samples import FilesystemItem, FileSystemSample, Sample
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
+import pytest
 
 
 def _plug_test(reader: BaseReader):
@@ -312,6 +316,7 @@ class TestUnderfolderReaderMultiprocessing(object):
                 resample = re_reader[sample_id]
                 assert sample["metadata"]["id"] == resample["metadata"]["id"]
 
+
 class TestUnderfolderWriterSymlinks(object):
     def test_symlinks_not_broken(self, toy_dataset_small, tmpdir_factory):
         folder = toy_dataset_small["folder"]
@@ -334,3 +339,87 @@ class TestUnderfolderWriterSymlinks(object):
             for k, v in sample.filesmap.items():
                 path = Path(v)
                 assert path.is_file()
+
+
+class TestUnderfolderLinking(object):
+    def test_linking(self, tmpdir, plain_samples_sequence_generator):
+
+        N = 32
+        samples = plain_samples_sequence_generator("", N)
+
+        # retrieve keys
+        assert len(samples) > 0
+        keys = list(samples[0].keys())
+
+        # creates root keys as copy of normal keys
+        root_keys = [f"{k}_root" for k in keys]
+        for sample in samples:
+            for rkey in root_keys:
+                sample[rkey] = sample[rkey.replace("_root", "")]
+
+        # Split datasets in N datasets for each key, write them to disk
+        subsamples = {}
+        writers = {}
+        subfolders = {}
+        for key, root_key in zip(keys, root_keys):
+            subsamples[key] = OperationFilterKeys([key, root_key])(samples)
+            subfolders[key] = Path(tmpdir.mkdir(key))
+            writers[key] = UnderfolderWriter(
+                folder=subfolders[key], root_files_keys=root_keys
+            )
+            writers[key](subsamples[key])
+            rich.print(key, "Writing", subfolders[key])
+
+        # Creates a tree to represent the linking structure among the subfolders
+        g = nx.full_rary_tree(3, len(keys))
+        for u, v, a in g.edges(data=True):
+            key_source = keys[u]
+            key_target = keys[v]
+            folder_source = str(subfolders[key_source])
+            folder_target = str(subfolders[key_target])
+            UnderfolderLinksPlugin.link_underfolders(folder_source, folder_target)
+            print(u, v, keys[u], keys[v])
+
+        # Creates the reader of the Root Underfolder
+        root_reader = UnderfolderReader(folder=subfolders[keys[0]])
+        assert len(root_reader) > 0
+
+        # Write the merged dataset for debug
+        merged_folder = Path(tmpdir.mkdir("_merged"))
+        writer = UnderfolderWriter(folder=merged_folder, root_files_keys=root_keys)
+        writer(root_reader)
+        rich.print("Merged output to", merged_folder)
+
+        # Checks for keys/root_keys consistency
+        for key in keys:
+            assert not root_reader.is_root_key(key)
+        for rkey in root_keys:
+            assert root_reader.is_root_key(rkey)
+
+        # Checks for merged keys presence
+        ref_sample = root_reader[0]
+        loaded_keys = set(list(ref_sample.keys()))
+        assert loaded_keys == set(keys) | set(root_keys)
+
+        # Content alignment test
+        for sample in root_reader:
+            assert int(sample["idx"]) == sample["number"]
+            assert sample["odd"] == (sample["number"] % 2 == 1)
+            assert np.isclose(sample["fraction"], sample["number"] / 1000.0)
+            assert sample["reverse_number"] == N - sample["number"]
+            assert sample["metadata"]["even"] == (sample["number"] % 2 == 0)
+            assert sample["metadata"]["N"] == sample["number"]
+
+        # Connect a Leaf to the root underfolder in order to build a cycle
+        dg = nx.to_directed(g)
+        leafs = [
+            x for x in dg.nodes() if dg.out_degree(x) == 1 and dg.in_degree(x) == 1
+        ]
+        assert len(leafs) > 0
+        folder_source = str(subfolders[keys[leafs[0]]])
+        folder_target = str(subfolders[keys[0]])
+        UnderfolderLinksPlugin.link_underfolders(folder_source, folder_target)
+
+        # Checks for cycle when UnderfolderReader is called
+        with pytest.raises(RuntimeError):
+            UnderfolderReader(folder=subfolders[keys[0]])

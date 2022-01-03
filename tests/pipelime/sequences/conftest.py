@@ -31,7 +31,7 @@ def plain_samples_generator():
                     "deep": {"super_deep": 0, "groupby_field": int(i / group_each)},
                 },
             }
-            samples.append(PlainSample(data=data))
+            samples.append(PlainSample(data=data, id=i))
 
         return samples
 

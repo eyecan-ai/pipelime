@@ -2,11 +2,12 @@ import json
 import uuid
 from pathlib import Path
 from typing import Sequence
-
+from rich.progress import track
 import numpy as np
 from PIL import Image, ImageDraw
 
 from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.sequences.readers.filesystem import UnderfolderReader
 
 
 class ToyDatasetGenerator(object):
@@ -134,37 +135,45 @@ class ToyDatasetGenerator(object):
 
     @classmethod
     def generate_toy_dataset(
-        cls, output_folder: str, size: int, image_size: Sequence[int], zfill: int = 5
+        cls,
+        output_folder: str,
+        size: int,
+        image_size: int = 256,
+        zfill: int = 5,
+        suffix: str = "",
+        as_undefolder: bool = False,
     ):
 
         output_folder = Path(output_folder)
+        if as_undefolder:
+            output_folder = output_folder / UnderfolderReader.DATA_SUBFOLDER
         output_folder.mkdir(parents=True, exist_ok=True)
 
         generator = ToyDatasetGenerator()
 
-        for idx in range(size):
+        for idx in track(range(size)):
 
             # Generate sample
             sample = generator.generate_image_sample([image_size, image_size])
 
             # Extracts metadata
             metadata = {
-                "bboxes": sample["bboxes"],
-                "keypoints": sample["keypoints"],
-                "label": sample["label"],
-                "id": sample["id"],
+                f"bboxes{suffix}": sample["bboxes"],
+                f"keypoints{suffix}": sample["keypoints"],
+                f"label{suffix}": sample["label"],
+                f"id{suffix}": sample["id"],
             }
 
             metadata = json.loads(json.dumps(metadata))
 
             # Naming
             name = str(idx).zfill(zfill)
-            image_name = f"{name}_image.png"
-            mask_name = f"{name}_mask.png"
-            instances_name = f"{name}_inst.png"
-            metadata_name = f"{name}_metadata.yml"
-            keypoints_name = f"{name}_keypoints.txt"
-            bboxes_name = f"{name}_bboxes.npy"
+            image_name = f"{name}_image{suffix}.png"
+            mask_name = f"{name}_mask{suffix}.png"
+            instances_name = f"{name}_inst{suffix}.png"
+            metadata_name = f"{name}_metadata{suffix}.yml"
+            keypoints_name = f"{name}_keypoints{suffix}.txt"
+            bboxes_name = f"{name}_bboxes{suffix}.npy"
 
             FSToolkit.store_data(str(output_folder / image_name), sample["rgb"])
             FSToolkit.store_data(str(output_folder / mask_name), sample["mask"])

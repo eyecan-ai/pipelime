@@ -6,9 +6,10 @@ from pipelime.sequences.samples import Sample, SamplesSequence
 
 
 class UnderfolderStream(DatasetStream):
-
-    def __init__(self, folder: str, allowed_keys: Optional[Sequence[str]] = None) -> None:
-        """ Creates an UnderfolderStream object that reads and writes samples from and to
+    def __init__(
+        self, folder: str, allowed_keys: Optional[Sequence[str]] = None
+    ) -> None:
+        """Creates an UnderfolderStream object that reads and writes samples from and to
         the given Underfolder format dataset
 
         :param folder: the Undefolder folder
@@ -26,9 +27,9 @@ class UnderfolderStream(DatasetStream):
             self._reload_writer()
 
     def _reload_writer(
-            self,
-            additional_root_files_keys: Optional[Sequence[str]] = None,
-            additional_extensions_map: Optional[Dict[str, str]] = None
+        self,
+        additional_root_files_keys: Optional[Sequence[str]] = None,
+        additional_extensions_map: Optional[Dict[str, str]] = None,
     ) -> None:
 
         root_files_keys = self._reader.get_reader_template().root_files_keys
@@ -44,11 +45,11 @@ class UnderfolderStream(DatasetStream):
             folder=self._folder,
             root_files_keys=root_files_keys,
             extensions_map=extensions_map,
-            remove_duplicates=True
+            remove_duplicates=True,
         )
 
     def add_root_files_keys(self, root_files_keys: Sequence[str]) -> None:
-        """ Adds the root files keys of the dataset.
+        """Adds the root files keys of the dataset.
 
         :param root_files_keys: The root files keys of the dataset.
         :type root_files_keys: Sequence[str]
@@ -56,7 +57,7 @@ class UnderfolderStream(DatasetStream):
         self._reload_writer(additional_root_files_keys=root_files_keys)
 
     def add_extensions_map(self, extensions_map: Dict[str, str]) -> None:
-        """ Adds the extensions map of the dataset.
+        """Adds the extensions map of the dataset.
 
         :param extensions_map: The extensions map of the dataset.
         :type extensions_map: Dict[str, str]
@@ -137,7 +138,7 @@ class UnderfolderStream(DatasetStream):
     def set_data(
         self, sample_id: int, item: str, data: any, format: str
     ) -> Tuple[any, str]:
-        """ Sets the sample's item with the given name in the given format.
+        """Sets the sample's item with the given name in the given format.
 
         :param sample_id: The id of the sample.
         :type sample_id: int

@@ -1,4 +1,4 @@
-from pipelime.sequences.samples import PlainSample,  SamplesSequence
+from pipelime.sequences.samples import PlainSample, SamplesSequence
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 import tempfile
 import rich
@@ -10,7 +10,9 @@ import multiprocessing
 
 
 def new_sample(i) -> PlainSample:
-    return PlainSample(data={'image': np.random.uniform(0, 255, (256, 256, 3)).astype(np.uint8)})
+    return PlainSample(
+        data={"image": np.random.uniform(0, 255, (256, 256, 3)).astype(np.uint8)}
+    )
 
 
 # ➡️➡️➡️ Reader
@@ -27,9 +29,7 @@ for num_workers in workers_options:
     # ➡️➡️➡️ Writer with manual template input
     writer_folder = tempfile.mkdtemp()
     writer = UnderfolderWriter(
-        folder=writer_folder,
-        extensions_map={'image': 'png'},
-        num_workers=num_workers
+        folder=writer_folder, extensions_map={"image": "png"}, num_workers=num_workers
     )
     t1 = time.perf_counter()
     writer(sequence)

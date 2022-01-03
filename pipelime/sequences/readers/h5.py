@@ -18,18 +18,54 @@ class H5Item(MetaItem):
         return self._item
 
 
+class MultiGroup:
+    """Manages H5PY groups fusion, if only one group is present it should behave like
+    a normal H5py group
+    """
+
+    def __init__(self, groups: Sequence[h5py.Group]) -> None:
+        self._groups = groups
+
+    def keys(self) -> Sequence[Hashable]:
+        keys = set()
+        for group in self._groups:
+            keys.update(group.keys())
+        return list(keys)
+
+    def __contains__(self, key: Hashable) -> bool:
+        for group in self._groups:
+            if key in group:
+                return True
+        return False
+
+    def __getitem__(self, key: Hashable) -> h5py.Group:
+        for group in reversed(self._groups):
+            if key in group:
+                return group[key]
+        raise KeyError(key)
+
+    def get(self, key: Hashable, getlink: bool = True) -> Union[h5py.Group, any]:
+        for group in reversed(self._groups):
+            if key in group:
+                return group.get(key, getlink=getlink)
+        raise KeyError(key)
+
+    def merge(self, other: "MultiGroup") -> "MultiGroup":
+        return MultiGroup(self._groups + other._groups)
+
+
 class H5Sample(Sample):
     def __init__(
         self,
-        group: h5py.Group,
+        group: Union[h5py.Group, MultiGroup],
         lazy: bool = True,
         copy_global_items: bool = True,
         id: Hashable = None,
     ):
         """Creates a H5Sample based on a key/filename map
 
-        :param group: h5py Group
-        :type group: h5py.Group
+        :param group: h5py Group or MultiGroup
+        :type group: Union[h5py.Group, MultiGroup]
         :param lazy: FALSE to preload data (slow), defaults to False
         :type lazy: bool, optional
         :param copy_global_items: TRUE to propagate global item to samples, defaults to True
@@ -38,7 +74,10 @@ class H5Sample(Sample):
         :type id: Hashable, optional
         """
         super().__init__(id=id)
-        self._group = group
+        self._group = MultiGroup([group]) if isinstance(group, h5py.Group) else group
+        self._cached = {}
+        self._lazy = lazy
+        self._copy_global_items = copy_global_items
         self._copy_global_items = copy_global_items
         self._keys = set()
         for key in self._group.keys():
@@ -84,6 +123,14 @@ class H5Sample(Sample):
 
     def __len__(self):
         return len(self._keys)
+
+    def merge(self, other: "H5Sample") -> "H5Sample":
+        merged_groups = self._group.merge(other._group)
+        merged_cache = self._cached.copy()
+        merged_cache.update(other._cached)
+        newsample = H5Sample(merged_groups, id=self.id)
+        newsample._cached = merged_cache
+        return newsample
 
     def copy(self):
         newsample = H5Sample(self._group, id=self.id)
@@ -132,7 +179,6 @@ class H5Reader(BaseReader):
         self._copy_root_files = copy_root_files
         self._lazy_samples = lazy_samples
 
-        # builds tree from subfolder with underscore notation
         self._h5database = H5Database(filename=self._filename, readonly=True)
         self._h5database.open()
 

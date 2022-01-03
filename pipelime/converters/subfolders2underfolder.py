@@ -11,7 +11,13 @@ import re
 class Subfolders2Underfolder(UnderfolderConverter):
     CHAR_TO_REPLACE = ["/", "\\", ":", "*", "?", '"', "<", ">", "|", "-"]
 
-    def __init__(self, folder: str, images_extension: str = "png") -> None:
+    def __init__(
+        self,
+        folder: str,
+        images_extension: str = "png",
+        use_symlinks: bool = False,
+        num_workers: int = 0,
+    ) -> None:
         """Converts a subfolder tree structure, containing images, to a single Underfolder.
         Subfolder structure should be like
 
@@ -30,8 +36,14 @@ class Subfolders2Underfolder(UnderfolderConverter):
         :type folder: str
         :param images_extension: image extension to include in conversion, defaults to "png"
         :type images_extension: str, optional
+        :param use_symlinks: use symlinks instead of copying files, defaults to False
+        :type use_symlinks: bool, optional
+        :param num_workers: number of workers to use, defaults to 0
+        :type num_workers: int, optional
         """
         self._folder = folder
+        self._use_symlinks = use_symlinks
+        self._num_workers = num_workers
         self._images_extension = images_extension
         out = self.remap(self.extract_subfolders_and_files(folder))
         self._items = out["items"]
@@ -144,5 +156,7 @@ class Subfolders2Underfolder(UnderfolderConverter):
                 "classmap": "yml",
             },
             copy_files=True,
+            use_symlinks=self._use_symlinks,
+            num_workers=self._num_workers,
         )
         writer(SamplesSequence(samples=samples))
