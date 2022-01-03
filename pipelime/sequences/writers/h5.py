@@ -1,10 +1,7 @@
 from pathlib import Path
-
 import h5py
-from choixe.spooks import Spook
 from rich.progress import track
 from schema import Optional, Or
-
 from pipelime.h5.toolkit import H5Database, H5ToolKit
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import Sample, SamplesSequence

@@ -4,11 +4,8 @@ import re
 import shutil
 from pathlib import Path
 from typing import Dict, Sequence, Optional
-
-from choixe.spooks import Spook
 from rich.progress import track
 from schema import Or
-
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.samples import (
@@ -40,25 +37,35 @@ class UnderfolderWriter(BaseWriter):
 
         :param folder: destiantion folder
         :type folder: str
-        :param root_files_keys: list of keys to write as underfolder root files (only the first element
-        encountered will be stored as root file, the others will be discarded), defaults to None
+        :param root_files_keys: list of keys to write as underfolder root files (only
+        the first element encountered will be stored as root file, the others will be
+        discarded), defaults to None
         :type root_files_keys: Optional[Sequence[str]]
-        :param extensions_map: dictionary of regex/extension to retrieve extension for each key matching
-        the corresponding regex. Unmatched keys will be stored as PICKLE object file, defaults to None
+        :param extensions_map: dictionary of regex/extension to retrieve extension for
+        each key matching the corresponding regex. Unmatched keys will be stored as
+        PICKLE object file, defaults to None
         :type extensions_map: Optional[Dict[str, str]]
-        :param zfill: Length of zero padding in case of integer sample indices, defaults to 5
+        :param zfill: Length of zero padding in case of integer sample indices,
+        defaults to 5
         :type zfill: int, optional
-        :param copy_files: TRUE to copy FileSystemSample directly if not cached before, defaults to True
+        :param copy_files: TRUE to copy FileSystemSample directly if not cached before,
+        defaults to True
         :type copy_files: bool, optional
-        :param use_symlinks: if TRUE (and copy_files == TRUE) the copy will be replaced with a symlink, defaults to False
+        :param use_symlinks: if TRUE (and copy_files == TRUE) the copy will be replaced
+        with a symlink, defaults to False
         :type use_symlinks: bool, optional
-        :param force_copy_keys: A list of string keys that will be copied/symlinked regardless of their
-        cached/modified state (all changes will be lost), if they contain file system items.
-        This is useful in case you want to quickly write an item that you know for certain it was not modified, even if it was cached.
+        :param force_copy_keys: A list of string keys that will be copied/symlinked
+        regardless of their cached/modified state (all changes will be lost), if they
+        contain file system items. This is useful in case you want to quickly write an
+        item that you know for certain it was not modified, even if it was cached.
         :type force_copy_keys: Optional[Sequence[str]]
-        :param remove_duplicates: if TRUE, will check for duplicates (same item with different extension) in the destination folder and delete them before storing, defaults to False
+        :param remove_duplicates: if TRUE, will check for duplicates (same item with
+        different extension) in the destination folder and delete them before storing,
+        defaults to False
         :type remove_duplicates: bool, optional
-        :param num_workers: if 0 disable multiprocessing, if -1 use Multiprocessing pool with all available processors, if > 0 use Multiprocessing using as many processes
+        :param num_workers: if 0 disable multiprocessing, if -1 use Multiprocessing
+        pool with all available processors, if > 0 use Multiprocessing using as many
+        processes
         :type num_workers: int, optional
         """
         self._folder = Path(folder)

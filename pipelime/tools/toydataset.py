@@ -1,7 +1,6 @@
 import json
 import uuid
 from pathlib import Path
-from typing import Sequence
 from rich.progress import track
 import numpy as np
 from PIL import Image, ImageDraw

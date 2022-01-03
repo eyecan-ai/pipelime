@@ -90,7 +90,7 @@ class H5Sample(Sample):
         self._cached = {}
         if not lazy:
             for k in self.keys():
-                d = self[k]
+                self.get(k)
 
     def is_cached(self, key) -> bool:
         return key in self._cached

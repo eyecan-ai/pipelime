@@ -204,7 +204,7 @@ class FileSystemSample(Sample):
         self._cached = {}
         if not lazy:
             for k in self.keys():
-                d = self[k]
+                self.get(k)
 
     @property
     def filesmap(self):

@@ -1,9 +1,5 @@
-from pipelime.sequences.writers.h5 import H5Writer
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.readers.h5 import H5Reader
-import tempfile
-import rich
-from pathlib import Path
 import time
 
 

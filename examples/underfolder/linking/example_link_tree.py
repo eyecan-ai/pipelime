@@ -10,7 +10,7 @@ from rich.console import Console
 
 ###############################################################################
 ###############################################################################
-## CODE TO re-GENERATE THE DATASETS SUBFOLDER
+# CODE TO re-GENERATE THE DATASETS SUBFOLDER
 ###############################################################################
 ###############################################################################
 # from pipelime.sequences.readers.filesystem import UnderfolderLinksPlugin
@@ -49,7 +49,7 @@ for sample in base_reader:
 
 Console().print(table)
 
-## Load plugins and show Links Graph if any
+# Load plugins and show Links Graph if any
 for plugin_name, plugin in base_reader.plugins_map.items():
     if isinstance(plugin, UnderfolderLinksPlugin):
         nx.draw(plugin.links_graph, with_labels=True)

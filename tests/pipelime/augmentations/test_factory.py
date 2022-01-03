@@ -1,7 +1,5 @@
-import albumentations as A
 import numpy as np
 from choixe.configurations import XConfig
-
 from pipelime.augmentations.factory import AugmentationsFactory
 
 

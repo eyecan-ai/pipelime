@@ -46,7 +46,7 @@ def toy_dataset_small(tmpdir):
 def toy_h5dataset_small(tmpdir):
     folder = Path(tmpdir.mkdir("toy_h5dataset"))
     datafolder = folder / "data"
-    filename = folder / "h5dataset.h5"
+    # filename = folder / "h5dataset.h5"
     size = 32
     image_size = 256
     zfill = 5

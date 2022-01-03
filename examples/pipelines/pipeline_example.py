@@ -82,7 +82,7 @@ graph.execute()
 graph.draw_to_file("/tmp/graph.png")
 try:
     os.system("open /tmp/graph.png")
-except:
+except Exception:
     os.system("open /tmp/graph.png")
 
 # graph.execute()

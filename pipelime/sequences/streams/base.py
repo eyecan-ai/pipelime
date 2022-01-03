@@ -1,7 +1,5 @@
 from abc import abstractmethod
 from typing import Dict, Sequence, Tuple
-from pathlib import Path
-
 import imageio
 from pipelime.sequences.readers.base import BaseReader
 from pipelime.sequences.writers.base import BaseWriter
@@ -113,9 +111,9 @@ class ItemConverter:
         if format in cls.IMAGE_FORMATS:
             return f"image/{format}"
         elif format in cls.MATRIX_FORMATS:
-            return f"application/json"
+            return "application/json"
         elif format in cls.DICT_FORMATS:
-            return f"application/json"
+            return "application/json"
         else:
             raise ValueError(f"Format {format} not supported yet")
 

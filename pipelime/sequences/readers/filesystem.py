@@ -99,7 +99,7 @@ class UnderfolderReader(BaseReader):
         # Load samples
         if self._num_workers == -1 or self._num_workers > 0:
             if self._lazy_samples:
-                logger.warning(f"Multiprocessing with Lazy Samples are useless!")
+                logger.warning("Multiprocessing with Lazy Samples are useless!")
             pool = multiprocessing.Pool(
                 None if self._num_workers == -1 else self._num_workers
             )
@@ -111,7 +111,7 @@ class UnderfolderReader(BaseReader):
 
         super().__init__(samples=samples)
 
-        ## Spawn plugins
+        # Spawn plugins
         self._plugins_map = UnderfolderPlugins.parse(self) if enable_plugins else {}
 
     def _read_sample(self, idx: int):
@@ -261,7 +261,8 @@ class UnderfolderLinksPlugin(UnderfolderPlugin):
                 )
                 if len(linked_reader) != len(reader.samples):
                     raise ValueError(
-                        f"Linked reader has a different number of samples ({len(linked_reader)}) than the current reader ({len(samples)})"
+                        f"Linked reader has a different number of samples"
+                        f"({len(linked_reader)}) than the current reader ({len(reader.samples)})"
                     )
 
                 reader.root_data.update(linked_reader.root_data)
@@ -289,7 +290,7 @@ class UnderfolderLinksPlugin(UnderfolderPlugin):
         loops = []
         try:
             loops = nx.find_cycle(graph)
-        except:
+        except Exception:
             pass
         if len(loops) > 0:
             raise RuntimeError("Cycle detected in the Underfolder links graph")
@@ -308,6 +309,10 @@ class UnderfolderLinksPlugin(UnderfolderPlugin):
         source_folder = Path(source_folder)
         source_reader = UnderfolderReader(folder=source_folder, lazy_samples=True)
         target_reader = UnderfolderReader(folder=target_folder, lazy_samples=True)
+        if len(source_reader) != len(target_reader):
+            raise RuntimeError(
+                "Cannot link underfolders with different number of samples"
+            )
 
         # Builds private key filename
         key = UnderfolderReader.PRIVATE_KEY_UNDERFOLDER_LINKS

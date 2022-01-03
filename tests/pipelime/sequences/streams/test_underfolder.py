@@ -1,7 +1,7 @@
 from pathlib import Path
 import imageio
 from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.sequences.samples import FileSystemSample, FilesystemItem, Sample
+from pipelime.sequences.samples import FileSystemSample, Sample
 from pipelime.sequences.streams.base import ItemConverter
 from pipelime.sequences.streams.underfolder import UnderfolderStream
 import io
@@ -24,7 +24,7 @@ class TestUnderfolderStreams:
         assert len(view) == 0
 
         with pytest.raises(ValueError):
-            manifest = view.manifest()
+            view.manifest()
 
     def test_stream_read(self, sample_underfolder_minimnist, tmp_path):
         folder = sample_underfolder_minimnist["folder"]
