@@ -288,9 +288,26 @@ class SamplesSequence(Sequence):
     def __init__(self, samples: Sequence[Sample]):
         self._samples = samples
 
+        # This import here is due to circular dependency 💀💀💀 !!
+        from pipelime.sequences.stages import StageIdentity
+
+        self._stage = StageIdentity()
+
     @property
     def samples(self):
         return self._samples
+
+    @property
+    def stage(self):
+        return self._stage
+
+    @stage.setter
+    def stage(self, stage):
+        # This import here is due to circular dependency 💀💀💀 !!
+        from pipelime.sequences.stages import SampleStage
+
+        assert isinstance(stage, SampleStage)
+        self._stage = stage
 
     @samples.setter
     def samples(self, samples: Sequence[Sample]):
@@ -303,7 +320,7 @@ class SamplesSequence(Sequence):
         if idx >= len(self):
             raise IndexError
 
-        return self._samples[idx]
+        return self._stage(self._samples[idx])
 
     def is_normalized(self) -> bool:
         """Checks for normalization i.e. each sample has to contain same keys.

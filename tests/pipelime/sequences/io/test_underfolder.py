@@ -342,7 +342,7 @@ class TestUnderfolderWriterSymlinks(object):
                 assert path.is_file()
 
 
-class TestUnderfolderLinking(object):
+class TestUnderfolderLinkPlugin:
     def test_linking(self, tmpdir, plain_samples_sequence_generator):
 
         N = 32
