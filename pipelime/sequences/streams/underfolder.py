@@ -158,5 +158,12 @@ class UnderfolderStream(DatasetStream):
 
         if self._writer is not None:
             sample = self.get_sample(sample_id)
+            old_keys = list(sample.keys())
             sample[item] = ItemConverter.data_to_item(data, format)
+
+            # Copy sample in order to delete key only on current instance
+            sample = sample.copy()
+            for key in old_keys:
+                if key != item:
+                    del sample[key]
             self._writer(SamplesSequence([sample]))
