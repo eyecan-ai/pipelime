@@ -1,7 +1,7 @@
 from choixe.spooks import Spook
 
 from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.sequences.samples import PlainSample
+from pipelime.sequences.samples import PlainSample, SamplesSequence
 from pipelime.sequences.stages import (
     SampleStage,
     StageAugmentations,
@@ -157,3 +157,32 @@ class TestStageCompose(object):
         assert "b" in out
         assert "c" in out
         assert "tail" not in out
+
+
+class TestSampleSequenceStaged:
+    def test_samplessequence_staged(self):
+
+        samples = []
+        for index in range(10):
+            samples.append(
+                PlainSample(
+                    data={"name": "sample", "idx": index, "float": 2.3, "tail": True}
+                )
+            )
+
+        stages = [
+            StageIdentity(),
+            StageRemap(remap={"name": "a"}, remove_missing=False),
+            StageRemap(remap={"idx": "b"}, remove_missing=False),
+            StageRemap(remap={"float": "c"}, remove_missing=False),
+            StageKeysFilter(keys=["a", "b"], negate=False),
+        ]
+
+        sequence = SamplesSequence(samples=samples)
+        sequence.stage = StageCompose(stages=stages)
+
+        for sample in sequence:
+            assert "a" in sample
+            assert "b" in sample
+            assert "c" not in sample
+            assert "tail" not in sample

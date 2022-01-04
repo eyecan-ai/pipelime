@@ -1,0 +1,4 @@
+__spook__: MyStageEquation
+args:
+  a: 2.0
+  b: 3.0

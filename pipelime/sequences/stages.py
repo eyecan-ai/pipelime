@@ -3,7 +3,6 @@ from typing import Sequence
 
 import albumentations as A
 from choixe.spooks import Spook
-
 from pipelime.sequences.samples import Sample
 
 

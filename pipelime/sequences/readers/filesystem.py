@@ -8,12 +8,12 @@ from typing import Optional
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample
+from pipelime.sequences.stages import SampleStage
 
 
 class UnderfolderReader(BaseReader):
     DATA_SUBFOLDER = "data"
     PRIVATE_KEY_QUALIFIER = "_"
-    PRIVATE_KEY_UNDERFOLDER_LINKS = "underfolder_links"
 
     def __init__(
         self,
@@ -315,7 +315,7 @@ class UnderfolderLinksPlugin(UnderfolderPlugin):
             )
 
         # Builds private key filename
-        key = UnderfolderReader.PRIVATE_KEY_UNDERFOLDER_LINKS
+        key = UnderfolderLinksPlugin.PLUGIN_NAME
         private_key_file = (
             source_folder / f"{UnderfolderReader.PRIVATE_KEY_QUALIFIER}{key}.yml"
         )
@@ -332,9 +332,44 @@ class UnderfolderLinksPlugin(UnderfolderPlugin):
         FSToolkit.store_data(private_key_file, prev_links)
 
 
+class UnderfolderStagePlugin(UnderfolderPlugin):
+    PLUGIN_NAME = "underfolder_stage"
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def apply(self, reader: UnderfolderReader, plugin_data: any):
+        reader.stage = SampleStage.create(plugin_data)
+
+    @classmethod
+    def set_stages(cls, source_folder: str, stage: SampleStage):
+        """Sets the Stage of the entire Underfolder
+
+        :param source_folder: Underfolder folder
+        :type source_folder: str
+        :param stage: Sample stage to set
+        :type stage: SampleStage
+        """
+
+        source_folder = Path(source_folder)
+        UnderfolderReader(folder=source_folder, lazy_samples=True)
+
+        # Builds private key filename
+        key = UnderfolderStagePlugin.PLUGIN_NAME
+        private_key_file = (
+            source_folder / f"{UnderfolderReader.PRIVATE_KEY_QUALIFIER}{key}.yml"
+        )
+
+        # Create private key file if not present
+        FSToolkit.store_data(private_key_file, stage.serialize())
+
+
 class UnderfolderPlugins:
 
-    PLUGINS_MAP = {UnderfolderLinksPlugin.PLUGIN_NAME: UnderfolderLinksPlugin}
+    PLUGINS_MAP = {
+        UnderfolderLinksPlugin.PLUGIN_NAME: UnderfolderLinksPlugin,
+        UnderfolderStagePlugin.PLUGIN_NAME: UnderfolderStagePlugin,
+    }
 
     @classmethod
     def parse(cls, reader: UnderfolderReader) -> Dict[str, UnderfolderPlugin]:
