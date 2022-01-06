@@ -248,7 +248,7 @@ class FileSystemSample(Sample):
         return newsample
 
     def copy(self):
-        newsample = FileSystemSample(self._filesmap, id=self.id)
+        newsample = FileSystemSample(self._filesmap.copy(), id=self.id)
         newsample._cached = self._cached.copy()
         return newsample
 

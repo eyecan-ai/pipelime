@@ -72,6 +72,22 @@ class TestFilesystemSample(object):
 
         del sample["_NEW_IMAGE_"]
 
+    def test_filesystem_sample_copy(self, filesystem_datasets):
+
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
+        reader = UnderfolderReader(folder=dataset_folder)
+
+        sample = reader[0]
+        old_keys = list(sample.keys())
+
+        sample_copy = sample.copy()
+        for key in sample_copy.keys():
+            del sample_copy[key]
+
+        for key in old_keys:
+            assert key not in sample_copy
+            assert key in sample
+
     def test_flush(self, filesystem_datasets, tmp_path_factory):
 
         dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
