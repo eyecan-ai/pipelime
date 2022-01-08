@@ -161,13 +161,16 @@ class UnderfolderStream(DatasetStream):
         :type data: any
         :param format: The format of the data.
         :type format: str
-        :raises KeyError: If the item key is not allowed to be modified.
+        :raises KeyError: If the sample_id is not found
+        :raises PermissionError: If the item key is not allowed to be modified.
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """
+        if sample_id not in self._samples_map:
+            raise KeyError(f"Sample id '{sample_id}' not found")
 
         if self._allowed_keys is not None and item not in self._allowed_keys:
-            raise KeyError(f"Item '{item}' not allowed")
+            raise PermissionError(f"Item '{item}' not allowed")
 
         if self._writer is not None:
             sample = self.get_sample(sample_id)
