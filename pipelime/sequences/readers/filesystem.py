@@ -119,9 +119,8 @@ class UnderfolderReader(BaseReader):
         if self._copy_root_files:
             data.update(self._root_data)
 
-        return FileSystemSample(
-            data_map=data, lazy=self._lazy_samples, id=self._ids[idx]
-        )
+        purged_id = self.purge_id(self._ids[idx])
+        return FileSystemSample(data_map=data, lazy=self._lazy_samples, id=purged_id)
 
     @property
     def plugins_map(self) -> Dict[str, "UnderfolderPlugin"]:
@@ -176,7 +175,7 @@ class UnderfolderReader(BaseReader):
                 raise TypeError(f"Anomalous sample type found: {type(sample)}")
 
             extensions_map = {}
-            idx_length = len(str(sample.id))
+            idx_length = len(self._ids[0])
             for key, filename in sample.filesmap.items():
                 extensions_map[key] = Path(filename).suffix.replace(".", "")
 

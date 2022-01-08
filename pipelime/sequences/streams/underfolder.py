@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, Hashable, KeysView, Optional, Sequence, Tuple
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.streams.base import DatasetStream, ItemConverter
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
@@ -23,6 +23,10 @@ class UnderfolderStream(DatasetStream):
         self._reader.flush()
         self._allowed_keys = allowed_keys
         self._writer = None
+        self._samples_map = {}
+        for sample in self._reader:
+            self._samples_map[sample.id] = sample
+
         if len(self._reader) > 0:
             self._reload_writer()
 
@@ -45,6 +49,7 @@ class UnderfolderStream(DatasetStream):
             folder=self._folder,
             root_files_keys=root_files_keys,
             extensions_map=extensions_map,
+            zfill=self._reader.get_reader_template().idx_length,
             remove_duplicates=True,
         )
 
@@ -88,28 +93,36 @@ class UnderfolderStream(DatasetStream):
         else:
             raise ValueError("Dataset is empty")
 
-    def get_sample(self, sample_id: int) -> Sample:
+    def get_sample_ids(self) -> KeysView:
+        """Get all the sample ids of the dataset.
+
+        :return: The sample ids of the dataset.
+        :rtype: KeysView
+        """
+        return self._samples_map.keys()
+
+    def get_sample(self, sample_id: Hashable) -> Sample:
         """Returns the sample with the given id.
 
         :param sample_id: The id of the sample.
-        :type sample_id: int
-        :raises ValueError: If the sample_id is out of range.
+        :type sample_id: Hashable
+        :raises KeyError: If the sample_id is out of range.
         :return: The sample with the given id.
         :rtype: Sample
         """
-        if sample_id < len(self._reader):
-            return self._reader[sample_id]
+        if sample_id in self._samples_map:
+            return self._samples_map[sample_id]
         else:
-            raise ValueError(f"Sample id '{sample_id}' out of range")
+            raise KeyError(f"Sample id '{sample_id}' not found")
 
-    def get_item(self, sample_id: int, item: str) -> any:
+    def get_item(self, sample_id: Hashable, item: str) -> any:
         """Returns the sample's item with the given name.
 
         :param sample_id: The id of the sample.
-        :type sample_id: int
+        :type sample_id: Hashable
         :param item: The name of the item.
         :type item: str
-        :raises ValueError: If the sample_id is out of range or if the item is not in the sample.
+        :raises KeyError: If the sample_id is out of range or if the item is not in the sample.
         :return: The item with the given name.
         :rtype: any
         """
@@ -117,13 +130,13 @@ class UnderfolderStream(DatasetStream):
         if item in sample:
             return sample[item]
         else:
-            raise ValueError(f"Item '{item}' not found")
+            raise KeyError(f"Item '{item}' not found")
 
-    def get_data(self, sample_id: int, item: str, format: str) -> Tuple[any, str]:
+    def get_data(self, sample_id: Hashable, item: str, format: str) -> Tuple[any, str]:
         """Returns the sample's item with the given name in the given format.
 
         :param sample_id: The id of the sample.
-        :type sample_id: int
+        :type sample_id: Hashable
         :param item: The name of the item.
         :type item: str
         :param format: The format of the item.
@@ -136,25 +149,25 @@ class UnderfolderStream(DatasetStream):
         return ItemConverter.item_to_data(item, format), mimetype
 
     def set_data(
-        self, sample_id: int, item: str, data: any, format: str
+        self, sample_id: Hashable, item: str, data: any, format: str
     ) -> Tuple[any, str]:
         """Sets the sample's item with the given name in the given format.
 
         :param sample_id: The id of the sample.
-        :type sample_id: int
+        :type sample_id: Hashable
         :param item: The name of the item.
         :type item: str
         :param data: The data to set [io.BytesIO, dict]
         :type data: any
         :param format: The format of the data.
         :type format: str
-        :raises ValueError: If the item key is not allowed to be modified.
+        :raises KeyError: If the item key is not allowed to be modified.
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """
 
         if self._allowed_keys is not None and item not in self._allowed_keys:
-            raise ValueError(f"Item '{item}' not allowed")
+            raise KeyError(f"Item '{item}' not allowed")
 
         if self._writer is not None:
             sample = self.get_sample(sample_id)
