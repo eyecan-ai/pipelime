@@ -31,6 +31,18 @@ class UnderfolderStream(DatasetStream):
         if len(self._reader) > 0:
             self._reload_writer()
 
+    def is_key_allowed(self, key: str) -> bool:
+        """Checks if the given key is allowed to be modified.
+
+        :param key: The key to check.
+        :type key: str
+        :return: True if the key is allowed to be modified, False otherwise.
+        :rtype: bool
+        """
+        if self._allowed_keys is not None and key not in self._allowed_keys:
+            return False
+        return True
+
     def _reload_writer(
         self,
         additional_root_files_keys: Optional[Sequence[str]] = None,
@@ -207,7 +219,7 @@ class UnderfolderStream(DatasetStream):
         if sample_id not in self._samples_map:
             raise KeyError(f"Sample id '{sample_id}' not found")
 
-        if self._allowed_keys is not None and item not in self._allowed_keys:
+        if not self.is_key_allowed(item):
             raise PermissionError(f"Item '{item}' not allowed")
 
         if self._writer is not None:

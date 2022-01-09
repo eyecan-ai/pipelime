@@ -72,11 +72,13 @@ class TestUnderfolderAPI:
 
             for sample_id in dataset_entity.manifest.sample_ids:
 
+                # wrong dataset name
                 with pytest.raises(HTTPException):
-                    get_wrong_sample_response = client.get(
-                        f"/dataset/{dataset_name}/-1"
-                    )
-                    assert get_wrong_sample_response.status_code == 400
+                    client.get(f"/dataset/IMPOSSIBLE_DATAS3T_nMAE!/{sample_id}")
+
+                # wrong sample id
+                with pytest.raises(HTTPException):
+                    client.get(f"/dataset/{dataset_name}/-1")
 
                 # Get sample response
                 get_sample_response = client.get(f"/dataset/{dataset_name}/{sample_id}")
@@ -105,6 +107,22 @@ class TestUnderfolderAPI:
                         f"/dataset/{dataset_name}/{sample_id}/{key}"
                     )
 
+                    # wrong dataset name
+                    with pytest.raises(HTTPException):
+                        client.get(
+                            f"/dataset/IMPOSSIBLE_DATSAET_NMAE!/{sample_id}/{key}"
+                        )
+
+                    # wrong sample id
+                    with pytest.raises(HTTPException):
+                        client.get(f"/dataset/{dataset_name}/-1/{key}")
+
+                    # wrong item name
+                    with pytest.raises(HTTPException):
+                        client.get(
+                            f"/dataset/{dataset_name}/{sample_id}/IMPOSSIBLE_NAME"
+                        )
+
                     # Checks the response is a binary data and is oK
                     assert get_sample_data_request.status_code == 200
                     assert len(get_sample_data_request.content) > 0
@@ -121,6 +139,17 @@ class TestUnderfolderAPI:
                 sample_entity.metadata["metadata"] = {"put": "inception"}
                 sample_entity.metadata["metadatay"] = [1, 2, 3, 4, 5]
                 sample_entity.data = {}
+
+                # wrong dataset name
+                with pytest.raises(HTTPException):
+                    client.put(
+                        f"/dataset/IMPOSSIBLE_DATAS3T_nMAE!/{sample_id}",
+                        json=sample_entity.dict(),
+                    )
+
+                # wrong sample id
+                with pytest.raises(HTTPException):
+                    client.put(f"/dataset/{dataset_name}/-1", json=sample_entity.dict())
 
                 # Update the sample with changed metadata
                 put_sample_request = client.put(

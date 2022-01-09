@@ -3,6 +3,7 @@ from pipelime.sequences.api.authentication import CustomAPIAuthentication
 from pipelime.sequences.api.base import (
     EntityDataset,
     EntitySample,
+    EntitySampleData,
     SequenceInterface,
 )
 from pipelime.sequences.samples import FileSystemSample
@@ -16,22 +17,28 @@ from fastapi.param_functions import Depends
 from fastapi.routing import APIRouter
 from starlette.responses import StreamingResponse
 from pipelime.sequences.api.base import EntityDataset, EntitySample
+import io
 
 
 class UnderfolderInterface(SequenceInterface):
-    def __init__(self, name: str, folder: str) -> None:
+    def __init__(
+        self, name: str, folder: str, allowed_keys: Optional[Sequence[str]] = None
+    ) -> None:
         """The UnderfolderInterface is a SequenceInterface that uses Entities to
-        'communicate' with the underlying UnderfolderStream (i.e. an UnderfolderReader and
-        UnderfolderWriter wrapper).
+        'communicate' with the underlying UnderfolderStream (i.e. an UnderfolderReader
+        and UnderfolderWriter wrapper).
 
 
         :param name: name of the interface (should be unique among all interfaces)
         :type name: str
         :param folder: the Underfolder path
         :type folder: str
+        :param allowed_keys: the list of allowed keys, if NONE all keys are allowed,
+        default None
+        :type allowed_keys: Optional[Sequence[str]], optional
         """
         self._name = name
-        self._stream = UnderfolderStream(folder=folder)
+        self._stream = UnderfolderStream(folder=folder, allowed_keys=allowed_keys)
 
     def _get_sample_entity(self, sample_id: int) -> EntitySample:
         """Returns the sample entity for the given sample id. Wraps all raw metadata
@@ -59,13 +66,19 @@ class UnderfolderInterface(SequenceInterface):
             else:
                 # TODO: move this kind of "File Description" in unique proxy
                 if DataCoding.is_image_extension(extension):
-                    entity.data[key] = {"type": "image", "encoding": extension}
+                    entity.data[key] = EntitySampleData(
+                        type="image", encoding=extension
+                    )
                 elif DataCoding.is_numpy_extension(extension):
-                    entity.data[key] = {"type": "numpy", "encoding": extension}
+                    entity.data[key] = EntitySampleData(
+                        type="numpy", encoding=extension
+                    )
                 elif DataCoding.is_pickle_extension(extension):
-                    entity.data[key] = {"type": "pickle", "encoding": extension}
+                    entity.data[key] = EntitySampleData(
+                        type="pickle", encoding=extension
+                    )
                 elif DataCoding.is_text_extension(extension):
-                    entity.data[key] = {"type": "text", "encoding": extension}
+                    entity.data[key] = EntitySampleData(type="text", encoding=extension)
 
         return entity
 
@@ -118,7 +131,7 @@ class UnderfolderInterface(SequenceInterface):
 
     def get_sample_data(
         self, sample_id: int, item_name: str, format: str = None
-    ) -> any:
+    ) -> io.BytesIO:
         """Returns the raw binary data for the given sample id and item name.
 
         :param sample_id: the sample id
@@ -129,8 +142,8 @@ class UnderfolderInterface(SequenceInterface):
         :type format: str, optional
         :raises KeyError: if sample_id is not found
         :raises KeyError: if item_name is not found
-        :return: the raw binary data
-        :rtype: any
+        :return: io.BytesIO buffer
+        :rtype: io.BytesIO
         """
 
         if sample_id in self._stream.get_sample_ids():
@@ -140,7 +153,10 @@ class UnderfolderInterface(SequenceInterface):
                 if format is None:
                     return self._stream.get_bytes(sample_id, item_name)
                 else:
-                    raise NotImplementedError("Custom format not implemented yet!")
+                    raise NotImplementedError(
+                        "Custom format not implemented yet, leave NONE for auto encoding"
+                        "based on filename extension!"
+                    )
                     # item = entity.data[item_name]
                     # data_format = format if format is not None else item["encoding"]
                     # return self._stream.get_data(sample_id, item_name, format=data_format)
@@ -173,8 +189,6 @@ class UnderfolderInterface(SequenceInterface):
             except PermissionError as e:
                 raise PermissionError(e)
 
-            except KeyError as e:
-                raise KeyError(e)
         else:
 
             raise KeyError(f"Sample {sample_id} not found")
@@ -184,12 +198,15 @@ class UnderfolderAPI(APIRouter):
     def __init__(
         self,
         underfolders_map: Dict[str, str],
+        allowed_keys_map: Optional[Dict[str, Sequence[str]]] = None,
         auth_callback: Callable[[str], bool] = None,
     ):
         """Initialize the API router with a map of underfolder names to underfolder paths.
 
         :param underfolders_map: A map of underfolder names to underfolder paths.
         :type underfolders_map: Dict[str, str]
+        :param allowed_keys_map: A map of underfolder names to allowed keys.
+        :type allowed_keys_map: Dict[str, Sequence[str]]
         :param auth_callback: A callback function that takes a token and returns a boolean
             indicating whether the token is valid.
         :type auth_callback: Callable[[str], bool]
@@ -203,10 +220,15 @@ class UnderfolderAPI(APIRouter):
         self._auth_callback: Optional[Callable[[str], bool]] = auth_callback
 
         # Single underfodlers interfaces
-        self._interfaces_map = {
-            name: UnderfolderInterface(name, folder)
-            for name, folder in self._underfolders_map.items()
-        }
+        self._interfaces_map = {}
+        for name, folder in self._underfolders_map.items():
+            allowed_keys = (
+                allowed_keys_map[name]
+                if (allowed_keys_map is not None and name in allowed_keys_map)
+                else None
+            )
+            interface = UnderfolderInterface(name, folder, allowed_keys=allowed_keys)
+            self._interfaces_map[name] = interface
 
         # .------------------.
         # | API list_dataset |
@@ -368,9 +390,6 @@ class UnderfolderAPI(APIRouter):
 
                 raise HTTPException(status_code=404, detail=str(e))
 
-            except ValueError as e:
-
-                raise HTTPException(status_code=405, detail=str(e))
         else:
 
             raise HTTPException(
