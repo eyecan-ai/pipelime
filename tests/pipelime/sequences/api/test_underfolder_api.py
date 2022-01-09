@@ -107,6 +107,12 @@ class TestUnderfolderAPI:
                         f"/dataset/{dataset_name}/{sample_id}/{key}"
                     )
 
+                    # TEMPORARY TEST FOR FORMAT CHECKS
+                    with pytest.raises(NotImplementedError):
+                        client.get(
+                            f"/dataset/{dataset_name}/{sample_id}/{key}?format=WOW"
+                        )
+
                     # wrong dataset name
                     with pytest.raises(HTTPException):
                         client.get(

@@ -16,8 +16,10 @@ from fastapi import HTTPException
 from fastapi.param_functions import Depends
 from fastapi.routing import APIRouter
 from starlette.responses import StreamingResponse
+from starlette.requests import Request
 from pipelime.sequences.api.base import EntityDataset, EntitySample
 import io
+from loguru import logger
 
 
 class UnderfolderInterface(SequenceInterface):
@@ -230,6 +232,10 @@ class UnderfolderAPI(APIRouter):
             interface = UnderfolderInterface(name, folder, allowed_keys=allowed_keys)
             self._interfaces_map[name] = interface
 
+            logger.info(
+                f"New API Interface created: (name={name}, folder={str(folder)})"
+            )
+
         # .------------------.
         # | API list_dataset |
         # '------------------'
@@ -287,6 +293,26 @@ class UnderfolderAPI(APIRouter):
             dependencies=self._get_dependencies(),
         )
 
+    def _log_api(
+        self,
+        request: Request,
+        message: str = "",
+    ):
+        import inspect
+
+        message_part = f" [{message}] " if message else ""
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        logger.info(
+            f"[{request.method}] {calframe[1][3]}{message_part}<- {request.client}"
+        )
+        logger.debug(
+            f"[{request.method}] {calframe[1][3]} path_params: {request.path_params}"
+        )
+        logger.debug(
+            f"[{request.method}] {calframe[1][3]} query_params: {request.query_params}"
+        )
+
     def _get_dependencies(self):
         dependencies: Sequence[Depends] = []
 
@@ -298,27 +324,35 @@ class UnderfolderAPI(APIRouter):
 
         return dependencies
 
-    async def list_datasets(self) -> Dict[str, EntityDataset]:
+    async def list_datasets(self, request: Request) -> Dict[str, EntityDataset]:
         """List all datasets as a dictionary of dataset names to dataset entity.
 
+        :param request: The request object.
+        :type request: Request
         :return: A dictionary of dataset names to dataset entity.
         :rtype: Dict[str, EntityDataset]
         """
+
+        self._log_api(request=request)
 
         return {
             name: interface.get_dataset()
             for name, interface in self._interfaces_map.items()
         }
 
-    async def get_dataset(self, dataset_name: str) -> EntityDataset:
+    async def get_dataset(self, dataset_name: str, request: Request) -> EntityDataset:
         """Get a dataset entity by name.
 
         :param dataset_name: The name of the dataset.
         :type dataset_name: str
+        :param request: The request object.
+        :type request: Request
         :raises HTTPException: If the dataset is not found.
         :return: The retreived dataset entity.
         :rtype: EntityDataset
         """
+
+        self._log_api(request=request)
 
         if dataset_name in self._interfaces_map:
 
@@ -330,18 +364,24 @@ class UnderfolderAPI(APIRouter):
                 status_code=404, detail=f"Dataset {dataset_name} not found"
             )
 
-    async def get_sample(self, dataset_name: str, sample_id: int) -> EntitySample:
+    async def get_sample(
+        self, dataset_name: str, sample_id: int, request: Request
+    ) -> EntitySample:
         """Get a sample entity by id and dataset name.
 
         :param dataset_name: The name of the dataset.
         :type dataset_name: str
         :param sample_id: The id of the sample.
         :type sample_id: int
+        :param request: The request object.
+        :type request: Request
         :raises HTTPException: If the sample is not found.
         :raises HTTPException: If the dataset is not found.
         :return: The retreived sample entity.
         :rtype: EntitySample
         """
+
+        self._log_api(request=request)
 
         if dataset_name in self._interfaces_map:
             try:
@@ -358,7 +398,12 @@ class UnderfolderAPI(APIRouter):
             )
 
     async def get_sample_data(
-        self, dataset_name: str, sample_id: int, item_name: str, format: str = None
+        self,
+        dataset_name: str,
+        sample_id: int,
+        item_name: str,
+        request: Request,
+        format: str = None,
     ) -> StreamingResponse:
         """Get a sample binary data by id and dataset name as a StreamingResponse.
 
@@ -368,6 +413,8 @@ class UnderfolderAPI(APIRouter):
         :type sample_id: int
         :param item_name:  The name of the item.
         :type item_name: str
+        :param request: The request object.
+        :type request: Request
         :param format: binary data encoding (e.g. jpg, png, pkl) , defaults to None
         :type format: str, optional
         :raises HTTPException: If the sample is not found.
@@ -376,6 +423,8 @@ class UnderfolderAPI(APIRouter):
         :return: binary data stream with selected mimetype
         :rtype: StreamingResponse
         """
+
+        self._log_api(request=request)
 
         if dataset_name in self._interfaces_map:
             try:
@@ -397,7 +446,11 @@ class UnderfolderAPI(APIRouter):
             )
 
     async def put_sample(
-        self, dataset_name: str, sample_id: int, sample_entity: EntitySample
+        self,
+        dataset_name: str,
+        sample_id: int,
+        sample_entity: EntitySample,
+        request: Request,
     ) -> EntitySample:
         """Updates a sample entity by id and dataset name. The body of the request should
         be a JSON serialized EntitySample object
@@ -408,11 +461,15 @@ class UnderfolderAPI(APIRouter):
         :type sample_id: int
         :param sample_entity: The sample entity data to update.
         :type sample_entity: EntitySample
+        :param request: The request object.
+        :type request: Request
         :raises HTTPException: If the sample is not found.
         :raises HTTPException: If the dataset is not found.
         :return: The retrieved sample entity after update operation.
         :rtype: EntitySample
         """
+
+        self._log_api(request=request)
 
         if dataset_name in self._interfaces_map:
             try:
