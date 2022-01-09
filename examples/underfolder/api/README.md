@@ -1,5 +1,13 @@
 # The UnderfolderAPI Server Example
 
+## Requirements
+
+```
+pip install uvicorn
+pip install webbrowser
+```
+
+
 This example launches the UnderfolderAPI server over a target Underfolder. The API exposes the following endpoints:
 
 ![Endpoints](images/endpoints.png)
