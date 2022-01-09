@@ -179,6 +179,12 @@ class UnderfolderStream(DatasetStream):
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """
+        import warnings
+
+        warnings.warn(
+            "get_data is deprecated; use get_bytes", warnings.DeprecationWarning
+        )
+
         item = self.get_item(sample_id, item)
         mimetype = ItemConverter.format_to_mimetype(format)
         return ItemConverter.item_to_data(item, format), mimetype
