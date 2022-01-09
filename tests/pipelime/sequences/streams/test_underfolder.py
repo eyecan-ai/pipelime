@@ -25,8 +25,7 @@ class TestUnderfolderStreams:
         view = UnderfolderStream(sample_underfolder_empty["folder"])
         assert len(view) == 0
 
-        with pytest.raises(ValueError):
-            view.manifest()
+        assert view.manifest()["size"] == 0
 
     def test_stream_read(self, sample_underfolder_minimnist, tmp_path):
         folder = sample_underfolder_minimnist["folder"]
@@ -76,7 +75,7 @@ class TestUnderfolderStreams:
             key = "IMPOSSIBLE_KEY!"
             assert key not in sample
 
-            with pytest.raises(ValueError):
+            with pytest.raises(KeyError):
                 view.get_item(sample_id, key)
 
     def test_stream_write(self, sample_underfolder_minimnist, tmp_path):
@@ -176,12 +175,12 @@ class TestUnderfolderStreams:
 
         for sample_id in range(len(view)):
 
-            with pytest.raises(ValueError):
+            with pytest.raises(PermissionError):
                 view.set_data(
                     sample_id, "metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
                 )
 
-            with pytest.raises(ValueError):
+            with pytest.raises(PermissionError):
                 view.set_data(sample_id, "matrix", {"data": [1, 2, 3.0]}, "matrix")
 
             view.set_data(

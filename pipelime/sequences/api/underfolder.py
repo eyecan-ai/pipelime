@@ -135,10 +135,15 @@ class UnderfolderInterface(SequenceInterface):
 
         if sample_id in self._stream.get_sample_ids():
             entity = self._get_sample_entity(sample_id)
+
             if item_name in entity.data:
-                item = entity.data[item_name]
-                data_format = format if format is not None else item["encoding"]
-                return self._stream.get_data(sample_id, item_name, format=data_format)
+                if format is None:
+                    return self._stream.get_bytes(sample_id, item_name)
+                else:
+                    raise NotImplementedError("Custom format not implemented yet!")
+                    # item = entity.data[item_name]
+                    # data_format = format if format is not None else item["encoding"]
+                    # return self._stream.get_data(sample_id, item_name, format=data_format)
             else:
                 raise KeyError(f"Item {item_name} not found")
         else:

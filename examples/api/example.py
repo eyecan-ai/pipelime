@@ -9,9 +9,9 @@ def auth_callback(token: str) -> bool:
 
 mapp = UnderfolderAPI(
     {
-        "data0": "../data/underfolder/example_dataset",
-        "data1": "../data/underfolder/example_dataset",
-        "data2": "../data/underfolder/example_dataset",
+        "A": "../../tests/sample_data/datasets/underfolder_minimnist",
+        "B": "../../tests/sample_data/datasets/underfolder_minimnist",
+        "C": "../../tests/sample_data/datasets/underfolder_minimnist",
     },
     auth_callback=auth_callback,
 )

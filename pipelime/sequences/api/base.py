@@ -4,15 +4,26 @@ from typing import Dict, Hashable, Optional, Sequence
 from pydantic.main import BaseModel
 
 
+class EntitySampleData(BaseModel):
+    type: str
+    encoding: str
+
+
 class EntitySample(BaseModel):
     id: int
     metadata: dict
-    data: Optional[dict]
+    data: Optional[Dict[str, EntitySampleData]]
+
+
+class EntityDatasetManifest(BaseModel):
+    size: int
+    keys: Sequence[str]
+    sample_ids: Sequence[int]
 
 
 class EntityDataset(BaseModel):
     name: str
-    manifest: dict
+    manifest: EntityDatasetManifest
 
 
 class SequenceInterface:
