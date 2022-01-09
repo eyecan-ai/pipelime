@@ -1,0 +1,59 @@
+body{
+    font-family: Roboto;
+}
+
+.binary-tag{
+    transition: all 0.3s;
+}
+.binary-tag:hover{
+    transform: scale(2);
+}
+.container-binary-data span{
+    background: #880E4F;
+    padding: 5px 10px 5px 10px;
+    border-radius: 5px;
+    margin-right: 5px;
+    color: white;
+    font-family: roboto;
+}
+
+.container-images{
+    display:block;
+}
+.container-images h5{
+    margin-right: 10px;
+}
+.container-images .thumbnail{
+    display: inline-block;
+    position: relative;
+    width: 200;
+    height: 150;
+    background: #333;
+    overflow: hidden;
+    margin-right: 10px;
+    box-shadow: 0px 0px 15px #333;
+}
+
+.container-images .thumbnail .title{
+    position: absolute;
+    background: white;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0.8;
+    z-index: 100;
+    font-size: 18;
+    text-align: center;
+}
+.container-images .thumbnail img{
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 100%;
+    opacity: 0.8;
+    font-size: 19px;
+    text-align: center;
+    right: 0;
+    top: 0;
+    margin: auto;
+}
