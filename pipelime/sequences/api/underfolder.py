@@ -1,12 +1,15 @@
 from typing import Dict, Sequence
+
 from pipelime.sequences.api.authentication import CustomAPIAuthentication
+from pipelime.sequences.operations import OperationFilterByScript
 from pipelime.sequences.api.base import (
     EntityDataset,
     EntitySample,
     EntitySampleData,
+    ParamPagination,
     SequenceInterface,
 )
-from pipelime.sequences.samples import FileSystemSample
+from pipelime.sequences.samples import FileSystemSample, Sample
 from pipelime.sequences.streams.underfolder import UnderfolderStream
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.tools.bytes import DataCoding
@@ -20,6 +23,8 @@ from starlette.requests import Request
 from pipelime.sequences.api.base import EntityDataset, EntitySample
 import io
 from loguru import logger
+import dictquery
+from pipelime.tools.dictionaries import DictionaryUtils
 
 
 class UnderfolderInterface(SequenceInterface):
@@ -42,22 +47,17 @@ class UnderfolderInterface(SequenceInterface):
         self._name = name
         self._stream = UnderfolderStream(folder=folder, allowed_keys=allowed_keys)
 
-    def _get_sample_entity(self, sample_id: int) -> EntitySample:
-        """Returns the sample entity for the given sample id. Wraps all raw metadata
-        into the EntitySample. For binary data just the item names and encoding will
-        be provided through the entity 'data' field
+    def _raw_sample_to_entity(self, raw_sample: Sample) -> EntitySample:
+        """Converts a raw sample into an entity sample.
 
-        :param sample_id: the sample id
-        :type sample_id: int
-        :return: the sample entity built
+        :param raw_sample: the raw sample
+        :type raw_sample: Sample
+        :return: the entity sample
         :rtype: EntitySample
         """
 
         # create entity
-        entity = EntitySample(id=sample_id, metadata={}, data={})
-
-        # get raw sample
-        raw_sample: FileSystemSample = self._stream.get_sample(sample_id)
+        entity = EntitySample(id=raw_sample.id, metadata={}, data={})
 
         # fill metadata and urls
         for key in raw_sample:
@@ -83,6 +83,22 @@ class UnderfolderInterface(SequenceInterface):
                     entity.data[key] = EntitySampleData(type="text", encoding=extension)
 
         return entity
+
+    def _get_sample_entity(self, sample_id: int) -> EntitySample:
+        """Returns the sample entity for the given sample id. Wraps all raw metadata
+        into the EntitySample. For binary data just the item names and encoding will
+        be provided through the entity 'data' field
+
+        :param sample_id: the sample id
+        :type sample_id: int
+        :return: the sample entity built
+        :rtype: EntitySample
+        """
+
+        # get raw sample
+        raw_sample: FileSystemSample = self._stream.get_sample(sample_id)
+
+        return self._raw_sample_to_entity(raw_sample)
 
     def _put_sample_entity(self, sample_id: int, entity: EntitySample) -> None:
         """Updates the raw sample with the given entity.
@@ -195,6 +211,27 @@ class UnderfolderInterface(SequenceInterface):
 
             raise KeyError(f"Sample {sample_id} not found")
 
+    def search_samples(self, proto_sample: EntitySample) -> Sequence[EntitySample]:
+
+        flatten_proto_metadata = DictionaryUtils.flatten(proto_sample.metadata)
+
+        def filter_sample(sample: FileSystemSample, sequence) -> bool:
+            entity = self._raw_sample_to_entity(sample)
+
+            valid = True
+            for key, value in flatten_proto_metadata.items():
+                query = f"`{key}` {value}"
+                valid = dictquery.match(entity.metadata, query)
+                if not valid:
+                    break
+            return valid
+
+        filtered_reader = OperationFilterByScript(path_or_func=filter_sample)(
+            self._stream.reader
+        )
+
+        return [self._raw_sample_to_entity(sample) for sample in filtered_reader]
+
 
 class UnderfolderAPI(APIRouter):
     def __init__(
@@ -222,7 +259,7 @@ class UnderfolderAPI(APIRouter):
         self._auth_callback: Optional[Callable[[str], bool]] = auth_callback
 
         # Single underfodlers interfaces
-        self._interfaces_map = {}
+        self._interfaces_map: Dict[str, UnderfolderInterface] = {}
         for name, folder in self._underfolders_map.items():
             allowed_keys = (
                 allowed_keys_map[name]
@@ -290,6 +327,17 @@ class UnderfolderAPI(APIRouter):
             response_model=EntitySample,
             endpoint=self.put_sample,
             methods=["PUT"],
+            dependencies=self._get_dependencies(),
+        )
+
+        # .-------------------.
+        # | API search_sample |
+        # '-------------------'
+        self.add_api_route(
+            "/search/{dataset_name}",
+            response_model=Sequence[EntitySample],
+            endpoint=self.search_samples,
+            methods=["GET"],
             dependencies=self._get_dependencies(),
         )
 
@@ -480,3 +528,22 @@ class UnderfolderAPI(APIRouter):
                 raise HTTPException(status_code=404, detail=str(e))
         else:
             raise HTTPException(status_code=404, detail=f"{dataset_name} not found")
+
+    async def search_samples(
+        self,
+        dataset_name: str,
+        request: Request,
+        proto_sample: EntitySample,
+        pagination: ParamPagination = Depends(),
+    ) -> Sequence[EntitySample]:
+
+        self._log_api(request=request)
+
+        if dataset_name in self._interfaces_map:
+
+            return self._interfaces_map[dataset_name].search_samples(proto_sample)
+        else:
+
+            raise HTTPException(
+                status_code=404, detail=f"Dataset {dataset_name} not found"
+            )

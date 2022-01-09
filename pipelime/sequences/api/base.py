@@ -26,6 +26,12 @@ class EntityDataset(BaseModel):
     manifest: EntityDatasetManifest
 
 
+class ParamPagination(BaseModel):
+    paginationStart: int = 0
+    paginationSize: int = 10
+    paginationEnd: Optional[int] = None
+
+
 class SequenceInterface:
     @abstractmethod
     def list_datasets(self) -> Sequence[EntityDataset]:

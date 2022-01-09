@@ -15,7 +15,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 
 class TestUnderfolderAPI:
-    def test_api_full(self, sample_underfolder_minimnist, tmp_path):
+    def test_api_basic(self, sample_underfolder_minimnist, tmp_path):
 
         # creates underfolders from minimnist sample data
         folders_names = ["A", "B"]
@@ -170,6 +170,55 @@ class TestUnderfolderAPI:
                 # checks for updateded metadata
                 assert sample["metadata"]["put"] == "inception"
                 assert len(sample["metadatay"]) == 5
+
+    @pytest.mark.parametrize(
+        "search_item",
+        [
+            {"metadata": {"metadata": {}}, "expected": 20},
+            {"metadata": {"metadata": {"sample_id": "== 0"}}, "expected": 1},
+            {"metadata": {"metadata": {"sample_id": "> 0"}}, "expected": 19},
+            {"metadata": {"metadata": {"sample_id": ">= 0"}}, "expected": 20},
+            {"metadata": {"metadata": {"double": "<= 20"}}, "expected": 11},
+            {
+                "metadata": {"metadata": {"double": "<= 20", "sample_id": "< 6"}},
+                "expected": 6,
+            },
+            {
+                "metadata": {
+                    "metadata": {"double": "<= 20", "sample_id": "< 6", "half": "== 0"}
+                },
+                "expected": 1,
+            },
+        ],
+    )
+    def test_api_search_samples(
+        self, sample_underfolder_minimnist, tmp_path, search_item
+    ):
+
+        # creates underfolders from minimnist sample data
+        dataset_name = "searchable"
+        folder = str(tmp_path / dataset_name)
+        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
+
+        # creates the api
+        api = UnderfolderAPI(
+            underfolders_map={dataset_name: folder}, auth_callback=None
+        )
+
+        # creates the API client
+        client = TestClient(api)
+
+        # Search ALL
+        metadata = search_item["metadata"]
+        expected_count = search_item["expected"]
+
+        search_response = client.get(
+            f"/search/{dataset_name}",
+            json=EntitySample(id=-1, metadata=metadata, data={}).dict(),
+        )
+        assert search_response.status_code == 200
+        samples_entities = [EntitySample(**x) for x in search_response.json()]
+        assert len(samples_entities) == expected_count
 
     def test_api_auth(self, sample_underfolder_minimnist, tmp_path):
 
