@@ -5,13 +5,15 @@ from fastapi.exceptions import HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordBearer
 
 import imageio
-from pipelime.sequences.api.base import EntityDataset, EntitySample
+from pipelime.sequences.api.base import EntityDataset, EntitySample, ParamPagination
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.api.underfolder import UnderfolderAPI
 from fastapi.testclient import TestClient
 import pytest
 import rich
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
+
+from pipelime.tools.dictionaries import DictSearch
 
 
 class TestUnderfolderAPI:
@@ -171,55 +173,6 @@ class TestUnderfolderAPI:
                 assert sample["metadata"]["put"] == "inception"
                 assert len(sample["metadatay"]) == 5
 
-    @pytest.mark.parametrize(
-        "search_item",
-        [
-            {"metadata": {"metadata": {}}, "expected": 20},
-            {"metadata": {"metadata": {"sample_id": "== 0"}}, "expected": 1},
-            {"metadata": {"metadata": {"sample_id": "> 0"}}, "expected": 19},
-            {"metadata": {"metadata": {"sample_id": ">= 0"}}, "expected": 20},
-            {"metadata": {"metadata": {"double": "<= 20"}}, "expected": 11},
-            {
-                "metadata": {"metadata": {"double": "<= 20", "sample_id": "< 6"}},
-                "expected": 6,
-            },
-            {
-                "metadata": {
-                    "metadata": {"double": "<= 20", "sample_id": "< 6", "half": "== 0"}
-                },
-                "expected": 1,
-            },
-        ],
-    )
-    def test_api_search_samples(
-        self, sample_underfolder_minimnist, tmp_path, search_item
-    ):
-
-        # creates underfolders from minimnist sample data
-        dataset_name = "searchable"
-        folder = str(tmp_path / dataset_name)
-        shutil.copytree(sample_underfolder_minimnist["folder"], folder)
-
-        # creates the api
-        api = UnderfolderAPI(
-            underfolders_map={dataset_name: folder}, auth_callback=None
-        )
-
-        # creates the API client
-        client = TestClient(api)
-
-        # Search ALL
-        metadata = search_item["metadata"]
-        expected_count = search_item["expected"]
-
-        search_response = client.get(
-            f"/search/{dataset_name}",
-            json=EntitySample(id=-1, metadata=metadata, data={}).dict(),
-        )
-        assert search_response.status_code == 200
-        samples_entities = [EntitySample(**x) for x in search_response.json()]
-        assert len(samples_entities) == expected_count
-
     def test_api_auth(self, sample_underfolder_minimnist, tmp_path):
 
         # secrets
@@ -289,3 +242,120 @@ class TestUnderfolderAPI:
             )
             assert response.status_code == 200
             rich.print(backed_request, response.status_code)
+
+    @pytest.mark.parametrize(
+        "search_item",
+        [
+            {
+                "metadata": {
+                    "info": {
+                        "sample_id": f"{DictSearch.KEY_PLACEHOLDER} >= 1 AND {DictSearch.KEY_PLACEHOLDER} <= 9"
+                    },
+                },
+                "expected": 3,
+                "pagination": {"paginationStart": 5, "paginationSize": 3},
+            },
+            {
+                "metadata": {
+                    "info": {
+                        "sample_id": f"{DictSearch.KEY_PLACEHOLDER} >= 1 AND {DictSearch.KEY_PLACEHOLDER} <= 9"
+                    },
+                },
+                "expected": 0,
+                "pagination": {"paginationStart": 20, "paginationSize": 30},
+            },
+            {
+                "metadata": {
+                    "info": {
+                        "sample_id": f"{DictSearch.KEY_PLACEHOLDER} >= 1 AND {DictSearch.KEY_PLACEHOLDER} <= 9"
+                    },
+                },
+                "expected": 3,
+                "pagination": {"paginationStart": 0, "paginationEnd": 2},
+            },
+        ],
+    )
+    def test_api_search_samples_basic_pagination(
+        self, sample_underfolder_minimnist_queries, tmp_path, search_item
+    ):
+
+        # creates underfolders from minimnist sample data
+        dataset_name = "searchable"
+        folder = str(tmp_path / dataset_name)
+        shutil.copytree(sample_underfolder_minimnist_queries["folder"], folder)
+
+        # creates the api
+        api = UnderfolderAPI(
+            underfolders_map={dataset_name: folder}, auth_callback=None
+        )
+
+        # creates the API client
+        client = TestClient(api)
+
+        # Search ALL
+        metadata = search_item["metadata"]
+        expected_count = search_item["expected"]
+        pagination = search_item["pagination"]
+
+        search_response = client.get(
+            f"/search/{dataset_name}",
+            json=EntitySample(id=-1, metadata=metadata, data={}).dict(),
+            params=ParamPagination(**pagination).dict(),
+        )
+        assert search_response.status_code == 200
+        samples_entities = [EntitySample(**x) for x in search_response.json()]
+        assert len(samples_entities) == expected_count
+
+    def test_api_search_samples_pagination_consistency(
+        self, sample_underfolder_minimnist_queries, tmp_path
+    ):
+
+        # creates underfolders from minimnist sample data
+        dataset_name = "searchable"
+        folder = str(tmp_path / dataset_name)
+        shutil.copytree(sample_underfolder_minimnist_queries["folder"], folder)
+
+        # creates the api
+        api = UnderfolderAPI(
+            underfolders_map={dataset_name: folder}, auth_callback=None
+        )
+
+        reader = UnderfolderReader(folder)
+
+        # creates the API client
+        client = TestClient(api)
+
+        # Search ALL
+        total = len(reader)
+
+        # Split all results with different paginations params
+        paginations = [
+            [0, -1, 5],  # Start 0, Size -1, End 5,
+            [6, -1, 8],  # Start 6, Size -1, End 8,
+            [9, -1, 10],  # Start 9, Size -1, End 10,
+            [11, 9, None],  # Start 11, Size 9, End None,
+        ]
+
+        # build params
+        paginations_params = [
+            ParamPagination(paginationStart=a, paginationSize=b, paginationEnd=c)
+            for a, b, c in paginations
+        ]
+
+        whole_samples = []
+
+        # SEARCH ALL Samples (wihtout query) but with pagination
+        for pagination_params in paginations_params:
+            rich.print("PAGINATION", pagination_params.dict())
+
+            search_response = client.get(
+                f"/search/{dataset_name}",
+                json=EntitySample(id=-1, metadata={}, data={}).dict(),
+                params=pagination_params.dict(),
+            )
+            assert search_response.status_code == 200
+            samples_entities = [EntitySample(**x) for x in search_response.json()]
+            whole_samples += samples_entities
+            rich.print("IDS", [x.id for x in samples_entities])
+
+        assert len(whole_samples) == total

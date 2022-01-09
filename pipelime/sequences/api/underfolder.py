@@ -1,7 +1,7 @@
 from typing import Dict, Sequence
 
 from pipelime.sequences.api.authentication import CustomAPIAuthentication
-from pipelime.sequences.operations import OperationFilterByScript
+from pipelime.sequences.operations import OperationFilterByScript, OperationOrderBy
 from pipelime.sequences.api.base import (
     EntityDataset,
     EntitySample,
@@ -24,7 +24,7 @@ from pipelime.sequences.api.base import EntityDataset, EntitySample
 import io
 from loguru import logger
 import dictquery
-from pipelime.tools.dictionaries import DictionaryUtils
+from pipelime.tools.dictionaries import DictSearch, DictionaryUtils
 
 
 class UnderfolderInterface(SequenceInterface):
@@ -212,25 +212,23 @@ class UnderfolderInterface(SequenceInterface):
             raise KeyError(f"Sample {sample_id} not found")
 
     def search_samples(self, proto_sample: EntitySample) -> Sequence[EntitySample]:
+        """Search samples based on the given sample entity.
 
-        flatten_proto_metadata = DictionaryUtils.flatten(proto_sample.metadata)
+        :param proto_sample: the sample entity with query values
+        :type proto_sample: EntitySample
+        :return: the list of samples matching the query
+        :rtype: Sequence[EntitySample]
+        """
 
         def filter_sample(sample: FileSystemSample, sequence) -> bool:
-            entity = self._raw_sample_to_entity(sample)
-
-            valid = True
-            for key, value in flatten_proto_metadata.items():
-                query = f"`{key}` {value}"
-                valid = dictquery.match(entity.metadata, query)
-                if not valid:
-                    break
-            return valid
+            return DictSearch.match_queries(proto_sample.metadata, sample)
 
         filtered_reader = OperationFilterByScript(path_or_func=filter_sample)(
             self._stream.reader
         )
 
-        return [self._raw_sample_to_entity(sample) for sample in filtered_reader]
+        entities = [self._raw_sample_to_entity(sample) for sample in filtered_reader]
+        return sorted(entities, key=lambda x: x.id)
 
 
 class UnderfolderAPI(APIRouter):
@@ -541,7 +539,11 @@ class UnderfolderAPI(APIRouter):
 
         if dataset_name in self._interfaces_map:
 
-            return self._interfaces_map[dataset_name].search_samples(proto_sample)
+            samples_entities = self._interfaces_map[dataset_name].search_samples(
+                proto_sample
+            )
+
+            return pagination.filter(samples_entities)
         else:
 
             raise HTTPException(

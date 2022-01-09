@@ -4,6 +4,7 @@ from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.streams.base import DatasetStream, ItemConverter
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 from pipelime.sequences.samples import FileSystemSample, Sample, SamplesSequence
+from deprecate import deprecated
 
 
 class UnderfolderStream(DatasetStream):
@@ -167,6 +168,7 @@ class UnderfolderStream(DatasetStream):
         else:
             raise KeyError(f"Item '{item}' not found in filesmap")
 
+    @deprecated("Use get_bytes instead")
     def get_data(self, sample_id: Hashable, item: str, format: str) -> Tuple[any, str]:
         """Returns the sample's item with the given name in the given format.
 
@@ -179,11 +181,6 @@ class UnderfolderStream(DatasetStream):
         :return: The item with the given name in the given format.
         :rtype: Tuple[any, str]
         """
-        import warnings
-
-        warnings.warn(
-            "get_data is deprecated; use get_bytes", warnings.DeprecationWarning
-        )
 
         item = self.get_item(sample_id, item)
         mimetype = ItemConverter.format_to_mimetype(format)

@@ -118,6 +118,11 @@ def filesystem_datasets(data_folder):
             "type": "Undefolder",
             "schemas": {},
         },
+        "minimnist_underfolder_queries": {
+            "folder": Path(data_folder) / "datasets" / "underfolder_minimnist_queries",
+            "type": "Undefolder",
+            "schemas": {},
+        },
     }
 
 
@@ -129,6 +134,11 @@ def sample_underfolder_minimnist(filesystem_datasets):
 @pytest.fixture(scope="session")
 def sample_underfolder_empty(filesystem_datasets):
     return filesystem_datasets["empty_underfolder"]
+
+
+@pytest.fixture(scope="session")
+def sample_underfolder_minimnist_queries(filesystem_datasets):
+    return filesystem_datasets["minimnist_underfolder_queries"]
 
 
 @pytest.fixture(scope="session")

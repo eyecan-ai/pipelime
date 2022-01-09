@@ -5,6 +5,7 @@ import pytest
 from pipelime.sequences.api.base import EntitySample, EntitySampleData
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.api.underfolder import UnderfolderInterface
+from pipelime.tools.dictionaries import DictSearch
 
 
 class TestUnderfolderInterface:
@@ -137,3 +138,108 @@ class TestUnderfolderInterface:
         else:
             with pytest.raises(PermissionError):
                 interface.put_sample(ref_entity.id, sample_entity)
+
+    # TEST SEARCH SAMPLES
+    @pytest.mark.parametrize(
+        "search_item",
+        [
+            {"metadata": {"info": {}}, "expected": 20},
+            {"metadata": {"info": {"sample_id": "== 0"}}, "expected": 1},
+            {"metadata": {"info": {"sample_id": "> 0"}}, "expected": 19},
+            {"metadata": {"info": {"sample_id": ">= 0"}}, "expected": 20},
+            {"metadata": {"info": {"double": "<= 20"}}, "expected": 11},
+            {
+                "metadata": {"info": {"double": "<= 20", "sample_id": "< 6"}},
+                "expected": 6,
+            },
+            {
+                "metadata": {
+                    "info": {"double": "<= 20", "sample_id": "< 6", "half": "== 0"}
+                },
+                "expected": 1,
+            },
+            {
+                "metadata": {"categories": {"main": "== 'category_odd'"}},
+                "expected": 10,
+            },
+            {
+                "metadata": {"categories": {"main": "!= 'category_odd'"}},
+                "expected": 10,
+            },
+            {
+                "metadata": {"categories": {"main": "LIKE 'category*'"}},
+                "expected": 20,
+            },
+            {
+                "metadata": {"categories": {"main": "LIKE '*odd'"}},
+                "expected": 10,
+            },
+            {
+                "metadata": {
+                    "info": {"sample_id": "< 5"},
+                    "categories": {"main": "LIKE '*odd'"},
+                },
+                "expected": 2,
+            },
+            {
+                "metadata": {
+                    "categories": {"others": "CONTAINS 'alpha'"},
+                },
+                "expected": 10,
+            },
+            {
+                "metadata": {
+                    "categories": {
+                        "others": f"{DictSearch.KEY_PLACEHOLDER} CONTAINS 'alpha' and {DictSearch.KEY_PLACEHOLDER} CONTAINS 'beta'"
+                    },
+                },
+                "expected": 10,
+            },
+            {
+                "metadata": {
+                    "categories": {
+                        "others": f"{DictSearch.KEY_PLACEHOLDER} CONTAINS 'alpha' and {DictSearch.KEY_PLACEHOLDER} CONTAINS 'zeta'"
+                    },
+                },
+                "expected": 0,
+            },
+            {
+                "metadata": {
+                    "categories": {
+                        "others": f"{DictSearch.KEY_PLACEHOLDER} CONTAINS 'alpha' OR {DictSearch.KEY_PLACEHOLDER} CONTAINS 'zeta'"
+                    },
+                },
+                "expected": 20,
+            },
+            {
+                "metadata": {
+                    "info": {
+                        "sample_id": f"{DictSearch.KEY_PLACEHOLDER} >= 1 AND {DictSearch.KEY_PLACEHOLDER} <= 2"
+                    },
+                },
+                "expected": 2,
+            },
+        ],
+    )
+    def test_search_samples(
+        self, sample_underfolder_minimnist_queries, tmp_path, search_item
+    ):
+
+        # creates underfolders from minimnist sample data
+        dataset_name = "searchable"
+        folder = str(tmp_path / dataset_name)
+        shutil.copytree(sample_underfolder_minimnist_queries["folder"], folder)
+
+        # creates the api
+        interface = UnderfolderInterface(dataset_name, folder)
+
+        # Search ALL
+        metadata = search_item["metadata"]
+        expected_count = search_item["expected"]
+
+        rich.print("Search item", search_item)
+        samples_entities = interface.search_samples(
+            EntitySample(id=-1, metadata=metadata, data={})
+        )
+
+        assert len(samples_entities) == expected_count

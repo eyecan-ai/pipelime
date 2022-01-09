@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Dict, Hashable, Optional, Sequence
 
 from pydantic.main import BaseModel
+import rich
 
 
 class EntitySampleData(BaseModel):
@@ -30,6 +31,16 @@ class ParamPagination(BaseModel):
     paginationStart: int = 0
     paginationSize: int = 10
     paginationEnd: Optional[int] = None
+
+    def filter(self, s: Sequence[any]) -> Sequence[any]:
+
+        start = self.paginationStart
+        end = (
+            self.paginationEnd + 1
+            if self.paginationEnd is not None
+            else start + self.paginationSize
+        )
+        return s[start:end]
 
 
 class SequenceInterface:
