@@ -13,4 +13,3 @@ loguru
 h5py
 pydantic
 fastapi
-uvicorn
