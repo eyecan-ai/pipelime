@@ -102,8 +102,8 @@ class Subfolders2Underfolder(UnderfolderConverter):
         :rtype: Sequence[Dict]
         """
         items = []
-        classmap = set()
-        for sub in subfolder:
+        classmap = {}
+        for sub_index, sub in enumerate(subfolder):
             for file in sub["files"]:
                 file_path = os.path.join(sub["folder"], file)
 
@@ -117,11 +117,16 @@ class Subfolders2Underfolder(UnderfolderConverter):
                     "filepath": file_path,
                     "category": category,
                 }
-                classmap.add(category)
+                category_item = {
+                    "name": category,
+                    "class_id": sub_index,
+                    "color": "#ff0000",
+                }
+                classmap[category] = category_item
                 items.append(data)
         return {
             "items": items,
-            "classmap": list(sorted(list(classmap))),
+            "classmap": classmap,
         }
 
     def convert(self, output_folder: str):
@@ -143,7 +148,7 @@ class Subfolders2Underfolder(UnderfolderConverter):
                 "category": item["category"],
                 "filename": item["filename"],
             }
-            sample["classmap"] = {"names": self._classmap}
+            sample["classmap"] = self._classmap
             samples.append(sample)
 
         writer = UnderfolderWriter(
