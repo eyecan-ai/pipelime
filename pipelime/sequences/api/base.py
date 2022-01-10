@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict, Hashable, Optional, Sequence
+from typing import Dict, Hashable, List, Optional, Sequence
 
 from pydantic.main import BaseModel
 import rich
@@ -25,6 +25,34 @@ class EntityDatasetManifest(BaseModel):
 class EntityDataset(BaseModel):
     name: str
     manifest: EntityDatasetManifest
+
+
+class EntityPagination(BaseModel):
+    offset: Optional[int] = 0
+    limit: Optional[int] = 50
+    total_count: Optional[int] = None
+
+    @classmethod
+    def create_from_sequence(self, Sequence: Sequence[any]) -> None:
+        pagination = EntityPagination()
+        pagination.offset = 0
+        pagination.limit = len(Sequence)
+        pagination.total_count = pagination.limit
+        return pagination
+
+    def filter(self, s: Sequence[any]) -> Sequence[any]:
+        return s[self.offset : self.offset + self.limit]
+
+
+class EntitySampleSearchRequest(BaseModel):
+    proto_sample: Optional[EntitySample]
+    only_pagination: Optional[bool] = False
+    pagination: Optional[EntityPagination] = None
+
+
+class EntitySampleSearchResponse(BaseModel):
+    samples: Sequence[EntitySample] = []
+    pagination: EntityPagination
 
 
 class ParamPagination(BaseModel):

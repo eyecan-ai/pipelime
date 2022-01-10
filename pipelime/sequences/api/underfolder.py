@@ -1,11 +1,16 @@
 from typing import Dict, Sequence
 
+import rich
+
 from pipelime.sequences.api.authentication import CustomAPIAuthentication
 from pipelime.sequences.operations import OperationFilterByScript, OperationOrderBy
 from pipelime.sequences.api.base import (
     EntityDataset,
+    EntityPagination,
     EntitySample,
     EntitySampleData,
+    EntitySampleSearchRequest,
+    EntitySampleSearchResponse,
     ParamPagination,
     SequenceInterface,
 )
@@ -333,7 +338,7 @@ class UnderfolderAPI(APIRouter):
         # '-------------------'
         self.add_api_route(
             "/search/{dataset_name}",
-            response_model=Sequence[EntitySample],
+            response_model=EntitySampleSearchResponse,
             endpoint=self.search_samples,
             methods=["POST"],
             dependencies=self._get_dependencies(),
@@ -531,19 +536,25 @@ class UnderfolderAPI(APIRouter):
         self,
         dataset_name: str,
         request: Request,
-        proto_sample: EntitySample,
-        pagination: ParamPagination = Depends(),
-    ) -> Sequence[EntitySample]:
+        search_entity: EntitySampleSearchRequest,
+    ) -> EntitySampleSearchResponse:
 
         self._log_api(request=request)
 
         if dataset_name in self._interfaces_map:
 
             samples_entities = self._interfaces_map[dataset_name].search_samples(
-                proto_sample
+                search_entity.proto_sample
             )
 
-            return pagination.filter(samples_entities)
+            if search_entity.only_pagination:
+                pagination = EntityPagination.create_from_sequence(samples_entities)
+                return EntitySampleSearchResponse(pagination=pagination)
+            else:
+                filtered = search_entity.pagination.filter(samples_entities)
+                return EntitySampleSearchResponse(
+                    samples=filtered, pagination=search_entity.pagination
+                )
         else:
 
             raise HTTPException(
