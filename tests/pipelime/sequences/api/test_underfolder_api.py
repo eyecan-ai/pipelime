@@ -56,7 +56,7 @@ class TestUnderfolderAPIBasic:
 
             # Get the wrong dataset
             with pytest.raises(HTTPException):
-                get_wrong_dataset_response = client.get(f"/dataset/IMPOSSIBLE_NAME!@/")
+                client.get("/dataset/IMPOSSIBLE_NAME!@/")
 
             # Get the dataset Entity from the single get_dataset endpoint
             get_dataset_response = client.get(f"/dataset/{dataset_name}")
@@ -361,6 +361,7 @@ class TestUnderfolderAPISearch:
 
         # total count
         total_count = response.pagination.total_count
+        assert total_count == total
 
         # split request in several paginations modes, and check consistency
         page_sizes = list(range(1, total_count))

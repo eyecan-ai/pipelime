@@ -1,4 +1,3 @@
-from typing import Dict, Sequence
 from pipelime.sequences.api.authentication import CustomAPIAuthentication
 from pipelime.sequences.operations import OperationFilterByScript
 from pipelime.sequences.api.entities import (
@@ -17,7 +16,7 @@ from pipelime.sequences.streams.underfolder import UnderfolderStream
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.tools.bytes import DataCoding
 
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Dict, Callable, Optional, Sequence
 from fastapi import HTTPException
 from fastapi.param_functions import Depends
 from fastapi.routing import APIRouter

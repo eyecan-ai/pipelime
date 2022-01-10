@@ -1,5 +1,5 @@
 from pydantic.main import BaseModel
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 
 class EntitySampleData(BaseModel):

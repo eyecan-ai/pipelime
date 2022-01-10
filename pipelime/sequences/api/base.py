@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict, Hashable, Sequence
+from typing import Hashable, Sequence
 from pipelime.sequences.api.entities import EntityDataset, EntitySample
 import io
 
