@@ -3,7 +3,7 @@ from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.streams.base import DatasetStream, ItemConverter
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
-from pipelime.sequences.samples import FileSystemSample, Sample, SamplesSequence
+from pipelime.sequences.samples import FileSystemSample, SamplesSequence
 
 
 class UnderfolderStream(DatasetStream):

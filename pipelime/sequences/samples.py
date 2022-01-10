@@ -352,7 +352,7 @@ class SamplesSequence(Sequence):
     def purge_id(cls, id: Hashable) -> Union[int, str]:
         try:
             return int(id)
-        except Exception as e:
+        except Exception:
             return str(id)
 
     def merge(self, other: "SamplesSequence") -> "SamplesSequence":

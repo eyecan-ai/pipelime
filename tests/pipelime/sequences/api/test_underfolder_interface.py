@@ -2,7 +2,7 @@ import io
 import shutil
 import rich
 import pytest
-from pipelime.sequences.api.base import EntitySample, EntitySampleData
+from pipelime.sequences.api.entities import EntitySample, EntitySampleData
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.api.underfolder import UnderfolderInterface
 from pipelime.tools.dictionaries import DictSearch

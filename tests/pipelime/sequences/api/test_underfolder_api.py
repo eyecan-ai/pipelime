@@ -1,24 +1,20 @@
 import io
 import shutil
-from _pytest._code.code import ExceptionInfo
 from fastapi.exceptions import HTTPException
-from fastapi.security.oauth2 import OAuth2PasswordBearer
 
 import imageio
-from pipelime.sequences.api.base import (
+from pipelime.sequences.api.entities import (
     EntityDataset,
     EntityPagination,
     EntitySample,
     EntitySampleSearchRequest,
     EntitySampleSearchResponse,
-    ParamPagination,
 )
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.api.underfolder import UnderfolderAPI, UnderfolderInterface
 from fastapi.testclient import TestClient
 import pytest
 import rich
-from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
 from pipelime.tools.dictionaries import DictSearch
 
@@ -227,7 +223,6 @@ class TestUnderfolderAPIBasic:
             # No Auth mechanism set, should fail with 401 UNATHORIZED
             with pytest.raises(HTTPException) as ex_info:
                 response = client.request(**backed_request)
-            ex_info: ExceptionInfo
             assert isinstance(ex_info.value, HTTPException)
             assert ex_info.value.status_code == 401
             rich.print(backed_request, ex_info.value.status_code)
@@ -238,7 +233,6 @@ class TestUnderfolderAPIBasic:
                     **backed_request,
                     headers={"Authorization": "Bearer " + invalid_secret},
                 )
-            ex_info: ExceptionInfo
             assert isinstance(ex_info.value, HTTPException)
             rich.print(backed_request, ex_info.value.status_code)
 
