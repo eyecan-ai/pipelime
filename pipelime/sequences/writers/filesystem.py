@@ -308,8 +308,8 @@ class UnderfolderWriterV2(UnderfolderWriter):
                 try:
                     # sample is, eg, a FileSystemSample
                     return sample.is_cached(key)    # type: ignore
-                except AttributeError:
-                    return False
+                except AttributeError:              # pragma: no cover
+                    return False                    # pragma: no cover
 
             meta_item = sample.metaitem(key)
             if (
