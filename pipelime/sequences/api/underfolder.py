@@ -335,7 +335,7 @@ class UnderfolderAPI(APIRouter):
             "/search/{dataset_name}",
             response_model=Sequence[EntitySample],
             endpoint=self.search_samples,
-            methods=["GET"],
+            methods=["POST"],
             dependencies=self._get_dependencies(),
         )
 

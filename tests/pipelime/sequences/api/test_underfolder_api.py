@@ -297,7 +297,7 @@ class TestUnderfolderAPI:
         expected_count = search_item["expected"]
         pagination = search_item["pagination"]
 
-        search_response = client.get(
+        search_response = client.post(
             f"/search/{dataset_name}",
             json=EntitySample(id=-1, metadata=metadata, data={}).dict(),
             params=ParamPagination(**pagination).dict(),
@@ -348,7 +348,7 @@ class TestUnderfolderAPI:
         for pagination_params in paginations_params:
             rich.print("PAGINATION", pagination_params.dict())
 
-            search_response = client.get(
+            search_response = client.post(
                 f"/search/{dataset_name}",
                 json=EntitySample(id=-1, metadata={}, data={}).dict(),
                 params=pagination_params.dict(),
