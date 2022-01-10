@@ -244,7 +244,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
     def __init__(
         self,
         folder: str,
-        file_writing_mode: FileHandling = FileHandling.COPY_IF_NOT_CACHED,
+        file_handling: FileHandling = FileHandling.COPY_IF_NOT_CACHED,
         copy_mode: CopyMode = CopyMode.DEEP_COPY,
         force_copy_keys: Optional[Sequence[str]] = None,
         reader_template: Optional[ReaderTemplate] = None,
@@ -266,7 +266,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
             remove_duplicates=remove_duplicates, num_workers=num_workers
         )
 
-        self._file_writing_mode = file_writing_mode
+        self._file_handling = file_handling
         self._copy_mode = copy_mode
 
         if self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
@@ -300,7 +300,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
             self._remove_duplicate_files(output_file)
 
         if (
-            self._file_writing_mode is not
+            self._file_handling is not
             UnderfolderWriterV2.FileHandling.ALWAYS_WRITE_FROM_CACHE
         ):
             # copy source file if possible
@@ -315,7 +315,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
             if (
                 isinstance(meta_item, FileSystemItem) and
                 meta_item.source().suffix == output_file.suffix and (
-                    self._file_writing_mode is
+                    self._file_handling is
                     UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK or
                     key in self._force_copy_keys or
                     not _is_item_cached()

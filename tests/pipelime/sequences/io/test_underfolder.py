@@ -13,7 +13,9 @@ from pipelime.sequences.readers.filesystem import (
     UnderfolderReader,
 )
 from pipelime.sequences.samples import FileSystemItem, FileSystemSample, Sample
-from pipelime.sequences.writers.filesystem import UnderfolderWriter
+from pipelime.sequences.writers.filesystem import (
+    UnderfolderWriter, UnderfolderWriterV2
+)
 import pytest
 
 
@@ -335,10 +337,14 @@ class TestUnderfolderWriterSymlinks(object):
         writer(reader)
 
         # check for broken symlinks
+        import platform
+        i_am_on_windows = (platform.system() == "Windows")
+
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
         for sample in re_reader:
             for k, v in sample.filesmap.items():
                 path = Path(v)
+                assert i_am_on_windows or path.is_symlink()
                 assert path.is_file()
 
 
@@ -424,3 +430,74 @@ class TestUnderfolderLinkPlugin:
         # Checks for cycle when UnderfolderReader is called
         with pytest.raises(RuntimeError):
             UnderfolderReader(folder=subfolders[keys[0]])
+
+
+class TestUnderfolderWriterV2(object):
+    def _read_write_data(self, source_folder, **writer_kwargs):
+        os.chdir(source_folder.parent)
+        source_folder = source_folder.name
+
+        reader = UnderfolderReader(folder=source_folder)
+        writer = UnderfolderWriterV2(**writer_kwargs)
+        writer(reader)
+
+    def test_deep_copy(self, toy_dataset_small, tmpdir_factory):
+        source_folder = toy_dataset_small["folder"]
+        writer_folder = str(Path(tmpdir_factory.mktemp(str(uuid.uuid1()))))
+
+        self._read_write_data(
+            source_folder,
+            folder=writer_folder,
+            file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
+            copy_mode=UnderfolderWriterV2.CopyMode.DEEP_COPY
+        )
+
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        for sample in re_reader:
+            for k, v in sample.filesmap.items():
+                path = Path(v)
+                assert not path.is_symlink()
+                assert path.is_file()
+                assert path.stat().st_nlink == 1
+
+    def test_symlink(self, toy_dataset_small, tmpdir_factory):
+        source_folder = toy_dataset_small["folder"]
+        writer_folder = str(Path(tmpdir_factory.mktemp(str(uuid.uuid1()))))
+
+        self._read_write_data(
+            source_folder,
+            folder=writer_folder,
+            file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
+            copy_mode=UnderfolderWriterV2.CopyMode.SYM_LINK
+        )
+
+        # check for broken symlinks
+        import platform
+        i_am_on_windows = (platform.system() == "Windows")
+
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        for sample in re_reader:
+            for k, v in sample.filesmap.items():
+                path = Path(v)
+                assert i_am_on_windows or path.is_symlink()
+                assert path.is_file()
+                assert path.stat().st_nlink == 1
+
+    def test_hardlink(self, toy_dataset_small, tmpdir_factory):
+        source_folder = toy_dataset_small["folder"]
+        writer_folder = str(Path(tmpdir_factory.mktemp(str(uuid.uuid1()))))
+
+        self._read_write_data(
+            source_folder,
+            folder=writer_folder,
+            file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+        )
+
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        for sample in re_reader:
+            for k, v in sample.filesmap.items():
+                path = Path(v)
+                assert not path.is_symlink()
+                assert path.is_file()
+                assert path.stat().st_nlink == 2
