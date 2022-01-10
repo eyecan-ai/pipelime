@@ -12,7 +12,7 @@ from pipelime.sequences.readers.filesystem import (
     UnderfolderLinksPlugin,
     UnderfolderReader,
 )
-from pipelime.sequences.samples import FilesystemItem, FileSystemSample, Sample
+from pipelime.sequences.samples import FileSystemItem, FileSystemSample, Sample
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
 import pytest
 
@@ -54,12 +54,12 @@ class TestUnderfolder(object):
 
                 for key in keys:
                     assert key in sample
-                    assert isinstance(sample.metaitem(key), FilesystemItem)
+                    assert isinstance(sample.metaitem(key), FileSystemItem)
 
                 if copy:
                     for key in root_keys:
                         assert key in sample
-                        assert isinstance(sample.metaitem(key), FilesystemItem)
+                        assert isinstance(sample.metaitem(key), FileSystemItem)
 
 
 class TestUnderfolderReaderWriterTemplating(object):

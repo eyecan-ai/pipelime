@@ -26,7 +26,7 @@ class MemoryItem(MetaItem):
         return None
 
 
-class FilesystemItem(MetaItem):
+class FileSystemItem(MetaItem):
     def __init__(self, path: str) -> None:
         super().__init__()
         self._path = Path(path)
@@ -260,7 +260,7 @@ class FileSystemSample(Sample):
 
     def metaitem(self, key: any):
         if key in self._filesmap:
-            return FilesystemItem(self._filesmap[key])
+            return FileSystemItem(self._filesmap[key])
         else:
             return MemoryItem()
 
