@@ -1,4 +1,5 @@
 import collections
+from typing import Optional
 import dictquery
 
 
@@ -43,6 +44,9 @@ class DictSearch:
                 'b': '$V >= 2 AND $V <= 10'
         }
 
+        The proto dict can contains also None values, in this case nothing happens, the query
+        is bypassed.
+
 
         :param proto_dict: the proto dict
         :type proto_dict: dict
@@ -57,13 +61,16 @@ class DictSearch:
         valid = True
         for key, value in flatten_proto_dict.items():
             query = DictSearch.build_query(key, value)
-            valid = dictquery.match(target_dict, query)
+            if query is not None:
+                valid = dictquery.match(target_dict, query)
             if not valid:
                 break
         return valid
 
     @classmethod
-    def build_query(cls, key: str, value: str) -> str:
+    def build_query(cls, key: str, value: Optional[str] = None) -> str:
+        if value is None:
+            return None
         if "$V" not in value:
             return f"`{key}` {value}"
         else:

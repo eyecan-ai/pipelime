@@ -189,6 +189,13 @@ class TestUnderfolderInterface:
             },
             {
                 "metadata": {
+                    "info": None,
+                    "categories": {"others": "CONTAINS 'alpha'"},
+                },
+                "expected": 10,
+            },
+            {
+                "metadata": {
                     "categories": {
                         "others": f"{DictSearch.KEY_PLACEHOLDER} CONTAINS 'alpha' and {DictSearch.KEY_PLACEHOLDER} CONTAINS 'beta'"
                     },

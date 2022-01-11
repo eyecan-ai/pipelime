@@ -538,18 +538,23 @@ class UnderfolderAPI(APIRouter):
 
         if dataset_name in self._interfaces_map:
 
-            samples_entities = self._interfaces_map[dataset_name].search_samples(
-                search_entity.proto_sample
-            )
-
-            if search_entity.only_pagination:
-                pagination = EntityPagination.create_from_sequence(samples_entities)
-                return EntitySampleSearchResponse(pagination=pagination)
-            else:
-                filtered = search_entity.pagination.filter(samples_entities)
-                return EntitySampleSearchResponse(
-                    samples=filtered, pagination=search_entity.pagination
+            try:
+                samples_entities = self._interfaces_map[dataset_name].search_samples(
+                    search_entity.proto_sample
                 )
+
+                if search_entity.only_pagination:
+                    pagination = EntityPagination.create_from_sequence(samples_entities)
+                    return EntitySampleSearchResponse(pagination=pagination)
+                else:
+                    filtered = search_entity.pagination.filter(samples_entities)
+                    return EntitySampleSearchResponse(
+                        samples=filtered, pagination=search_entity.pagination
+                    )
+            except Exception as e:
+                import traceback
+
+                raise HTTPException(status_code=500, detail=f"{traceback.format_exc()}")
         else:
 
             raise HTTPException(
