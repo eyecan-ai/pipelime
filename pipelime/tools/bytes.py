@@ -8,14 +8,14 @@ import numpy as np
 
 class DataCoding(object):
 
-    IMAGE_CODECS = ["jpg", "jpeg", "png", "tiff", "bmp"]
+    IMAGE_CODECS = ("jpg", "jpeg", "png", "tiff", "bmp")
     IMAGE_CODECS_IS_LOSSY = {"jpg": True, "jpeg": True}
     IMAGE_CODECS_HAS_ALPHA = {"png": True}
 
-    NUMPY_CODECS = ["npy"]
-    TEXT_CODECS = ["txt"]
-    METADATA_CODECS = ["json", "yml", "yaml"]
-    PICKLE_CODECS = ["pkl"]
+    NUMPY_CODECS = ("npy",)
+    TEXT_CODECS = ("txt",)
+    METADATA_CODECS = ("json", "yml", "yaml", "toml", "tml")
+    PICKLE_CODECS = ("pkl", "pickle")
 
     @classmethod
     def is_image_extension(cls, extension: str):
