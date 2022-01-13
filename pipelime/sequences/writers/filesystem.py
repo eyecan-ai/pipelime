@@ -71,15 +71,12 @@ class UnderfolderWriter(BaseWriter):
         """
         self._folder = Path(folder)
 
-        self._root_files_keys = root_files_keys \
-            if root_files_keys is not None else []
-        self._extensions_map = extensions_map \
-            if extensions_map is not None else {}
+        self._root_files_keys = root_files_keys if root_files_keys is not None else []
+        self._extensions_map = extensions_map if extensions_map is not None else {}
         self._zfill = zfill
         self._copy_files = copy_files
         self._use_symlinks = use_symlinks
-        self._force_copy_keys = force_copy_keys \
-            if force_copy_keys is not None else []
+        self._force_copy_keys = force_copy_keys if force_copy_keys is not None else []
         self._remove_duplicates = remove_duplicates
         self._num_workers = num_workers
 
@@ -91,6 +88,7 @@ class UnderfolderWriter(BaseWriter):
 
         if self._use_symlinks:
             import platform
+
             if platform.system() == "Windows":
                 logger.warning(
                     "Symlink is not supported on Windows,"
@@ -249,21 +247,26 @@ class UnderfolderWriterV2(UnderfolderWriter):
         force_copy_keys: Optional[Sequence[str]] = None,
         reader_template: Optional[ReaderTemplate] = None,
         remove_duplicates: bool = False,
-        num_workers: int = 0
+        num_workers: int = 0,
     ):
         root_file_keys, extensions_map, zfill = (
-            reader_template.root_files_keys,
-            reader_template.extensions_map,
-            reader_template.idx_length
-        ) if reader_template is not None else (
-            None, None, 5
+            (
+                reader_template.root_files_keys,
+                reader_template.extensions_map,
+                reader_template.idx_length,
+            )
+            if reader_template is not None
+            else (None, None, 5)
         )
 
         super().__init__(
-            folder=folder, root_files_keys=root_file_keys,
-            extensions_map=extensions_map, zfill=zfill,
+            folder=folder,
+            root_files_keys=root_file_keys,
+            extensions_map=extensions_map,
+            zfill=zfill,
             force_copy_keys=force_copy_keys,
-            remove_duplicates=remove_duplicates, num_workers=num_workers
+            remove_duplicates=remove_duplicates,
+            num_workers=num_workers,
         )
 
         self._file_handling = file_handling
@@ -271,6 +274,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
 
         if self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
             import platform
+
             if platform.system() == "Windows":
                 logger.warning(
                     "Symlink is not supported on Windows,"
@@ -278,9 +282,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
                 )
                 self._copy_mode = UnderfolderWriterV2.CopyMode.DEEP_COPY
 
-    def _copy_filesystem_item(
-        self, output_file: Path, item: FileSystemItem
-    ) -> None:
+    def _copy_filesystem_item(self, output_file: Path, item: FileSystemItem) -> None:
         path = item.source()
         if path != output_file:
             if self._copy_mode is UnderfolderWriterV2.CopyMode.DEEP_COPY:
@@ -290,9 +292,10 @@ class UnderfolderWriterV2(UnderfolderWriter):
             elif self._copy_mode is UnderfolderWriterV2.CopyMode.HARD_LINK:
                 try:
                     # (new in version 3.10)
-                    output_file.hardlink_to(path)   # type: ignore
+                    output_file.hardlink_to(path)  # type: ignore
                 except AttributeError:
                     import os
+
                     os.link(path, output_file)
 
     def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
@@ -300,25 +303,26 @@ class UnderfolderWriterV2(UnderfolderWriter):
             self._remove_duplicate_files(output_file)
 
         if (
-            self._file_handling is not
-            UnderfolderWriterV2.FileHandling.ALWAYS_WRITE_FROM_CACHE
+            self._file_handling
+            is not UnderfolderWriterV2.FileHandling.ALWAYS_WRITE_FROM_CACHE
         ):
             # copy source file if possible
             def _is_item_cached():
                 try:
                     # sample is, eg, a FileSystemSample
-                    return sample.is_cached(key)    # type: ignore
-                except AttributeError:              # pragma: no cover
-                    return False                    # pragma: no cover
+                    return sample.is_cached(key)  # type: ignore
+                except AttributeError:  # pragma: no cover
+                    return False  # pragma: no cover
 
             meta_item = sample.metaitem(key)
             if (
-                isinstance(meta_item, FileSystemItem) and
-                meta_item.source().suffix == output_file.suffix and (
-                    self._file_handling is
-                    UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK or
-                    key in self._force_copy_keys or
-                    not _is_item_cached()
+                isinstance(meta_item, FileSystemItem)
+                and meta_item.source().suffix == output_file.suffix
+                and (
+                    self._file_handling
+                    is UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK
+                    or key in self._force_copy_keys
+                    or not _is_item_cached()
                 )
             ):
                 # * it is a file AND

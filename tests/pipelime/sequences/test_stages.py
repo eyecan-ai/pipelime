@@ -91,7 +91,7 @@ class TestStageKeysFilter(object):
 
 
 class TestStageAugmentations(object):
-    def test_augmentations(self, toy_dataset_small):
+    def test_augmentations(self, toy_dataset_small, tmp_path):
 
         import albumentations as A
 
@@ -129,9 +129,22 @@ class TestStageAugmentations(object):
 
         for sample in reader:
             out = stage(sample)
-
             for key in sample.keys():
                 assert key in out
+
+        transform_file = str(tmp_path / "tr.json")
+        A.save(transform, transform_file)
+        stage_fromfile = StageAugmentations(
+            transform_cfg=transform_file,
+            targets={
+                "image": "image",
+                "mask": "mask",
+                "inst": "inst",
+                "keypoints": "keypoints",
+                "bboxes": "bboxes",
+            },
+        )
+        assert stage.to_dict() == stage_fromfile.to_dict()
 
 
 class TestStageCompose(object):

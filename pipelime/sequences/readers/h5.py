@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Dict, Hashable, Sequence, Union
+from typing import Hashable, Sequence, Union
 
 import h5py
 from schema import Optional
 
 from pipelime.h5.toolkit import H5Database, H5ToolKit
-from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import MemoryItem, MetaItem, Sample
 
 
@@ -68,7 +68,8 @@ class H5Sample(Sample):
         :type group: Union[h5py.Group, MultiGroup]
         :param lazy: FALSE to preload data (slow), defaults to False
         :type lazy: bool, optional
-        :param copy_global_items: TRUE to propagate global item to samples, defaults to True
+        :param copy_global_items: TRUE to propagate global item to samples, defaults to
+            True
         :type copy_global_items: bool, optional
         :param id: hashable value used as id
         :type id: Hashable, optional
@@ -156,18 +157,6 @@ class H5Sample(Sample):
             del self._cached[k]
 
 
-class H5ReaderTemplate(object):
-    def __init__(
-        self,
-        extensions_map: Dict[str, any],
-        root_files_keys: Sequence[str],
-        idx_length: int = 5,
-    ):
-        self.extensions_map = extensions_map
-        self.root_files_keys = root_files_keys
-        self.idx_length = idx_length
-
-
 class H5Reader(BaseReader):
     DATA_SUBFOLDER = "data"
 
@@ -210,13 +199,13 @@ class H5Reader(BaseReader):
     def is_root_key(self, key: str):
         return key in self._root_files_keys
 
-    def get_reader_template(self) -> Union[H5ReaderTemplate, None]:
+    def get_reader_template(self) -> Union[ReaderTemplate, None]:
         """Retrieves the template of the h5 reader, i.e. a mapping
         between sample_key/file_extension and a list of root files keys
 
         :raises TypeError: If first sample is not a H5Sample
-        :return: None if dataset is empty, otherwise an H5ReaderTemplate
-        :rtype: Union[H5ReaderTemplate, None]
+        :return: None if dataset is empty, otherwise a ReaderTemplate
+        :rtype: Union[ReaderTemplate, None]
         """
 
         if len(self) > 0:
@@ -230,7 +219,7 @@ class H5Reader(BaseReader):
                 if sample.get_encoding(key) is not None:
                     extensions_map[key] = sample.get_encoding(key)
 
-            return H5ReaderTemplate(
+            return ReaderTemplate(
                 extensions_map=extensions_map,
                 root_files_keys=list(self._root_files_keys),
                 idx_length=idx_length,

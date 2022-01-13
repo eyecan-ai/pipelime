@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Sequence, Union
 
 import albumentations as A
 from choixe.spooks import Spook
@@ -113,15 +113,25 @@ class StageKeysFilter(SampleStage):
 
 
 class StageAugmentations(SampleStage):
-    def __init__(self, transform_cfg: dict, targets: dict):
+    def __init__(self, transform_cfg: Union[dict, str], targets: dict):
         super().__init__()
-        self._transform_cfg = transform_cfg
+
+        self._transform: A.Compose = (
+            A.load(
+                transform_cfg,
+                data_format="json" if transform_cfg.endswith("json") else "yaml",
+            )
+            if isinstance(transform_cfg, str)
+            else A.from_dict(transform_cfg)
+        )
+        self._transform_cfg = A.to_dict(self._transform)
+
         self._targets = targets
-        self._transform: A.Compose = A.from_dict(transform_cfg)
         self._transform.add_targets(self._purge_targets(self._targets))
 
     def _purge_targets(self, targets: dict):
-        # TODO: could it be wrong if targets also contains 'image' or 'mask' (aka default target)?
+        # TODO: could it be wrong if targets also contains
+        # 'image' or 'mask' (aka default target)?
         return targets
 
     def __call__(self, x: Sample) -> Sample:
