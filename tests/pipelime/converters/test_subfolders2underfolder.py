@@ -12,14 +12,14 @@ class TestSubfolders2Underfolder:
         dataset = UnderfolderReader(folder=folder)
 
         output_folder = Path(tmpdir.mkdir("subfolders_dataset"))
-        print("COnvertion to:", output_folder)
+        print("Conversion to: ", output_folder)
 
         for sample in dataset:
             sample: FileSystemSample
             sample_id = sample["metadata"]["sample_id"]
             split_A = int(sample["metadata"]["double"]) % 3
             split_B = int(sample["metadata"]["double"]) % 5
-            split_C = "custom  string-to?? replace"
+            split_C = "custom  string-to replace"
             sample_path = (
                 output_folder
                 / str(sample_id)

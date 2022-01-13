@@ -404,11 +404,11 @@ class TestCLIUnderfolderOperationMix:
         runner = CliRunner()
         runner.invoke(
             operation_filterkeys,
-            f"-i {input_folder} -o {input_folder_a} -k pose -k label",
+            f"-i \"{input_folder}\" -o \"{input_folder_a}\" -k pose -k label",
         )
         runner.invoke(
             operation_filterkeys,
-            f"-i {input_folder} -o {input_folder_b} -k image -k points",
+            f"-i \"{input_folder}\" -o \"{input_folder_b}\" -k image -k points",
         )
 
         options = []
