@@ -1,9 +1,11 @@
 import copy
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Optional, Sequence, Set, Tuple
 import re
 import pydash
 import rich
 from pipelime.tools.dictionaries import DictionaryUtils
+import networkx as nx
+import itertools
 
 
 class PipesConfigParser:
@@ -302,20 +304,25 @@ class PipesConfigParser:
         for node_name in nodes:
             node = nodes[node_name]
 
-            # Parse the 'inputs'
-            inputs = node.get("inputs", None)
-            if inputs is not None:
-                self._parse_and_replace_branch(inputs)
+            for key, value in node.items():
+                rich.print("BRANCK", key, value)
+                if isinstance(value, dict):
+                    self._parse_and_replace_branch(value)
 
-            # Parse the 'outputs'
-            outputs = node.get("outputs", None)
-            if outputs is not None:
-                self._parse_and_replace_branch(outputs)
+            # # Parse the 'inputs'
+            # inputs = node.get("inputs", None)
+            # if inputs is not None:
+            #     self._parse_and_replace_branch(inputs)
+
+            # # Parse the 'outputs'
+            # outputs = node.get("outputs", None)
+            # if outputs is not None:
+            #     self._parse_and_replace_branch(outputs)
 
         return parsed
 
 
-class PipeGraph:
+class PipeGraph(nx.DiGraph):
     class PipeGraphNode:
         def __init__(self, name: str, type: str = "operation"):
             self.name = name
@@ -334,61 +341,123 @@ class PipeGraph:
         def __eq__(self, o: object) -> bool:
             return self.id == o.id
 
+    def __init__(self, cfg: dict):
+        super().__init__()
+        self._cfg = cfg
+        PipeGraph.build_nodes_graph(self._cfg, self)
+
+    @property
+    def operations_graph(self):
+        return PipeGraph.filter_graph(self, "data")
+
+    @property
+    def data_graph(self):
+        return PipeGraph.filter_graph(self, "operation")
+
+    @property
+    def root_nodes(self) -> Sequence[PipeGraphNode]:
+        return [node for node in self.nodes if len(list(self.predecessors(node))) == 0]
+
+    def consumable_operations(self, produced_data: Set[PipeGraphNode]):
+        consumables = set()
+        for node in self.operations_graph.nodes:
+            in_data = [x for x in self.predecessors(node) if x.type == "data"]
+            if all(x in produced_data for x in in_data):
+                consumables.add(node)
+        return consumables
+
+    def consume(self, operation_nodes: Sequence[PipeGraphNode]) -> Set[PipeGraphNode]:
+        consumed_data = set()
+        for node in operation_nodes:
+            out_data = [x for x in self.successors(node) if x.type == "data"]
+            consumed_data.update(out_data)
+        return consumed_data
+
+    def build_execution_stack(self) -> Sequence[Sequence[PipeGraphNode]]:
+
+        # the execution stack is a list of lists of nodes. Each list represents a
+        execution_stack: Sequence[Sequence[PipeGraph.PipeGraphNode]] = []
+
+        # initalize global produced data with the root nodes
+        global_produced_data = set()
+        global_produced_data.update(self.root_nodes)
+
+        # set of operations that have been consumed
+        consumed_operations = set()
+
+        while True:
+            # which operations can be consumed given the produced data?
+            consumable: set = self.consumable_operations(global_produced_data)
+
+            # Remove from consumable operations the ones that have already been consumed
+            consumable = consumable.difference(consumed_operations)
+
+            # No consumable operations? We are done!
+            if len(consumable) == 0:
+                break
+
+            # If not empty, append consumable operations to the execution stack
+            execution_stack.append(consumable)
+
+            # The set of produced data is the union of all the consumed operations
+            produced_data: set = self.consume(consumable)
+
+            # Add the consumed operations to the consumed operations set
+            consumed_operations.update(consumable)
+
+            # Add the produced data to the global produced data
+            global_produced_data.update(produced_data)
+
+        return execution_stack
+
     @classmethod
-    def build_nodes_graph(cls, cfg: dict) -> dict:
-        """Build a graph of the nodes.
+    def build_nodes_graph(
+        cls, cfg: dict, target_graph: Optional[nx.DiGraph] = None
+    ) -> dict:
 
-        :param cfg: configuration to parse
-        :type cfg: dict
-        :return: nodes graph
-        :rtype: dict
-        """
-
-        import networkx as nx
-
-        g = nx.DiGraph()
+        g = nx.DiGraph() if target_graph is None else target_graph
         nodes = cfg["nodes"]
 
         for node_name, node in nodes.items():
-            inputs = node.get("inputs", [])
-            outputs = node.get("outputs", [])
+            inputs = node.get("inputs", {})
+            outputs = node.get("outputs", {})
 
             for input_key, input_value in inputs.items():
                 if isinstance(input_value, str):
+                    input_value = [input_value]
+                [
                     g.add_edge(
-                        PipeGraph.PipeGraphNode(input_value, "data"),
+                        PipeGraph.PipeGraphNode(str(x), "data"),
                         PipeGraph.PipeGraphNode(node_name, "operation"),
                     )
-                elif isinstance(input_value, Sequence):
-                    [
-                        g.add_edge(
-                            PipeGraph.PipeGraphNode(x, "data"),
-                            PipeGraph.PipeGraphNode(node_name, "operation"),
-                        )
-                        for x in input_value
-                    ]
-                else:
-                    raise NotImplementedError(
-                        f"input type {type(input_value)} not implemented"
-                    )
+                    for x in input_value
+                ]
 
             for output_key, output_value in outputs.items():
                 if isinstance(output_value, str):
+                    output_value = [output_value]
+                [
                     g.add_edge(
                         PipeGraph.PipeGraphNode(node_name, "operation"),
-                        PipeGraph.PipeGraphNode(output_value, "data"),
+                        PipeGraph.PipeGraphNode(x, "data"),
                     )
-                elif isinstance(output_value, Sequence):
-                    [
-                        g.add_edge(
-                            PipeGraph.PipeGraphNode(node_name, "operation"),
-                            PipeGraph.PipeGraphNode(x, "data"),
-                        )
-                        for x in output_value
-                    ]
-                else:
-                    raise NotImplementedError(
-                        f"input type {type(output_value)} not implemented"
-                    )
+                    for x in output_value
+                ]
 
         return g
+
+    @classmethod
+    def filter_graph(
+        cls, full_graph: nx.DiGraph, remove_type: str = "data"
+    ) -> nx.DiGraph:
+        operation_graph: nx.DiGraph = nx.DiGraph()
+
+        for node in full_graph.nodes:
+            if node.type == remove_type:
+                predecessors = list(full_graph.predecessors(node))
+                successors = list(full_graph.successors(node))
+                pairs = list(itertools.product(predecessors, successors))
+                for pair in pairs:
+                    operation_graph.add_edge(pair[0], pair[1])
+
+        return operation_graph

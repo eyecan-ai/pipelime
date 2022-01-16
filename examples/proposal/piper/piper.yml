@@ -1,8 +1,12 @@
 # regex    @(\w*)\(([^)]+)\)
 nodes:
+  empty:
+    command: empty
+    outputs:
+      fake_output: 'miao'
   conversion:
     foreach:
-      items: '@var(params.input_folders)'
+      items: "@var(params.input_folders)"
       do:
         command: myconvert
         inputs:
@@ -18,12 +22,35 @@ nodes:
           do: '@var(params.converted_folder)/@iter(item)'
       fake_input: 'miao'
     outputs:
-      output_folder: '@var(params.summed_folder)A'
+      output_folder: '@var(params.summed_folder)'
   filter:
     command: pipelime underfolder filter_keys
     args:
       keys: ['image','metadata']
     inputs:
-      input_folder: '@VAR(params.summed_folder)A'
+      input_folder: '@VAR(params.summed_folder)'
     outputs:
-      output_folder: '@VAR(params.detected_folder)'
+      output_folder: '@VAR(params.filtered_folder)'
+  split:
+    command: pipelime underfolder split
+    args:
+      splits_percentages:
+        foreach:
+          items: '@var(params.splits)'
+          do: '@iter(item.p)'
+    inputs:
+      input_folder: '@VAR(params.filtered_folder)'
+    outputs:
+      output_folders:
+        foreach:
+          items: '@var(params.splits)'
+          do: '@VAR(params.output_folder)/@iter(item.name)'
+  check:
+    foreach:
+      items: '@var(params.splits)'
+      do:
+        command: pipelime underfolder check
+        inputs:
+          input_folder: '@VAR(params.output_folder)/@iter(item.name)'
+        outputs:
+          output_folder: '@VAR(params.checked_folder)/@iter(item.name)'
