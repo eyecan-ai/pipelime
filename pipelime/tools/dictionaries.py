@@ -1,19 +1,44 @@
 import collections
-from typing import Optional
+from typing import Dict, Optional
 import dictquery
+from choixe.configurations import XConfig
 
 
 class DictionaryUtils:
     @classmethod
-    def flatten(cls, d, parent_key="", sep="."):
-        items = []
-        for k, v in d.items():
-            new_key = parent_key + sep + k if parent_key else k
-            if isinstance(v, collections.MutableMapping):
-                items.extend(cls.flatten(v, new_key, sep=sep).items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
+    def flatten(cls, d: dict, parent_key="", sep=".") -> Dict[str, any]:
+        """Computes a flattened dictionary.
+        For example:
+
+        {
+            "a": {
+                "b": {
+                    "c": 1
+                }
+                "d": 2
+            }
+        }
+
+        becomes:
+
+        {
+            "a.b.c": 1,
+            "a.d": 2
+        }
+
+        :param d: [description]
+        :type d: dict
+        :param parent_key: [description], defaults to ""
+        :type parent_key: str, optional
+        :param sep: [description], defaults to "."
+        :type sep: str, optional
+        :return: [description]
+        :rtype: Dict[str, any]
+        """
+        return {
+            k: v
+            for k, v in XConfig.from_dict(d).chunks(discard_private_qualifiers=True)
+        }
 
 
 class DictSearch:

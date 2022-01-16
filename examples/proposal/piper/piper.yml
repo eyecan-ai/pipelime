@@ -1,0 +1,29 @@
+# regex    @(\w*)\(([^)]+)\)
+nodes:
+  conversion:
+    foreach:
+      items: '@var(params.input_folders)'
+      do:
+        command: myconvert
+        inputs:
+          input_folder: '@iter(item)'
+        outputs:
+          output_folder: '@var(params.converted_folder)/@iter(item)'
+  summation:
+    command: pipelime underfolder sum
+    inputs:
+      input_folders: 
+        foreach:
+          items: '@var(params.input_folders)'
+          do: '@var(params.converted_folder)/@iter(item)'
+      fake_input: 'miao'
+    outputs:
+      output_folder: '@var(params.summed_folder)A'
+  filter:
+    command: pipelime underfolder filter_keys
+    args:
+      keys: ['image','metadata']
+    inputs:
+      input_folder: '@VAR(params.summed_folder)A'
+    outputs:
+      output_folder: '@VAR(params.detected_folder)'
