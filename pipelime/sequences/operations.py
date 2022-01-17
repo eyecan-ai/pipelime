@@ -282,9 +282,10 @@ class OperationResetIndices(SequenceOperation, Spook):  # TODO: unit test!
 
 
 class OperationSubsample(SequenceOperation, Spook):
-    """Subsamples an input sequence picking one element every K."""
+    """Subsamples an input sequence picking one element every K
+    or a percentage of all the elements."""
 
-    def __init__(self, factor: Union[int, float]) -> None:
+    def __init__(self, factor: Union[int, float], start: Union[int, float] = 0) -> None:
         """Instantiates an `OperationSubsample` with a given factor.
 
         :param factor: Set to:
@@ -293,9 +294,21 @@ class OperationSubsample(SequenceOperation, Spook):
         - a `float` to specify a percentage of input elements to preserve
 
         :type factor: Union[int, float]
+        :param start: defaults to 0, set to:
+
+        - an `int` (when `factor` is int) to specify a starting index for the subsampling factor
+        - a `float` (when `factor` is float) to specify a percentage to discard before the elements to preserve
+
+        :type start: Union[int, float], optional
         """
         super().__init__()
         self._factor = factor
+        self._start = start
+
+        assert self._start >= 0
+
+        if isinstance(self._factor, int):
+            assert isinstance(self._start, int)
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
@@ -308,21 +321,21 @@ class OperationSubsample(SequenceOperation, Spook):
 
         new_samples = x.samples.copy()
         if isinstance(self._factor, int):
-            new_samples = new_samples[
-                :: self._factor
-            ]  # Pick an element each `self._factor` elements
+            # Pick an element each `self._factor` elements
+            new_samples = new_samples[self._start :: self._factor]
         elif isinstance(self._factor, float):
+            new_start = int(len(new_samples) * min(max(self._start, 0), 1.0))
             new_size = int(len(new_samples) * min(max(self._factor, 0), 1.0))
-            new_samples = new_samples[:new_size]
+            new_samples = new_samples[new_start : new_start + new_size]
 
         return SamplesSequence(samples=new_samples)
 
     @classmethod
     def spook_schema(cls) -> dict:
-        return {"factor": Or(float, int)}
+        return {"factor": Or(float, int), "start": Or(float, int)}
 
     def to_dict(self):
-        return {"factor": self._factor}
+        return {"factor": self._factor, "start": self._start}
 
 
 class OperationShuffle(SequenceOperation, Spook):
