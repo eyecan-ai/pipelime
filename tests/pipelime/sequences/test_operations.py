@@ -114,6 +114,71 @@ class TestOperationSubsample(object):
                         if F == 1.0:
                             assert len(out) == N
 
+    def test_subsample_start(self, plain_samples_sequence_generator):
+
+        sizes = [32, 10, 128, 16, 1]
+        factors_int = [2, 10, 20, 1]
+        factors_float = [0.1, -0.1, 10.2, 1.0]
+        starts_int = [-1, 0, 1, 2, 10, 0.5]
+        starts_float = [-0.1, 0.0, 0.1, 0.5, 0.9]
+
+        # test with integer inputs
+        for F in factors_int:
+            for N in sizes:
+                for S in starts_int:
+                    dataset = plain_samples_sequence_generator("d0_", N)
+
+                    if S < 0:
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    if isinstance(S, float):
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    op = OperationSubsample(factor=F, start=S)
+                    _plug_test(op)
+
+                    if N > 0:
+                        out = op(dataset)
+
+                        assert isinstance(out, SamplesSequence)
+
+                        if F > 1 and N > 1:
+                            assert len(out) < N
+                        if F == 1 and S == 0:
+                            assert len(out) == N
+
+        # test with float inputs
+        for F in factors_float:
+            for N in sizes:
+                for S in starts_float:
+                    dataset = plain_samples_sequence_generator("d0_", N)
+
+                    if S < 0:
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    op = OperationSubsample(factor=F, start=S)
+                    _plug_test(op)
+
+                    if N > 0:
+                        out = op(dataset)
+
+                        assert isinstance(out, SamplesSequence)
+
+                        op = OperationSubsample(factor=F, start=S)
+                        _plug_test(op)
+
+                        if 0.0 < F < 1.0:
+                            assert len(out) < N
+
+                        if F == 1.0 and S == 0.0:
+                            assert len(out) == N
+
 
 class TestOperationIdentity(object):
     def test_subsample(self, plain_samples_sequence_generator):
