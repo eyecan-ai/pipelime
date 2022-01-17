@@ -1,4 +1,5 @@
 from choixe.configurations import XConfig
+import cv2
 import numpy as np
 import rich
 from pipelime.pipes.parser import PipeGraph, PipesConfigParser
@@ -8,6 +9,8 @@ from networkx.drawing.nx_agraph import to_agraph
 import random
 import string
 from faker import Faker
+from tempfile import NamedTemporaryFile
+import imageio
 
 
 def draw_graph(graph: nx.DiGraph, agraph: bool = True):
@@ -40,10 +43,15 @@ def draw_graph(graph: nx.DiGraph, agraph: bool = True):
             node_color="#ff0000",
             label="data",
         )
-        nx.draw_networkx_labels(graph, pos, font_size=10, font_family="sans-serif")
+        nx.draw_networkx_labels(graph, pos, font_size=12, font_family="sans-serif")
         nx.draw_networkx_edges(graph, pos)
         # nx.draw(graph, pos, with_labels=True)
-        plt.show()
+        f = NamedTemporaryFile(suffix=".png")
+        rich.print("Writing to", f.name)
+        plt.savefig(f.name, dpi=1000)
+        img = imageio.imread(f.name)
+        f.close()
+        return img
     else:
 
         agraph = to_agraph(graph)
@@ -62,20 +70,24 @@ def draw_graph(graph: nx.DiGraph, agraph: bool = True):
                 node.attr["shape"] = "parallelogram"
 
         agraph.layout("dot")
-        fname = "/tmp/ama.png"
-        agraph.draw(fname)
-        rich.print("Written to", fname)
+        f = NamedTemporaryFile(suffix=".png")
+        rich.print("Writing to", f.name)
+        agraph.draw(f.name)
+        img = imageio.imread(f.name)
+        print(img.shape)
+        f.close()
+        return img
 
 
 fake = Faker()
 
-splits_percentages = np.random.uniform(0.01, 0.99, size=(20,))
+splits_percentages = np.random.uniform(0.01, 0.99, size=(3,))
 splits_percentages = np.exp(splits_percentages) / np.sum(np.exp(splits_percentages))
 splits_name = [fake.name() for x in splits_percentages]
 
 global_data = {
     "params": {
-        "input_folders": [fake.name() for _ in range(10)],
+        "input_folders": [fake.name() for _ in range(3)],
         "converted_folder": "/tmp/converted",
         "summed_folder": "/home/summed",
         "detected_folder": "/home/detected",
@@ -96,8 +108,7 @@ cfg = XConfig(filename)
 
 # Create Parser
 parser = PipesConfigParser()
-parser.set_global_data("params", global_data["params"])
-parsed = parser.parse_cfg(cfg.to_dict())
+parsed = parser.parse_cfg(cfg.to_dict(), global_data=global_data)
 rich.print(parsed)
 
 # Creste graph from parsed configuration
@@ -117,4 +128,6 @@ pos = nx.nx_pydot.graphviz_layout(graph, prog="dot")
 # for n in nx.all_topological_sorts(graph.operations_graph):
 #     rich.print(n)
 
-draw_graph(graph)
+img = draw_graph(graph)
+cv2.imshow("graph", img)
+cv2.waitKey(0)

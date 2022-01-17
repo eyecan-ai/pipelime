@@ -1,11 +1,23 @@
 import copy
-from typing import Callable, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, Optional, Sequence, Set, Tuple
 import re
+from pydantic import BaseModel
 import pydash
 import rich
 from pipelime.tools.dictionaries import DictionaryUtils
 import networkx as nx
 import itertools
+
+
+class NodeModel(BaseModel):
+    command: str
+    args: dict = {}
+    inputs: dict = {}
+    outputs: dict = {}
+
+
+class NodesModel(BaseModel):
+    nodes: Dict[str, NodeModel]
 
 
 class PipesConfigParser:
@@ -22,6 +34,9 @@ class PipesConfigParser:
         self._regex = re.compile(self.PLACEHOLDER_REGEX)
         self._global_data = {}
 
+    def clear_global_data(self):
+        self._global_data.clear()
+
     def set_global_data(self, key: str, value: any):
         """Set a global data key/value pair.
 
@@ -32,9 +47,10 @@ class PipesConfigParser:
         """
         self._global_data[key] = value
 
-    def _replace_variable(self, m: re.Match) -> any:
+    def _convert_match_to_variable(self, m: re.Match) -> any:
         """This is a callable, used in the _parse_string function. It will be called on
-        every "value" found in the configuration dict.
+        every "value" found in the configuration dict. It converts the regex match to the
+        corresponding value in the global data.
 
         :param m: re.Match object
         :type m: re.Match
@@ -48,9 +64,10 @@ class PipesConfigParser:
         else:
             return m.group()
 
-    def _replace_foreach_item(self, m: re.Match, index: int, item: any) -> any:
+    def _convert_match_to_item_data(self, m: re.Match, index: int, item: any) -> any:
         """This is a callable, used in the _parse_string function. It will be called on
-        nodes in a foreach loop.
+        nodes in a foreach loop. It converts the regex match to the corresponding value/s
+        of the current item.
 
         :param m: re.Match object
         :type m: re.Match
@@ -94,13 +111,13 @@ class PipesConfigParser:
         flat_node = DictionaryUtils.flatten(node)
         for key, value in flat_node.items():
             flat_node[key] = self._parse_string(
-                value, lambda m: self._replace_foreach_item(m, index, item)
+                value, lambda m: self._convert_match_to_item_data(m, index, item)
             )
             pydash.set_(empty, key, flat_node[key])
         return empty
 
     def _parse_string(
-        self, s: str, replace_cb: Callable[[re.Match], any] = _replace_variable
+        self, s: str, replace_cb: Callable[[re.Match], any] = _convert_match_to_variable
     ) -> any:
         """Parse a string searching for placeholders. For example a string could be:
 
@@ -145,7 +162,10 @@ class PipesConfigParser:
         else:
             return s
 
-    def _extract_foreach(self, node: dict) -> Tuple[dict, dict]:
+    def _extract_foreach_data(
+        self,
+        node: dict,
+    ) -> Tuple[Optional[dict], Optional[dict]]:
         """Extract the foreach data from the node if any. A foreach node is a dict like:
 
         {
@@ -164,8 +184,9 @@ class PipesConfigParser:
         :type node: dict
         :raises Exception: If needed keys are missing ('do' and 'items')
         :return: (pseudo node, foreach data). The pseudo node is a dict within the 'do' key.
-        'foreach data' is the data contained in the 'items' key.
-        :rtype: Tuple[dict, dict]
+        'foreach data' is the data contained in the 'items' key. If no foreach data is found,
+        the pseudo node and the foreach data are None.
+        :rtype: Tuple[Optional[dict], Optional[dict]]
         """
         if PipesConfigParser.PLACEHOLDER_FOREACH_NAME in node:
             foreach_node = node[PipesConfigParser.PLACEHOLDER_FOREACH_NAME]
@@ -181,10 +202,10 @@ class PipesConfigParser:
         else:
             return None, None
 
-    def _parse_and_replace_branch(self, cfg: dict) -> dict:
-        """Parse a branch of the config. A branch is a dict several keys each of which
-        could be a foreach node. This is used to parse foreach(s) inside nodes, like input
-        or output ports. A branch could be:
+    def _expand_dict_values(self, branch_cfg: dict) -> dict:
+        """Parse a generic dict where values could be a foreach node. This is used to
+        parse foreach(s) inside nodes arguments, like input or output ports. A branch config
+        could be something like:
 
         {
             'inputA': {
@@ -203,8 +224,8 @@ class PipesConfigParser:
             }
         }
 
-        :param cfg: branch to parse
-        :type cfg: dict
+        :param branch_cfg: branch to parse
+        :type branch_cfg: dict
         :raises Exception: If needed keys are missing ('do' and 'items')
         :raises Exception: If the 'do' item is not a string
         :raises Exception: If the 'items' item is not a Sequence
@@ -212,11 +233,13 @@ class PipesConfigParser:
         :rtype: dict
         """
 
+        branch_cfg = copy.deepcopy(branch_cfg)
+
         to_replace_data = {}
-        for key, value in cfg.items():
+        for key, value in branch_cfg.items():
             if isinstance(value, dict):
                 if PipesConfigParser.PLACEHOLDER_FOREACH_NAME in value:
-                    pseudo_node, foreach_data = self._extract_foreach(value)
+                    pseudo_node, foreach_data = self._extract_foreach_data(value)
                     if pseudo_node is not None:
                         if not isinstance(pseudo_node, str):
                             raise Exception(
@@ -231,7 +254,7 @@ class PipesConfigParser:
                             parsed_list.append(
                                 self._parse_string(
                                     pseudo_node,
-                                    lambda m: self._replace_foreach_item(
+                                    lambda m: self._convert_match_to_item_data(
                                         m, value_index, value
                                     ),
                                 )
@@ -239,20 +262,20 @@ class PipesConfigParser:
                         to_replace_data[key] = parsed_list
 
         for key, value in to_replace_data.items():
-            cfg[key] = value
+            branch_cfg[key] = value
 
-        return cfg
+        return branch_cfg
 
-    def parse_cfg(self, cfg: dict) -> dict:
-        """Parse the configuration
+    def _replace_variables_deep(self, cfg: dict) -> dict:
+        """Deep replace all variables placeholders in the config.
 
-        :param cfg: configuration to parse
+        :param cfg: config to parse
         :type cfg: dict
-        :return: parsed configuration
+        :return: parsed config
         :rtype: dict
         """
 
-        parsed = copy.deepcopy(cfg)
+        new_cfg = copy.deepcopy(cfg)
 
         # Parse variables. This is done first because the variables could be used in
         # other nodes/foreach nodes. Iterates over the whole configuration as a flat list
@@ -260,19 +283,31 @@ class PipesConfigParser:
         for key, value in DictionaryUtils.flatten(cfg).items():
             if isinstance(value, str):
                 pydash.set_(
-                    parsed,
+                    new_cfg,
                     key,
-                    self._parse_string(value, replace_cb=self._replace_variable),
+                    self._parse_string(
+                        value, replace_cb=self._convert_match_to_variable
+                    ),
                 )
 
-        # Parse foreach nodes. Each configuration node could contain a foreach node. This
-        # means that the node generates multiple nodes based on a list of values.
-        nodes = parsed["nodes"]
+        return new_cfg
+
+    def _expand_nodes(self, nodes_cfg: dict) -> dict:
+        """Iterates through the nodes and expand foreach-nodes.
+
+        :param nodes_cfg: nodes config {node_name: node_config}
+        :type nodes_cfg: dict
+        :return: expanded nodes config {node_name: node_config}
+        :rtype: dict
+        """
+
+        nodes_cfg = copy.deepcopy(nodes_cfg)
+
         to_add_nodes = {}  # used to not modify original dict while iterating
         to_delete_nodes = set()  # used to not modify original dict while iterating
-        for node_name in nodes:
-            node = nodes[node_name]
-            pseudo_node, foreach_data = self._extract_foreach(node)
+        for node_name in nodes_cfg:
+            node = nodes_cfg[node_name]
+            pseudo_node, foreach_data = self._extract_foreach_data(node)
 
             # if pseudo_node is not None, then the node is a foreach node!
             if pseudo_node is not None:
@@ -293,31 +328,66 @@ class PipesConfigParser:
 
         # remove the foreach nodes
         for node_name in to_delete_nodes:
-            del nodes[node_name]
+            del nodes_cfg[node_name]
 
         # Add the new nodes to the original config
         for node_name in to_add_nodes:
-            nodes[node_name] = to_add_nodes[node_name]
+            nodes_cfg[node_name] = to_add_nodes[node_name]
+
+        return nodes_cfg
+
+    def _expand_nodes_arguments(self, nodes_cfg: dict) -> dict:
+        """Iterate through all nodes and expand the foreach branches in arguments.
+
+        :param nodes_cfg: nodes config {node_name: node_config}
+        :type nodes_cfg: dict
+        :return: expanded config {node_name: node_config}
+        :rtype: dict
+        """
+
+        nodes_cfg = copy.deepcopy(nodes_cfg)
+
+        for node_name in nodes_cfg:
+            node = nodes_cfg[node_name]
+
+            to_expand = {}
+            for key, value in node.items():
+                if isinstance(value, dict):
+                    to_expand[key] = self._expand_dict_values(value)
+
+            for key, value in to_expand.items():
+                nodes_cfg[node_name][key] = value
+
+        return nodes_cfg
+
+    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> dict:
+        """Parse the configuration
+
+        :param cfg: configuration to parse
+        :type cfg: dict
+        :param global_variables: global variables
+        :type global_variables: Optional[dict], default None
+        :return: parsed configuration
+        :rtype: dict
+        """
+
+        # sets global variables
+        if global_data is not None:
+            self.clear_global_data()
+            [self.set_global_data(k, v) for k, v in global_data.items()]
+
+        # replace all variables
+        parsed = self._replace_variables_deep(cfg)
+
+        # Parse foreach nodes. Each configuration node could contain a foreach node. This
+        # means that the node generates multiple nodes based on a list of values.
+        parsed["nodes"] = self._expand_nodes(parsed["nodes"])
 
         # Parse the branches. AKA foreach nodes inside nodes inputs/outputs values.
-        nodes = parsed["nodes"]
-        for node_name in nodes:
-            node = nodes[node_name]
+        parsed["nodes"] = self._expand_nodes_arguments(parsed["nodes"])
 
-            for key, value in node.items():
-                rich.print("BRANCK", key, value)
-                if isinstance(value, dict):
-                    self._parse_and_replace_branch(value)
-
-            # # Parse the 'inputs'
-            # inputs = node.get("inputs", None)
-            # if inputs is not None:
-            #     self._parse_and_replace_branch(inputs)
-
-            # # Parse the 'outputs'
-            # outputs = node.get("outputs", None)
-            # if outputs is not None:
-            #     self._parse_and_replace_branch(outputs)
+        m = NodesModel(**parsed)
+        rich.print(m.dict())
 
         return parsed
 
