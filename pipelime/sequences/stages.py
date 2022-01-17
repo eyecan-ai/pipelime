@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Sequence, Union
+from typing import Union
+from collections.abc import Sequence, Mapping
 
 import albumentations as A
 from choixe.spooks import Spook
@@ -48,12 +49,13 @@ class StageIdentity(SampleStage):
 
 
 class StageRemap(SampleStage):
-    def __init__(self, remap: dict, remove_missing: bool = True):
+    def __init__(self, remap: Mapping[str, str], remove_missing: bool = True):
         """Remaps keys in sample
 
         :param remap: old_key:new_key dictionary remap
-        :type remap: dict
-        :param remove_missing: if TRUE missing keys in remap will be removed in the output sample, defaults to True
+        :type remap: Mapping[str, str]
+        :param remove_missing: if TRUE missing keys in remap will be removed in the
+            output sample, defaults to True
         :type remove_missing: bool, optional
         """
         super().__init__()
@@ -83,16 +85,16 @@ class StageRemap(SampleStage):
 
 
 class StageKeysFilter(SampleStage):
-    def __init__(self, keys: list, negate: bool = False):
+    def __init__(self, key_list: Sequence[str], negate: bool = False):
         """Filter sample keys
 
-        :param keys: list of keys to preserve
-        :type keys: list
+        :param key_list: list of keys to preserve
+        :type key_list: Sequence[str]
         :param negate: TRUE to delete input keys, FALSE delete all but keys
         :type negate: bool
         """
         super().__init__()
-        self._keys = keys
+        self._keys = key_list
         self._negate = negate
 
     def __call__(self, x: Sample) -> Sample:
@@ -124,6 +126,8 @@ class StageAugmentations(SampleStage):
             if isinstance(transform_cfg, str)
             else A.from_dict(transform_cfg)
         )
+
+        # get an up-to-date description
         self._transform_cfg = A.to_dict(self._transform)
 
         self._targets = targets

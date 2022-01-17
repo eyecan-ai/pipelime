@@ -105,7 +105,7 @@ class ToyDatasetGenerator(object):
             "instances": np.array(instances),
         }
 
-    def generate_image_sample(self, size, max_label=5, objects_number_range=[1, 5]):
+    def generate_image_sample(self, size, max_label=5, objects_number_range=(1, 5)):
 
         objects = []
         bboxes = []
@@ -140,11 +140,13 @@ class ToyDatasetGenerator(object):
         image_size: int = 256,
         zfill: int = 5,
         suffix: str = "",
-        as_undefolder: bool = False,
+        as_underfolder: bool = False,
+        max_label: int = 5,
+        objects_number_range: tuple[int, int] = (1, 5),
     ):
 
         output_folder = Path(output_folder)
-        if as_undefolder:
+        if as_underfolder:
             output_folder = output_folder / UnderfolderReader.DATA_SUBFOLDER
         output_folder.mkdir(parents=True, exist_ok=True)
 
@@ -153,7 +155,9 @@ class ToyDatasetGenerator(object):
         for idx in track(range(size)):
 
             # Generate sample
-            sample = generator.generate_image_sample([image_size, image_size])
+            sample = generator.generate_image_sample(
+                [image_size, image_size], max_label, objects_number_range
+            )
 
             # Extracts metadata
             metadata = {
