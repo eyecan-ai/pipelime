@@ -13,3 +13,4 @@ loguru
 h5py
 pydantic
 fastapi
+requests

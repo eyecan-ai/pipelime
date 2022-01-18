@@ -1,7 +1,4 @@
-from pathlib import Path
 import click
-from pipelime.sequences.readers.filesystem import UnderfolderReader
-from pipelime.tools.toydataset import ToyDatasetGenerator
 
 
 @click.command("generate_toy_dataset")
@@ -13,6 +10,10 @@ from pipelime.tools.toydataset import ToyDatasetGenerator
     "--suffix", type=str, default="", help="Suffix to add to the output files"
 )
 def generate_toy_dataset(output_folder, size, image_size, zfill, suffix):
+
+    from pathlib import Path
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.tools.toydataset import ToyDatasetGenerator
 
     output_folder = Path(output_folder) / UnderfolderReader.DATA_SUBFOLDER
     ToyDatasetGenerator.generate_toy_dataset(
