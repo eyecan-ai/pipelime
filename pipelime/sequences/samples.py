@@ -14,7 +14,7 @@ class MetaItem(object):
         pass
 
     @abstractmethod
-    def source(self) -> any:
+    def source(self) -> Any:
         pass
 
 
@@ -22,7 +22,7 @@ class MemoryItem(MetaItem):
     def __init__(self) -> None:
         super().__init__()
 
-    def source(self) -> any:
+    def source(self) -> Any:
         return None
 
 
@@ -31,7 +31,7 @@ class FileSystemItem(MetaItem):
         super().__init__()
         self._path = Path(path)
 
-    def source(self) -> any:
+    def source(self) -> Any:
         return self._path
 
 
@@ -56,7 +56,7 @@ class Sample(MutableMapping):
         pass
 
     @abstractmethod
-    def metaitem(self, key: any) -> MetaItem:
+    def metaitem(self, key: Any) -> MetaItem:
         pass
 
     @abstractmethod
@@ -120,7 +120,6 @@ class GroupedSample(Sample):
         return str(self._samples)
 
     def merge(self, other: "GroupedSample") -> "GroupedSample":
-        # raise NotImplementedError(f'Merging of grouped samples is not implemented yet')
         samples = self._samples
         others_samples = other._samples
         if len(samples) != len(others_samples):
@@ -135,7 +134,7 @@ class GroupedSample(Sample):
         for x in self._samples:
             x.rename(old_key=old_key, new_key=new_key)
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         for x in self._samples:
             return x.metaitem(key)
         return None
@@ -184,7 +183,7 @@ class PlainSample(Sample):
             self._data[new_key] = self._data[old_key]
             del self._data[old_key]
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         return MemoryItem()
 
 
@@ -258,7 +257,7 @@ class FileSystemSample(Sample):
             if old_key in self._cached:
                 self._cached[new_key] = self._cached.pop(old_key)
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         if key in self._filesmap:
             return FileSystemItem(self._filesmap[key])
         else:
@@ -316,7 +315,7 @@ class SamplesSequence(Sequence):
     def __len__(self) -> int:
         return len(self._samples)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> Sample:
         if idx >= len(self):
             raise IndexError
 
@@ -351,7 +350,7 @@ class SamplesSequence(Sequence):
     @classmethod
     def purge_id(cls, id: Hashable) -> Union[int, str]:
         try:
-            return int(id)
+            return int(id)  # type: ignore
         except Exception:
             return str(id)
 

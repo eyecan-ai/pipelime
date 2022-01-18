@@ -1,0 +1,112 @@
+from pipelime.sequences.samples import Sample, PlainSample, SamplesSequence
+from pipelime.sequences.stages import StageKeysFilter
+import pipelime.sequences.proxies as sp
+
+from collections.abc import Sequence
+
+
+class SideEffectSample(PlainSample):
+    def get_bypass(self, key):
+        return self._data.get(key, None)
+
+    def __getitem__(self, key):
+        if self._data[key] > 0:
+            self._data[key] *= -1
+        return self._data[key]
+
+    def merge(self, other: "SideEffectSample") -> "SideEffectSample":
+        new_data = self._data.copy()
+        new_data.update(other._data.copy())
+        return SideEffectSample(data=new_data, id=self.id)
+
+    def copy(self):
+        return SideEffectSample(data=self._data.copy(), id=self.id)
+
+
+class TestSequenceProxy:
+    def _make_sequence(
+        self, sample_cache: sp.CachedSamplesSequence.SampleCache, max_idx: int
+    ) -> tuple[sp.CachedSamplesSequence, set[str], set[str], set[str], set[str]]:
+        source_sseq = SamplesSequence(
+            samples=[
+                SideEffectSample(
+                    {"data_1": i, "data_2": i * 2, "data_3": i * 3, "data_4": i * 4}
+                )
+                for i in range(1, max_idx)
+            ]
+        )
+        source_sseq.stage = StageKeysFilter(["data_1", "data_2", "data_3"])
+        cached_sseq = sp.CachedSamplesSequence(
+            source=source_sseq,
+            sample_cache=sample_cache,
+            forced_keys={"data_1"},
+            stage=StageKeysFilter(["data_1", "data_2"]),
+        )
+
+        forced_keys = {"data_1"}
+        last_stage_keys = forced_keys | {"data_2"}
+        hidden_stage_keys = last_stage_keys | {"data_3"}
+        all_keys = hidden_stage_keys | {"data_4"}
+        return cached_sseq, all_keys, hidden_stage_keys, last_stage_keys, forced_keys
+
+    def _check_samples(
+        self,
+        kset: set[str],
+        ksrc: set[str],
+        sseq: Sequence[Sample],
+        negative_keys: set[str],
+    ):
+        for s in sseq:
+            for k in kset:
+                if k in negative_keys:
+                    assert s.get_bypass(k) < 0  # type: ignore
+                else:
+                    assert s.get_bypass(k) > 0  # type: ignore
+            for k in ksrc - kset:
+                assert s.get_bypass(k) is None  # type: ignore
+
+    def _check_cache(
+        self, sseq: sp.CachedSamplesSequence, max_idx: int, cached_idx: set[int]
+    ):
+        for idx in range(1, max_idx):
+            if idx in cached_idx:
+                assert sseq._sample_cache.get_sample(idx) is not None
+            else:
+                assert sseq._sample_cache.get_sample(idx) is None
+
+    def test_endless_cached_proxy(self):
+        max_idx = 5
+        sseq, k0, k1, k2, fk = self._make_sequence(
+            sp.CachedSamplesSequence.EndlessCachePolicy(), max_idx
+        )
+
+        # raw source
+        self._check_samples(k0, k0, sseq.samples.samples, set())  # type: ignore
+        # copy after first stage
+        self._check_samples(k1, k0, sseq.samples, set())
+        # copy after second stage, then accessed and cached
+        self._check_samples(k2, k0, sseq, fk)
+        # these have never been accessed
+        self._check_samples(k1, k0, sseq.samples, set())
+
+        # all samples have been cached
+        self._check_cache(sseq, max_idx, {i for i in range(max_idx-1)})
+
+    def test_bounded_cached_proxy(self):
+        cache_size = 2
+        max_idx = 5
+        sseq, k0, k1, k2, fk = self._make_sequence(
+            sp.CachedSamplesSequence.BoundedCachePolicy(cache_size), max_idx
+        )
+
+        # raw source
+        self._check_samples(k0, k0, sseq.samples.samples, set())  # type: ignore
+        # copy after first stage
+        self._check_samples(k1, k0, sseq.samples, set())
+        # copy after second stage, then accessed and cached
+        self._check_samples(k2, k0, sseq, fk)
+        # these have never been accessed
+        self._check_samples(k1, k0, sseq.samples, set())
+
+        # only first samples have been cached
+        self._check_cache(sseq, max_idx, {i for i in range(cache_size)})
