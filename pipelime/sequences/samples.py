@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Hashable, Sequence, Union
+from typing import Any, Dict, Hashable, Sequence, Union, Optional
 import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
@@ -284,13 +284,16 @@ class FileSystemSample(Sample):
 
 
 class SamplesSequence(Sequence):
-    def __init__(self, samples: Sequence[Sample]):
+    # This import here is due to circular dependency 💀💀💀 !!
+    from pipelime.sequences.stages import SampleStage
+
+    def __init__(self, samples: Sequence[Sample], stage: Optional[SampleStage] = None):
         self._samples = samples
 
         # This import here is due to circular dependency 💀💀💀 !!
         from pipelime.sequences.stages import StageIdentity
 
-        self._stage = StageIdentity()
+        self._stage = StageIdentity() if stage is None else stage
 
     @property
     def samples(self):
