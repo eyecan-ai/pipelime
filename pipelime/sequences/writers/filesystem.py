@@ -1,15 +1,16 @@
 import multiprocessing
-import os
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Sequence, Optional
+from typing import Dict, Sequence, Optional, Any
 from rich.progress import track
 from schema import Or
+from enum import Enum
+from loguru import logger
 from pipelime.filesystem.toolkit import FSToolkit
-from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import (
-    FilesystemItem,
+    FileSystemItem,
     FileSystemSample,
     Sample,
     SamplesSequence,
@@ -70,25 +71,34 @@ class UnderfolderWriter(BaseWriter):
         """
         self._folder = Path(folder)
 
-        self._empty_template = root_files_keys is None and extensions_map is None
         self._root_files_keys = root_files_keys if root_files_keys is not None else []
         self._extensions_map = extensions_map if extensions_map is not None else {}
         self._zfill = zfill
         self._copy_files = copy_files
         self._use_symlinks = use_symlinks
+        self._force_copy_keys = force_copy_keys if force_copy_keys is not None else []
         self._remove_duplicates = remove_duplicates
         self._num_workers = num_workers
 
-        if force_copy_keys is None:
-            force_copy_keys = []
-
-        self._force_copy_keys = force_copy_keys
         self._datafolder = self._folder / self.DATA_SUBFOLDER
-        if not self._datafolder.exists():
-            self._datafolder.mkdir(parents=True, exist_ok=True)
+        self._datafolder.mkdir(parents=True, exist_ok=True)
 
         # multiprocessing attrs
-        self._saved_root_keys = None
+        self._saved_root_keys = {}
+
+        if self._use_symlinks:
+            import platform
+
+            if platform.system() == "Windows":
+                logger.warning(
+                    "Symlink is not supported on Windows,"
+                    " switching to file deep copy"
+                )
+                self._use_symlinks = False
+
+    @property
+    def _empty_template(self) -> bool:
+        return not (self._root_files_keys or self._extensions_map)
 
     def _build_sample_basename(self, sample: Sample):
         if isinstance(sample.id, int):
@@ -154,28 +164,34 @@ class UnderfolderWriter(BaseWriter):
             for sample in track(x, description="Writing Underfolder"):
                 self._process_sample(sample)
 
-    def _copy_filesystem_item(self, output_file: Path, item: FilesystemItem) -> None:
+    def _copy_filesystem_item(self, output_file: Path, item: FileSystemItem) -> None:
         path = item.source()
-        if not self._use_symlinks:
-            if path != output_file:
+        if path != output_file:
+            if not self._use_symlinks:
                 shutil.copy(path, output_file)
-        else:
-            os.symlink(path, output_file)
+            else:
+                output_file.symlink_to(path)
+
+    def _dump_cached_item(self, output_file: Path, item: Any):
+        FSToolkit.store_data(str(output_file), item)
+
+    def _remove_duplicate_files(self, output_file: Path):
+        duplicates = list(output_file.parent.glob(f"{output_file.stem}.*"))
+        for f in duplicates:
+            if f.suffix != output_file.suffix:
+                f.unlink()
 
     def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
         copy_item = False
 
         if self._remove_duplicates:
-            duplicates = list(output_file.parent.glob(f"{output_file.stem}.*"))
-            for f in duplicates:
-                if f.suffix != output_file.suffix:
-                    f.unlink()
+            self._remove_duplicate_files(output_file)
 
         if self._copy_files and isinstance(sample, FileSystemSample):
             item = sample.metaitem(key)
             if (
                 not sample.is_cached(key) or key in self._force_copy_keys
-            ) and isinstance(item, FilesystemItem):
+            ) and isinstance(item, FileSystemItem):
                 path = item.source()
                 if path.suffix == output_file.suffix:
                     copy_item = True
@@ -183,8 +199,7 @@ class UnderfolderWriter(BaseWriter):
         if copy_item:
             self._copy_filesystem_item(output_file, item)
         else:
-            item = sample[key]
-            FSToolkit.store_data(output_file, item)
+            self._dump_cached_item(output_file, sample[key])
 
     @classmethod
     def bean_schema(cls) -> dict:
@@ -211,3 +226,112 @@ class UnderfolderWriter(BaseWriter):
             "extensions_map": self._extensions_map,
             "zfill": self._zfill,
         }
+
+
+class UnderfolderWriterV2(UnderfolderWriter):
+    class FileHandling(Enum):
+        ALWAYS_WRITE_FROM_CACHE = 0
+        ALWAYS_COPY_FROM_DISK = 1
+        COPY_IF_NOT_CACHED = 2
+
+    class CopyMode(Enum):
+        DEEP_COPY = 0
+        SYM_LINK = 1
+        HARD_LINK = 2
+
+    def __init__(
+        self,
+        folder: str,
+        file_handling: FileHandling = FileHandling.COPY_IF_NOT_CACHED,
+        copy_mode: CopyMode = CopyMode.DEEP_COPY,
+        force_copy_keys: Optional[Sequence[str]] = None,
+        reader_template: Optional[ReaderTemplate] = None,
+        remove_duplicates: bool = False,
+        num_workers: int = 0,
+    ):
+        root_file_keys, extensions_map, zfill = (
+            (
+                reader_template.root_files_keys,
+                reader_template.extensions_map,
+                reader_template.idx_length,
+            )
+            if reader_template is not None
+            else (None, None, 5)
+        )
+
+        super().__init__(
+            folder=folder,
+            root_files_keys=root_file_keys,
+            extensions_map=extensions_map,
+            zfill=zfill,
+            force_copy_keys=force_copy_keys,
+            remove_duplicates=remove_duplicates,
+            num_workers=num_workers,
+        )
+
+        self._file_handling = file_handling
+        self._copy_mode = copy_mode
+
+        if self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
+            import platform
+
+            if platform.system() == "Windows":
+                logger.warning(
+                    "Symlink is not supported on Windows,"
+                    " switching to file deep copy"
+                )
+                self._copy_mode = UnderfolderWriterV2.CopyMode.DEEP_COPY
+
+    def _copy_filesystem_item(self, output_file: Path, item: FileSystemItem) -> None:
+        path = item.source()
+        if path != output_file:
+            if self._copy_mode is UnderfolderWriterV2.CopyMode.DEEP_COPY:
+                shutil.copy(path, output_file)
+            elif self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
+                output_file.symlink_to(path)
+            elif self._copy_mode is UnderfolderWriterV2.CopyMode.HARD_LINK:
+                try:
+                    # (new in version 3.10)
+                    output_file.hardlink_to(path)  # type: ignore
+                except AttributeError:
+                    import os
+
+                    os.link(path, output_file)
+
+    def _write_sample_item(self, output_file: Path, sample: Sample, key: str):
+        if self._remove_duplicates:
+            self._remove_duplicate_files(output_file)
+
+        if (
+            self._file_handling
+            is not UnderfolderWriterV2.FileHandling.ALWAYS_WRITE_FROM_CACHE
+        ):
+            # copy source file if possible
+            def _is_item_cached():
+                try:
+                    # sample is, eg, a FileSystemSample
+                    return sample.is_cached(key)  # type: ignore
+                except AttributeError:  # pragma: no cover
+                    return False  # pragma: no cover
+
+            meta_item = sample.metaitem(key)
+            if (
+                isinstance(meta_item, FileSystemItem)
+                and meta_item.source().suffix == output_file.suffix
+                and (
+                    self._file_handling
+                    is UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK
+                    or key in self._force_copy_keys
+                    or not _is_item_cached()
+                )
+            ):
+                # * it is a file AND
+                # * suffix does not change (eg, no image re-encoding) AND
+                # ** always copy OR
+                # ** this key must be always copied OR
+                # ** item is not cached
+                self._copy_filesystem_item(output_file, meta_item)
+                return
+
+        # if any of the above checks failed, just dump the item value
+        self._dump_cached_item(output_file, sample[key])

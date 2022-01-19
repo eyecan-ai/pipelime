@@ -17,7 +17,7 @@ class ReaderTemplate(object):
         self.root_files_keys = root_files_keys
         self.idx_length = idx_length
 
-    def __eq__(self, o: object) -> bool:
+    def __eq__(self, o: "ReaderTemplate") -> bool:
         equality = True
         equality = equality and (not DeepDiff(o.extensions_map, self.extensions_map))
         equality = equality and (set(self.root_files_keys) == set(o.root_files_keys))

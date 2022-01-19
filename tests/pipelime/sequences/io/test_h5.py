@@ -62,7 +62,7 @@ class TestH5(object):
                 assert isinstance(sample, H5Sample)
                 assert len(sample.keys()) > 0
 
-            out_filename = output_folder / "output_dataset.h5"
+            out_filename = output_folder / (dataset_name + ".h5")
             writer = H5Writer(filename=out_filename)
             _plug_test_writer(writer)
             writer(reader)
@@ -76,8 +76,6 @@ class TestH5(object):
             for sample in second_reader:
                 for key in sample:
                     assert key in proto_sample
-
-            out_filename.unlink()
 
     def test_reader_copy_root(self, h5_datasets: dict, tmpdir):
 

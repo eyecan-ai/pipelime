@@ -114,9 +114,16 @@ def operation_mix(input_folders, output_folder):
     help="Subsamplig factor. INT (1,inf) or FLOAT [0.0,1.0]",
 )
 @click.option(
+    "-s",
+    "--start",
+    type=float,
+    default=0,
+    help="Subsamplig start. INT (0,inf) or FLOAT [0.0,1.0]",
+)
+@click.option(
     "-o", "--output_folder", required=True, type=str, help="Output Underfolder"
 )
-def operation_subsample(input_folder, factor, output_folder):
+def operation_subsample(input_folder, factor, start, output_folder):
 
     from pipelime.sequences.operations import OperationResetIndices, OperationSubsample
     from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -126,7 +133,10 @@ def operation_subsample(input_folder, factor, output_folder):
     template = dataset.get_reader_template()
 
     # operations
-    op_subsample = OperationSubsample(factor=int(factor) if factor > 1 else factor)
+    op_subsample = OperationSubsample(
+        factor=int(factor) if factor > 1 else factor,
+        start=int(start) if factor > 1 else start,
+    )
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_subsample(dataset))
 

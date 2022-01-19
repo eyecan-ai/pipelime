@@ -1,4 +1,5 @@
 from click.testing import CliRunner
+import math
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 
 
@@ -62,6 +63,44 @@ class TestCLIUnderfolderOperationSubsample:
             print("OUTPUT", factor, output_folder)
 
             assert len(output_reader) == expected_length
+
+    def test_subsample_start(self, tmpdir, sample_underfolder_minimnist):
+
+        import uuid
+        from pathlib import Path
+
+        from pipelime.cli.underfolder.operations import operation_subsample
+
+        input_folder = sample_underfolder_minimnist["folder"]
+        input_dataset = UnderfolderReader(folder=input_folder)
+        L = len(input_dataset)
+
+        N = 5
+        start_N = 7
+        exp_N = math.ceil((L - start_N) / N)
+        perc = 1 / N
+        start_perc = 0.1
+        exp_perc = min(int(L * perc), L - int(L * perc))
+
+        for factor, start, exp_length in zip(
+            [perc, N], [start_perc, start_N], [exp_perc, exp_N]
+        ):
+            output_folder = Path(tmpdir.mkdir(str(uuid.uuid1())))
+            options = []
+            options.extend(["-i", str(input_folder)])
+            options.extend(["-o", f"{str(output_folder)}"])
+            options.extend(["-f", f"{factor}"])
+            options.extend(["-s", f"{start}"])
+
+            runner = CliRunner()
+            result = runner.invoke(operation_subsample, options)
+            print(result)
+
+            assert result.exit_code == 0
+            output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+            print("OUTPUT", factor, output_folder)
+
+            assert len(output_reader) == exp_length
 
 
 class TestCLIUnderfolderOperationShuffle:
@@ -404,11 +443,11 @@ class TestCLIUnderfolderOperationMix:
         runner = CliRunner()
         runner.invoke(
             operation_filterkeys,
-            f"-i {input_folder} -o {input_folder_a} -k pose -k label",
+            f'-i "{input_folder}" -o "{input_folder_a}" -k pose -k label',
         )
         runner.invoke(
             operation_filterkeys,
-            f"-i {input_folder} -o {input_folder_b} -k image -k points",
+            f'-i "{input_folder}" -o "{input_folder_b}" -k image -k points',
         )
 
         options = []

@@ -162,7 +162,7 @@ class H5ToolKit:
     ENCODING_STRING = "_encoding"
     ENCODING_BINARY = "pkl"
     OPTIONS = {"png": {"compress_level": 4}}
-    ALLOWED_ENCODINGS = DataCoding.IMAGE_CODECS + [ENCODING_BINARY]
+    ALLOWED_ENCODINGS = DataCoding.IMAGE_CODECS + (ENCODING_BINARY,)
 
     @classmethod
     def get_encoding(cls, dataset: h5py.Dataset) -> Optional[str]:

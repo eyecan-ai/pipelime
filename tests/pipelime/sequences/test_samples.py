@@ -2,7 +2,7 @@ import numpy as np
 
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import (
-    FilesystemItem,
+    FileSystemItem,
     FileSystemSample,
     GroupedSample,
     MemoryItem,
@@ -61,7 +61,7 @@ class TestFilesystemSample(object):
         sample = reader[0]
 
         for key in sample.keys():
-            assert isinstance(sample.metaitem(key), FilesystemItem)
+            assert isinstance(sample.metaitem(key), FileSystemItem)
 
         assert len(sample) > 0
         assert isinstance(sample["image"], np.ndarray)
