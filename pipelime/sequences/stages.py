@@ -43,7 +43,7 @@ class StageIdentity(SampleStage):
     def __init__(self):
         super().__init__()
 
-    def __call__(self, x: any) -> any:
+    def __call__(self, x: Sample) -> Sample:
         return x
 
 
