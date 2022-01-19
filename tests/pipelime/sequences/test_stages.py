@@ -80,7 +80,7 @@ class TestStageKeysFilter(object):
 
         negates = [True, False]
         for negate in negates:
-            stage = StageKeysFilter(keys=["name", "idx"], negate=negate)
+            stage = StageKeysFilter(key_list=["name", "idx"], negate=negate)
             _plug_test(stage)
 
             out = stage(s)
@@ -157,7 +157,7 @@ class TestStageCompose(object):
             StageRemap(remap={"name": "a"}, remove_missing=False),
             StageRemap(remap={"idx": "b"}, remove_missing=False),
             StageRemap(remap={"float": "c"}, remove_missing=False),
-            StageKeysFilter(keys=["a", "b", "c"], negate=False),
+            StageKeysFilter(key_list=["a", "b", "c"], negate=False),
             StageIdentity(),
         ]
 
@@ -188,7 +188,7 @@ class TestSampleSequenceStaged:
             StageRemap(remap={"name": "a"}, remove_missing=False),
             StageRemap(remap={"idx": "b"}, remove_missing=False),
             StageRemap(remap={"float": "c"}, remove_missing=False),
-            StageKeysFilter(keys=["a", "b"], negate=False),
+            StageKeysFilter(key_list=["a", "b"], negate=False),
         ]
 
         sequence = SamplesSequence(samples=samples)

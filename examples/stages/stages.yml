@@ -5,7 +5,7 @@ args:
     args: {}
   - __spook__: pipelime.sequences.stages.StageKeysFilter
     args:
-      keys:
+      key_list:
       - value
       negate: false
   - __spook__: pipelime.sequences.stages.StageRemap

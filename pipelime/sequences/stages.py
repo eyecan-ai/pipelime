@@ -108,10 +108,10 @@ class StageKeysFilter(SampleStage):
 
     @classmethod
     def spook_schema(cls) -> dict:
-        return {"keys": list, "negate": bool}
+        return {"key_list": list, "negate": bool}
 
     def to_dict(self):
-        return {"keys": self._keys, "negate": self._negate}
+        return {"key_list": self._keys, "negate": self._negate}
 
 
 class StageAugmentations(SampleStage):
