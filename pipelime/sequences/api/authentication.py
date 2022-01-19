@@ -40,6 +40,7 @@ class CustomAPIAuthentication(OAuth2):
             scopes = {}
         flows = OAuthFlowsModel(password={"tokenUrl": tokenUrl, "scopes": scopes})
         self._token_callback = token_callback
+        self._token_key = tokenUrl
         super().__init__(
             flows=flows,
             scheme_name=scheme_name,
@@ -54,14 +55,17 @@ class CustomAPIAuthentication(OAuth2):
         authorization: str = request.headers.get("Authorization")
         scheme, token = get_authorization_scheme_param(authorization)
         if not authorization or scheme.lower() != "bearer":
-            if self.auto_error:
-                raise HTTPException(
-                    status_code=HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            if self._token_key in request.query_params:
+                token = request.query_params[self._token_key]
             else:
-                return None
+                if self.auto_error:
+                    raise HTTPException(
+                        status_code=HTTP_401_UNAUTHORIZED,
+                        detail="Not authenticated",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                else:
+                    return None
 
         # If the token is present:
         # Verify the token by means of external callback function provided by the user
