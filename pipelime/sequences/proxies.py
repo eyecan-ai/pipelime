@@ -2,8 +2,16 @@ from pipelime.sequences.samples import Sample, SamplesSequence
 from pipelime.sequences.stages import SampleStage, StageCompose
 from bisect import bisect_right
 
-from typing import Optional, Union, Any
-from collections.abc import Set, MutableMapping, Sequence, Collection, Callable
+from typing import (
+    Optional,
+    Union,
+    Any,
+    Set,
+    MutableMapping,
+    Sequence,
+    Collection,
+    Callable,
+)
 from abc import ABC, abstractmethod
 
 

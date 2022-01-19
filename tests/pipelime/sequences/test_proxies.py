@@ -2,7 +2,7 @@ from pipelime.sequences.samples import Sample, PlainSample, SamplesSequence
 from pipelime.sequences.stages import StageKeysFilter
 import pipelime.sequences.proxies as sp
 
-from collections.abc import Sequence
+from typing import Sequence, Tuple, Set
 
 
 class SideEffectSample(PlainSample):
@@ -47,7 +47,7 @@ class TestSequenceProxy:
 
     def _make_cached_sequence(
         self, sample_cache: sp.CachedSamplesSequence.SampleCache, max_idx: int
-    ) -> tuple[sp.CachedSamplesSequence, set[str], set[str], set[str], set[str]]:
+    ) -> Tuple[sp.CachedSamplesSequence, Set[str], Set[str], Set[str], Set[str]]:
         source_sseq = SamplesSequence(
             samples=[
                 SideEffectSample(
@@ -72,10 +72,10 @@ class TestSequenceProxy:
 
     def _check_samples(
         self,
-        kset: set[str],
-        ksrc: set[str],
+        kset: Set[str],
+        ksrc: Set[str],
         sseq: Sequence[Sample],
-        negative_keys: set[str],
+        negative_keys: Set[str],
     ):
         for s in sseq:
             for k in kset:
@@ -87,7 +87,7 @@ class TestSequenceProxy:
                 assert s.get_bypass(k) is None  # type: ignore
 
     def _check_cache(
-        self, sseq: sp.CachedSamplesSequence, max_idx: int, cached_idx: set[int]
+        self, sseq: sp.CachedSamplesSequence, max_idx: int, cached_idx: Set[int]
     ):
         for idx in range(1, max_idx):
             if idx in cached_idx:
