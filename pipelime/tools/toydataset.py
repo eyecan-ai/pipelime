@@ -4,6 +4,7 @@ from pathlib import Path
 from rich.progress import track
 import numpy as np
 from PIL import Image, ImageDraw
+from typing import Tuple
 
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -142,7 +143,7 @@ class ToyDatasetGenerator(object):
         suffix: str = "",
         as_underfolder: bool = False,
         max_label: int = 5,
-        objects_number_range: tuple[int, int] = (1, 5),
+        objects_number_range: Tuple[int, int] = (1, 5),
     ):
 
         output_folder = Path(output_folder)

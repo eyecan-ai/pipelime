@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union
-from collections.abc import Sequence, Mapping
+from typing import Union, Sequence, Mapping
 
 import albumentations as A
 from choixe.spooks import Spook

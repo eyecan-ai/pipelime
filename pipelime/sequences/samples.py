@@ -1,9 +1,8 @@
 import uuid
 from abc import abstractmethod
-from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Hashable, Sequence
+from typing import Any, Dict, Hashable, Sequence, MutableMapping
 import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
