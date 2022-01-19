@@ -25,7 +25,7 @@ class TestUnderfolderStagePlugin:
             StageRemap(remap={"number": "b"}, remove_missing=False),
             StageRemap(remap={"reverse_number": "c"}, remove_missing=False),
             StageRemap(remap={"odd": "d"}, remove_missing=False),
-            StageKeysFilter(keys=["a", "b"], negate=False),
+            StageKeysFilter(key_list=["a", "b"], negate=False),
         ]
         stage = StageCompose(stages=stages)
 

@@ -7,9 +7,21 @@ import click
 @click.option("--image_size", type=int, default=256, help="Output image size")
 @click.option("--zfill", type=int, default=5, help="Zero padding digits")
 @click.option(
+    "--max_label", type=int, default=5, help="Generate class labels in range [0, <arg>]"
+)
+@click.option(
+    "--nr_objs",
+    type=int,
+    nargs=2,
+    default=(1, 4),
+    help="The number of objects in every image will be in this range (endpoints included)",
+)
+@click.option(
     "--suffix", type=str, default="", help="Suffix to add to the output files"
 )
-def generate_toy_dataset(output_folder, size, image_size, zfill, suffix):
+def generate_toy_dataset(
+    output_folder, size, image_size, zfill, max_label, nr_objs, suffix
+):
 
     from pathlib import Path
     from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -22,6 +34,8 @@ def generate_toy_dataset(output_folder, size, image_size, zfill, suffix):
         image_size=image_size,
         zfill=zfill,
         suffix=suffix,
+        max_label=max_label,
+        objects_number_range=(nr_objs[0], nr_objs[1] + 1),
     )
 
 

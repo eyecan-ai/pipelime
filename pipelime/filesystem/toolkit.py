@@ -4,11 +4,12 @@ import pickle
 import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import imageio
 import numpy as np
 import yaml
+import toml
 
 from pipelime.tools.bytes import DataCoding
 
@@ -18,16 +19,27 @@ class FSToolkit(object):
     # Default imageio options for each image format
     OPTIONS = {"png": {"compress_level": 4}}
 
+    YAML_EXT = ("yaml", "yml")
+    JSON_EXT = ("json",)
+    TOML_EXT = ("toml", "tml")
+    METADATA_EXT = YAML_EXT + JSON_EXT + TOML_EXT
+
+    NUMPY_TXT_EXT = ("txt", "data")
+    NUMPY_NATIVE_EXT = ("npy", "npz")
+    NUMPY_EXT = NUMPY_TXT_EXT + NUMPY_NATIVE_EXT
+
+    PICKLE_EXT = ("pkl", "pickle")
+
     # Declare TREE structure
     @classmethod
     def tree(cls):
         return defaultdict(cls.tree)
 
     @classmethod
-    def tree_from_underscore_notation_files(cls, folder: str):
+    def tree_from_underscore_notation_files(cls, folder: Union[str, Path]):
         """Walk through files in folder generating a tree based on Underscore notation.
-        Leafs of abovementioned tree are string representing filenames, inner nodes represent
-        keys hierarchy.
+        Leafs of abovementioned tree are string representing filenames, inner nodes
+        represent keys hierarchy.
 
         :param folder: target folder
         :type folder: str
@@ -74,7 +86,7 @@ class FSToolkit(object):
     @classmethod
     def is_metadata_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
-        return ext in ["yml", "json", "toml", "tml"]
+        return ext in cls.METADATA_EXT
 
     @classmethod
     def is_image_file(cls, filename: str) -> bool:
@@ -90,13 +102,13 @@ class FSToolkit(object):
     @classmethod
     def is_numpy_array_file(cls, filename: str) -> bool:
         ext = cls.get_file_extension(filename)
-        if ext in ["txt", "data"]:
+        if ext in cls.NUMPY_TXT_EXT:
             try:
                 cls._numpy_load_txt(filename)
                 return True
             except Exception:
                 return False
-        if ext in ["npy", "npz"]:
+        elif ext in cls.NUMPY_NATIVE_EXT:
             try:
                 np.load(filename)
                 return True
@@ -105,9 +117,9 @@ class FSToolkit(object):
         return False
 
     @classmethod
-    def is_picke_file(cls, filename: str):
+    def is_pickle_file(cls, filename: str):
         ext = cls.get_file_extension(filename)
-        return ext == "pkl"
+        return ext in cls.PICKLE_EXT
 
     @classmethod
     def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
@@ -118,49 +130,56 @@ class FSToolkit(object):
         :return: Loaded data as array or dict. May return NONE
         :rtype: Union[None, np.ndarray, dict]
         """
+        try:
+            if cls.is_image_file(filename):
+                return np.array(imageio.imread(filename))
+            else:
+                extension = cls.get_file_extension(filename)
+                if extension in cls.YAML_EXT:
+                    return yaml.safe_load(open(filename, "r"))
+                elif extension in cls.JSON_EXT:
+                    return json.load(open(filename))
+                elif extension in cls.TOML_EXT:
+                    return dict(toml.load(filename))
+                elif extension in cls.PICKLE_EXT:
+                    return pickle.load(open(filename, "rb"))
+                elif extension in cls.NUMPY_EXT:
+                    npdata = (
+                        cls._numpy_load_txt(filename)
+                        if extension in cls.NUMPY_TXT_EXT
+                        else (
+                            np.load(filename)
+                            if extension in cls.NUMPY_NATIVE_EXT
+                            else None
+                        )
+                    )
+                    if npdata is not None:
+                        return np.atleast_2d(npdata)
+        except Exception as e:
+            raise Exception(f"Loading data error: {e}")
 
-        extension = cls.get_file_extension(filename)
-        data = None
-
-        if cls.is_image_file(filename):
-            data = np.array(imageio.imread(filename))
-
-        elif cls.is_numpy_array_file(filename):
-            if extension in ["txt"]:
-                data = cls._numpy_load_txt(filename)
-            elif extension in ["npy", "npz"]:
-                data = np.load(filename)
-            if data is not None:
-                data = np.atleast_2d(data)
-
-        elif cls.is_metadata_file(filename):
-            if extension in ["yml"]:
-                data = yaml.safe_load(open(filename, "r"))
-            elif extension in ["json"]:
-                data = json.load(open(filename))
-        elif cls.is_picke_file(filename):
-            data = pickle.load(open(filename, "rb"))
-        else:
-            raise NotImplementedError(f"Unknown file extension: {filename}")
-        return data
+        raise NotImplementedError(f"Unknown file extension: {filename}")
 
     @classmethod
-    def store_data(cls, filename: str, data: any):
-
-        extension = cls.get_file_extension(filename)
-        if DataCoding.is_image_extension(extension):
-            options = cls.OPTIONS.get(extension, {})
-            imageio.imwrite(filename, data, **options)
-        elif DataCoding.is_text_extension(extension):
-            np.savetxt(filename, data)
-        elif DataCoding.is_numpy_extension(extension):
-            np.save(filename, data)
-        elif DataCoding.is_metadata_extension(extension):
-            if extension in ["yml"]:
+    def store_data(cls, filename: str, data: Any):
+        try:
+            extension = cls.get_file_extension(filename)
+            if DataCoding.is_image_extension(extension):
+                options = cls.OPTIONS.get(extension, {})
+                imageio.imwrite(filename, data, **options)
+            elif DataCoding.is_text_extension(extension):
+                np.savetxt(filename, data)
+            elif DataCoding.is_numpy_extension(extension):
+                np.save(filename, data)
+            elif extension in cls.YAML_EXT:
                 yaml.safe_dump(data, open(filename, "w"))
-            elif extension in ["json"]:
+            elif extension in cls.JSON_EXT:
                 json.dump(data, open(filename, "w"))
-        elif DataCoding.is_pickle_extension(extension):
-            pickle.dump(data, open(filename, "wb"))
-        else:
-            raise NotImplementedError(f"Unknown file extension: {filename}")
+            elif extension in cls.TOML_EXT:
+                toml.dump(data, open(filename, "w"))
+            elif DataCoding.is_pickle_extension(extension):
+                pickle.dump(data, open(filename, "wb"))
+            else:
+                raise NotImplementedError(f"Unknown file extension: {filename}")
+        except Exception as e:
+            raise Exception(f"Loading data error: {e}")

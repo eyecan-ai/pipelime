@@ -80,7 +80,7 @@ class TestStageKeysFilter(object):
 
         negates = [True, False]
         for negate in negates:
-            stage = StageKeysFilter(keys=["name", "idx"], negate=negate)
+            stage = StageKeysFilter(key_list=["name", "idx"], negate=negate)
             _plug_test(stage)
 
             out = stage(s)
@@ -91,7 +91,7 @@ class TestStageKeysFilter(object):
 
 
 class TestStageAugmentations(object):
-    def test_augmentations(self, toy_dataset_small):
+    def test_augmentations(self, toy_dataset_small, tmp_path):
 
         import albumentations as A
 
@@ -129,9 +129,22 @@ class TestStageAugmentations(object):
 
         for sample in reader:
             out = stage(sample)
-
             for key in sample.keys():
                 assert key in out
+
+        transform_file = str(tmp_path / "tr.json")
+        A.save(transform, transform_file)
+        stage_fromfile = StageAugmentations(
+            transform_cfg=transform_file,
+            targets={
+                "image": "image",
+                "mask": "mask",
+                "inst": "inst",
+                "keypoints": "keypoints",
+                "bboxes": "bboxes",
+            },
+        )
+        assert stage.to_dict() == stage_fromfile.to_dict()
 
 
 class TestStageCompose(object):
@@ -144,7 +157,7 @@ class TestStageCompose(object):
             StageRemap(remap={"name": "a"}, remove_missing=False),
             StageRemap(remap={"idx": "b"}, remove_missing=False),
             StageRemap(remap={"float": "c"}, remove_missing=False),
-            StageKeysFilter(keys=["a", "b", "c"], negate=False),
+            StageKeysFilter(key_list=["a", "b", "c"], negate=False),
             StageIdentity(),
         ]
 
@@ -175,7 +188,7 @@ class TestSampleSequenceStaged:
             StageRemap(remap={"name": "a"}, remove_missing=False),
             StageRemap(remap={"idx": "b"}, remove_missing=False),
             StageRemap(remap={"float": "c"}, remove_missing=False),
-            StageKeysFilter(keys=["a", "b"], negate=False),
+            StageKeysFilter(key_list=["a", "b"], negate=False),
         ]
 
         sequence = SamplesSequence(samples=samples)

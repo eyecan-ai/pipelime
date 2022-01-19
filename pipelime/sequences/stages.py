@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Union, Sequence, Mapping
 
 import albumentations as A
 from choixe.spooks import Spook
@@ -48,12 +48,13 @@ class StageIdentity(SampleStage):
 
 
 class StageRemap(SampleStage):
-    def __init__(self, remap: dict, remove_missing: bool = True):
+    def __init__(self, remap: Mapping[str, str], remove_missing: bool = True):
         """Remaps keys in sample
 
         :param remap: old_key:new_key dictionary remap
-        :type remap: dict
-        :param remove_missing: if TRUE missing keys in remap will be removed in the output sample, defaults to True
+        :type remap: Mapping[str, str]
+        :param remove_missing: if TRUE missing keys in remap will be removed in the
+            output sample, defaults to True
         :type remove_missing: bool, optional
         """
         super().__init__()
@@ -83,16 +84,16 @@ class StageRemap(SampleStage):
 
 
 class StageKeysFilter(SampleStage):
-    def __init__(self, keys: list, negate: bool = False):
+    def __init__(self, key_list: Sequence[str], negate: bool = False):
         """Filter sample keys
 
-        :param keys: list of keys to preserve
-        :type keys: list
+        :param key_list: list of keys to preserve
+        :type key_list: Sequence[str]
         :param negate: TRUE to delete input keys, FALSE delete all but keys
         :type negate: bool
         """
         super().__init__()
-        self._keys = keys
+        self._keys = key_list
         self._negate = negate
 
     def __call__(self, x: Sample) -> Sample:
@@ -106,22 +107,34 @@ class StageKeysFilter(SampleStage):
 
     @classmethod
     def spook_schema(cls) -> dict:
-        return {"keys": list, "negate": bool}
+        return {"key_list": list, "negate": bool}
 
     def to_dict(self):
-        return {"keys": self._keys, "negate": self._negate}
+        return {"key_list": self._keys, "negate": self._negate}
 
 
 class StageAugmentations(SampleStage):
-    def __init__(self, transform_cfg: dict, targets: dict):
+    def __init__(self, transform_cfg: Union[dict, str], targets: dict):
         super().__init__()
-        self._transform_cfg = transform_cfg
+
+        self._transform: A.Compose = (
+            A.load(
+                transform_cfg,
+                data_format="json" if transform_cfg.endswith("json") else "yaml",
+            )
+            if isinstance(transform_cfg, str)
+            else A.from_dict(transform_cfg)
+        )
+
+        # get an up-to-date description
+        self._transform_cfg = A.to_dict(self._transform)
+
         self._targets = targets
-        self._transform: A.Compose = A.from_dict(transform_cfg)
         self._transform.add_targets(self._purge_targets(self._targets))
 
     def _purge_targets(self, targets: dict):
-        # TODO: could it be wrong if targets also contains 'image' or 'mask' (aka default target)?
+        # TODO: could it be wrong if targets also contains
+        # 'image' or 'mask' (aka default target)?
         return targets
 
     def __call__(self, x: Sample) -> Sample:
