@@ -1,5 +1,6 @@
 from pathlib import Path
 import imageio
+from pipelime.sequences.operations import OperationResetIndices
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import FileSystemSample, Sample
 from pipelime.sequences.streams.base import ItemConverter
@@ -10,6 +11,7 @@ import shutil
 import numpy as np
 
 from pipelime.sequences.writers.filesystem import UnderfolderWriter
+from pipelime.tools.idgenerators import IdGeneratorUUID
 
 
 class TestUnderfolderStreams:
@@ -23,8 +25,7 @@ class TestUnderfolderStreams:
         view = UnderfolderStream(sample_underfolder_empty["folder"])
         assert len(view) == 0
 
-        with pytest.raises(ValueError):
-            view.manifest()
+        assert view.manifest()["size"] == 0
 
     def test_stream_read(self, sample_underfolder_minimnist, tmp_path):
         folder = sample_underfolder_minimnist["folder"]
@@ -74,7 +75,7 @@ class TestUnderfolderStreams:
             key = "IMPOSSIBLE_KEY!"
             assert key not in sample
 
-            with pytest.raises(ValueError):
+            with pytest.raises(KeyError):
                 view.get_item(sample_id, key)
 
     def test_stream_write(self, sample_underfolder_minimnist, tmp_path):
@@ -86,7 +87,54 @@ class TestUnderfolderStreams:
         assert len(view) > 0
         assert len(dataset) == len(view)
 
-        for sample_id in range(len(view)):
+        for sample_id in view.get_sample_ids():
+
+            view.set_data(
+                sample_id, "new_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
+            )
+            view.set_data(sample_id, "new_matrix", {"data": [1, 2, 3.0]}, "matrix")
+            view.set_data(
+                sample_id,
+                "new_points",
+                {"data": [1, 2, 3.0, 4, 5, 6]},
+                "matrix",
+            )
+
+            image = np.random.rand(28, 28, 3)
+            image_bytes = io.BytesIO()
+            imageio.imwrite(image_bytes, image, format="jpg")
+            view.set_data(sample_id, "new_image", image_bytes, "jpg")
+
+        view.flush()
+        for sample in view.reader:
+            assert isinstance(sample, FileSystemSample)
+            for key in sample:
+                assert not sample.is_cached(key)
+
+        dataset = UnderfolderReader(folder=folder)
+        for sample in dataset:
+            assert "new_metadata" in sample
+            assert "new_matrix" in sample
+            assert "new_points" in sample
+            assert "new_image" in sample
+
+    def test_stream_write_uuid(self, sample_underfolder_minimnist, tmp_path):
+        temp_reader = UnderfolderReader(sample_underfolder_minimnist["folder"])
+        filtered = OperationResetIndices(generator=IdGeneratorUUID())(temp_reader)
+
+        folder = tmp_path / "dataset"
+        UnderfolderWriter(
+            folder=folder,
+            extensions_map=temp_reader.get_reader_template().extensions_map,
+            root_files_keys=temp_reader.get_reader_template().root_files_keys,
+        )(filtered)
+
+        dataset = UnderfolderReader(folder=folder)
+        view = UnderfolderStream(folder)
+        assert len(view) > 0
+        assert len(dataset) == len(view)
+
+        for sample_id in view.get_sample_ids():
 
             view.set_data(
                 sample_id, "new_metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
@@ -127,12 +175,12 @@ class TestUnderfolderStreams:
 
         for sample_id in range(len(view)):
 
-            with pytest.raises(ValueError):
+            with pytest.raises(PermissionError):
                 view.set_data(
                     sample_id, "metadata", {"data": [1, 2, 3.0], "flag": True}, "dict"
                 )
 
-            with pytest.raises(ValueError):
+            with pytest.raises(PermissionError):
                 view.set_data(sample_id, "matrix", {"data": [1, 2, 3.0]}, "matrix")
 
             view.set_data(

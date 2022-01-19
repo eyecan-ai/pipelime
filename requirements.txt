@@ -11,3 +11,6 @@ Pillow>=8.0.0
 appdirs
 loguru
 h5py
+pydantic
+fastapi
+requests

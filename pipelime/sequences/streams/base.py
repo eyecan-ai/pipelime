@@ -13,6 +13,7 @@ class ItemConverter:
     IMAGE_FORMATS = ["jpg", "jpeg", "png"]
     MATRIX_FORMATS = ["matrix"]
     DICT_FORMATS = ["dict"]
+    TEXT_FORMATS = ["txt"]
 
     @classmethod
     def data_to_item(cls, data: any, format: str) -> any:
@@ -115,7 +116,18 @@ class ItemConverter:
         elif format in cls.DICT_FORMATS:
             return "application/json"
         else:
-            raise ValueError(f"Format {format} not supported yet")
+            return f"application/{format}"
+
+    @classmethod
+    def item_filename_to_data(cls, item_filename: str) -> io.BytesIO:
+        """Converts an item filename to a bytes stream
+
+        :param item_filename: The item filename to convert.
+        :type item_filename: str
+        :return: file bytes IO
+        :rtype: io.BytesIO
+        """
+        return io.BytesIO(open(item_filename, "rb").read())
 
 
 class DatasetStream:

@@ -1,0 +1,165 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+    <link href="https://cdn.materialdesignicons.com/2.1.19/css/materialdesignicons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+
+<body>
+
+    <div id="app">
+
+        <!-- RELOAD PANEL -->
+        <div class="box">
+            <button class="button is-primary" @click='reload'>Reload</button>
+        </div>
+
+        <!-- DATASET LIST PANEL -->
+        <div class="box" v-if='datasets.length > 0'>
+            <h1 class="title">Datasets list:</h1>
+            <div class="block">
+                <button class="button is-info mr-2 mb-1" v-for='(dataset,index) in datasets'
+                    @click="loadDataset(dataset)">
+                    <i class="mdi mdi-database mdi-light"></i> {{dataset.name}}
+                </button>
+            </div>
+        </div>
+
+        <!-- SELECTED DATASET PANEL -->
+        <div class="box" v-if='dataset !== null'>
+            <h1 class="title">Dataset: {{dataset.name}}</h1>
+
+            <!--  DATASET MANIFEST -->
+            <div class="block">
+                <h2 class="subtitle">Manifest:</h2>
+                <code class="prettyprint lang-js">{{dataset.manifest}}</code>
+            </div>
+
+            <!-- DATASET SAMPLES LIST -->
+            <div class="block">
+                <h2 class="subtitle">Samples List:</h2>
+                <div class='block'>
+                    <button class="button is-primary mr-2 mb-1" v-for="(sample_id, index) in samples_ids"
+                        @click="loadSample(sample_id)">Sample[{{sample_id}}]</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SELECTED SAMPLE PANEL -->
+        <div class="box" v-if='sample !== null'>
+
+            <!-- SAMPLE METADATA -->
+            <h1 class="title">Sample [{{sample.id}}]</h1>
+            <div class="block">
+                <h2 class="subtitle">Metadata:</h2>
+                <code class="zoomcode prettyprint lang-js">{{sample.metadata}}</code>
+            </div>
+
+            <!-- SAMPLE BINARY DATA LIST -->
+            <div class="block">
+                <h2 class="subtitle">Binary data:</h2>
+                <div class='block container-binary-data'>
+                    <div class="tag is-success mr-2 binary-tag" v-for="(dataValue, dataName) in sample.data">
+                        {{dataName}}</div>
+                </div>
+            </div>
+
+            <!-- SAMPLE IMAGES -->
+            <div class='block container-images'>
+                <h2 class="subtitle">Images:</h2>
+                <div class="block">
+                    <div v-for="(dataValue, dataName) in sample.data" v-if="dataValue.type == 'image'"
+                        class='thumbnail'>
+                        <div class="title">{{dataName}}</div>
+                        <a :href="dataUrl(dataName)" target="_blank">
+                            <img :src="dataUrl(dataName)" />
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        var app = new Vue({
+            el: '#app',
+            data: {
+                // ****************************************************************************
+                // 
+                // THIS IS THE BASE URL, CHANGE IT IF YOU WANT TO USE ANOTHER SERVER HOST:PORT
+                // 
+                // ****************************************************************************
+                baseUrl: 'http://localhost:8099',
+                datasets: [],
+                dataset: null,
+                samples_ids: [],
+                sample: null
+            },
+            methods: {
+                /**
+                 * Reload the datasets list
+                 */
+                reload() {
+                    this.dataset = null
+                    this.datasets = []
+                    this.samples_ids = []
+                    this.sample = null
+                    axios.get(this.baseUrl + '/datasets').then(response => {
+                        this.datasets = Object.values(response.data)
+                    });
+                },
+                /**
+                 * Load a dataset given its dataset Entity
+                 * @param {Object} dataset
+                 */
+                loadDataset(dataset) {
+                    axios.get(this.baseUrl + '/dataset/' + dataset.name).then(response => {
+
+                        // Sets response entity as current dataset 
+                        this.dataset = response.data;
+
+                        // Pretty-fy the manifest json 
+                        this.$nextTick(() => { PR.prettyPrint() })
+
+                        // Loads the samples list
+                        this.samples_ids = []
+                        this.dataset.manifest.sample_ids.forEach((sample_id) => {
+                            this.samples_ids.push(sample_id)
+                        });
+                    });
+                },
+                /**
+                 * Load a sample given its id
+                 * @param {Number} sample_id
+                 */
+                loadSample(sample_id) {
+                    axios.get(this.baseUrl + '/dataset/' + this.dataset.name + "/" + sample_id).then(response => {
+
+                        // Sets response entity as current sample
+                        this.sample = response.data;
+
+                        // Pretty-fy the metadata json
+                        this.$nextTick(() => { PR.prettyPrint() })
+                    });
+                },
+                /**
+                 * Return the data url for a given data name
+                 */
+                dataUrl(name) {
+                    var url = this.baseUrl
+                    url += '/dataset/' + this.dataset.name
+                    url += '/' + this.sample.id
+                    url += '/' + name
+                    return url
+                }
+            }
+        })
+    </script>
+</body>
+
+</html>

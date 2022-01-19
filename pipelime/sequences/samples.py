@@ -2,7 +2,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Hashable, Sequence, MutableMapping
+from typing import Any, Dict, Hashable, Sequence, MutableMapping, Union
 import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
@@ -346,6 +346,13 @@ class SamplesSequence(Sequence):
         :rtype: int
         """
         return len(str(len(self)))
+
+    @classmethod
+    def purge_id(cls, id: Hashable) -> Union[int, str]:
+        try:
+            return int(id)
+        except Exception:
+            return str(id)
 
     def merge(self, other: "SamplesSequence") -> "SamplesSequence":
         new_samples = [x.merge(y) for x, y in zip(self, other)]
