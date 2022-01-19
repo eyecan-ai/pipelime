@@ -1,5 +1,4 @@
-import collections
-from typing import Optional
+from typing import Optional, MutableMapping
 import dictquery
 
 
@@ -9,7 +8,7 @@ class DictionaryUtils:
         items = []
         for k, v in d.items():
             new_key = parent_key + sep + k if parent_key else k
-            if isinstance(v, collections.MutableMapping):
+            if isinstance(v, MutableMapping):
                 items.extend(cls.flatten(v, new_key, sep=sep).items())
             else:
                 items.append((new_key, v))
@@ -22,31 +21,36 @@ class DictSearch:
     @classmethod
     def match_queries(cls, proto_dict: dict, target_dict: dict) -> bool:
         """Match a dict against a dict proto. The dict proto is a dict where values
-        are 'dictquery'-like strings (i.e. info here: https://github.com/cyberlis/dictquery).
+        are 'dictquery'-like strings (i.e. info here:
+        https://github.com/cyberlis/dictquery).
         For example with the proto dict:
 
-        {
-            'a': {
-                'b': {
-                    'c': '>= 1',
+        .. code-block:: python
+
+            {
+                'a': {
+                    'b': {
+                        'c': '>= 1',
+                    },
                 },
-            },
-        }
+            }
 
         will match positive if the target dict is {'a': {'b': {'c': 10}}} and negative
         if the target dict is {'a': {'b': {'c': 0}}}.
 
         The proto dict can contains also multiple occurrences of the same key. In this
-        case the value should contains placeholders for the occurrence number. For example:
+        case the value should contains placeholders for the occurrence number.
+        For example:
 
-        {
-            'a': {
-                'b': '$V >= 2 AND $V <= 10'
-        }
+        .. code-block:: python
 
-        The proto dict can contains also None values, in this case nothing happens, the query
-        is bypassed.
+            {
+                'a': {
+                    'b': '$V >= 2 AND $V <= 10'
+            }
 
+        The proto dict can contains also None values, in this case nothing happens, the
+        query is bypassed.
 
         :param proto_dict: the proto dict
         :type proto_dict: dict
@@ -68,7 +72,7 @@ class DictSearch:
         return valid
 
     @classmethod
-    def build_query(cls, key: str, value: Optional[str] = None) -> str:
+    def build_query(cls, key: str, value: Optional[str] = None) -> Optional[str]:
         if value is None:
             return None
         if "$V" not in value:
