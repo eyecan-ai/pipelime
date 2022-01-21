@@ -14,6 +14,7 @@ from pipelime.cli.underfolder.operations import (
     operation_subsample,
     operation_sum,
     summary,
+    dump,
 )
 
 
@@ -35,3 +36,4 @@ underfolder.add_command(operation_split_by_value)
 underfolder.add_command(operation_groupby)
 underfolder.add_command(operation_mix)
 underfolder.add_command(summary)
+underfolder.add_command(dump)

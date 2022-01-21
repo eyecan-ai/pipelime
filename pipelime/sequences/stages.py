@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, Sequence, Mapping
+from typing import Union, Collection, Sequence, Mapping
 
 import albumentations as A
 from choixe.spooks import Spook
@@ -84,11 +84,11 @@ class StageRemap(SampleStage):
 
 
 class StageKeysFilter(SampleStage):
-    def __init__(self, key_list: Sequence[str], negate: bool = False):
+    def __init__(self, key_list: Collection[str], negate: bool = False):
         """Filter sample keys
 
         :param key_list: list of keys to preserve
-        :type key_list: Sequence[str]
+        :type key_list: Collection[str]
         :param negate: TRUE to delete input keys, FALSE delete all but keys
         :type negate: bool
         """

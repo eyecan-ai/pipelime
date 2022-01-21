@@ -1,9 +1,11 @@
 from pipelime.sequences.samples import Sample, FileSystemItem
-from pipelime.sequences.stages import SampleStage, StageIdentity, StageKeysFilter
 from pipelime.filesystem.toolkit import FSToolkit
 
 import numpy as np
 import imageio
+from rich.progress import Progress
+from rich.console import Console
+from sys import stderr
 
 import shutil
 from enum import Enum
@@ -41,7 +43,9 @@ class HeaderDataWriter(DataWriter):
         return HeaderDataWriter(self._prefix + f"[{idx}]", self._sep)
 
     def key_node(self, key: str) -> DataWriter:
-        return HeaderDataWriter(self._prefix + f">{key}", self._sep)
+        return HeaderDataWriter(
+            self._prefix + f">{key}" if self._prefix else f"{key}", self._sep
+        )
 
     def coordinate_node(self, coords: Tuple) -> DataWriter:
         coord_str = ":".join([str(idx) for idx in coords])
@@ -79,7 +83,7 @@ class HeaderDataTypeWriter(DataWriter):
             type_str = (
                 "s"
                 if isinstance(elem, (str, bytes))
-                else ("d" if isinstance(elem, (int, bool)) else "c")
+                else "c"
             )
         return self._sep + type_str
 
@@ -89,12 +93,12 @@ class HeaderDataRoleWriter(DataWriter):
         self,
         node_name: str,
         sep: str,
-        output_path: Union[Path, str],
+        output_path: Optional[Union[Path, str]],
         role_map: Mapping[str, str],
     ):
         self._node_name = node_name
         self._sep = sep
-        self._output_path = str(output_path)
+        self._output_path = "" if output_path is None else str(output_path)
         self._role_map = role_map
 
     def index_node(self, idx: int) -> DataWriter:
@@ -125,17 +129,15 @@ class HeaderDataRoleWriter(DataWriter):
                     role_str = f"type=image origin={self._output_path}"
                 else:
                     role_str = "meta"
-            elif isinstance(elem, (int, bool)):
-                role_str = "class"
             else:
                 role_str = ""
         return self._sep + role_str
 
 
 class ValueDataWriter(DataWriter):
-    def __init__(self, sep: str, output_path: Union[Path, str]):
+    def __init__(self, sep: str, output_path: Optional[Union[Path, str]]):
         self._sep = sep
-        self._output_path = Path(output_path)
+        self._output_path = None if output_path is None else Path(output_path)
 
     def index_node(self, idx: int) -> DataWriter:
         return ValueDataWriter(self._sep, self._output_path)
@@ -151,7 +153,8 @@ class ValueDataWriter(DataWriter):
             elem = str(elem)
             if Path(elem).is_file() and FSToolkit.is_image_file(elem):
                 elem = Path(elem)
-                elem = str(elem.relative_to(self._output_path))
+                if self._output_path is not None:
+                    elem = str(elem.relative_to(self._output_path))
         return self._sep + str(elem)
 
 
@@ -179,14 +182,19 @@ class LinkType(Enum):
     DEEP_COPY = 0
     SYM_LINK = 1
     HARD_LINK = 2
+    # alias to ease cli creation
+    copy = DEEP_COPY
+    soft = SYM_LINK
+    hard = HARD_LINK
 
 
-def _make_iter(
+def _make_sample_iterator(
     samples: Sequence[Sample],
-    start: int,
-    stop: int,
-    step: int,
+    start: Optional[int],
+    stop: Optional[int],
+    step: Optional[int],
 ):
+    index_range = range(len(samples))
     if step is None:
         step = 1
     if start is None:
@@ -201,14 +209,21 @@ def _make_iter(
             stop = len(samples) - 1 - stop
         step = -step
         samples = reversed(samples)  # type: ignore
-    return islice(samples, start, stop, step)
+        index_range = reversed(index_range)
+
+    from math import trunc
+
+    return zip(
+        islice(index_range, start, stop, step), islice(samples, start, stop, step)
+    ), trunc(((len(samples) if stop is None else stop) - 1 - start) / step + 1)
 
 
 def _link_file(
-    src_path: Path,
-    target_folder: Path,
-    link_type: LinkType,
-):
+    src_path: Path, target_folder: Optional[Path], link_type: LinkType
+) -> str:
+    if target_folder is None or not target_folder.exists():
+        return str((Path("") / src_path.name).resolve())  # fake path
+
     trg_file = target_folder / src_path.name
 
     if link_type is LinkType.DEEP_COPY:
@@ -227,58 +242,79 @@ def _link_file(
     return str(trg_file)
 
 
+def _write_image(
+    image: np.ndarray, filename: str, target_folder: Optional[Path]
+) -> str:
+    if target_folder is None or not target_folder.exists():
+        return str((Path("") / filename).resolve())  # fake path
+
+    trg_file = target_folder / Path(filename)
+    imageio.imwrite(trg_file, image)
+    return str(trg_file)
+
+
+def _link_or_load(
+    sample: Sample, item_key: str, target_folder: Optional[Path], link_type: LinkType
+) -> Any:
+    # link images, load everything else
+    item = sample.metaitem(item_key)
+    return (
+        _link_file(Path(item.source()), target_folder, link_type)
+        if isinstance(item, FileSystemItem)
+        and FSToolkit.is_image_file(str(item.source()))
+        else sample[item_key]  # this may load a file from disk
+    )
+
+
+def _maybe_write_data(
+    data: Any, sample_index: int, item_key: str, target_folder: Optional[Path]
+) -> Any:
+    # dump image-like data to disk
+    if (
+        isinstance(data, np.ndarray)
+        and data.dtype == "uint8"
+        and (
+            len(data.shape) == 2  # (H, W) mono
+            or (
+                len(data.shape) == 3  # mono, rgb, rgba
+                and (
+                    data.shape[0] in (1, 3, 4)  # (C, H, W)
+                    or data.shape[-1] in (1, 3, 4)  # (H, W, C)
+                )
+            )
+        )
+    ):
+        if len(data.shape) == 3:
+            if data.shape[0] in (1, 3, 4):
+                data = np.moveaxis(data, -3, -1)
+            if data.shape[-1] == 1:
+                data = np.squeeze(data, axis=-1)
+        return _write_image(data, f"{sample_index}-{item_key}.png", target_folder)
+
+    return data
+
+
 def _extract_samples(
-    assets_path: Path,
+    assets_path: Optional[Path],
     link_type: LinkType,
     samples: Sequence[Sample],
-    stage: SampleStage,
-    start: int,
-    stop: int,
-    step: int,
-) -> Sequence[Mapping[str, Any]]:
-    filtered_samples: Sequence[Mapping[str, Any]] = []
-    for src in _make_iter(samples, start, stop, step):
-        src = stage(src)
+    start: Optional[int],
+    stop: Optional[int],
+    step: Optional[int],
+    progress: Progress,
+) -> Sequence[Tuple[int, Mapping[str, Any]]]:
+    filtered_samples: Sequence[Tuple[int, Mapping[str, Any]]] = []
+    sample_it, size = _make_sample_iterator(samples, start, stop, step)
+
+    task = progress.add_task("Reading samples...", total=size)
+    for index, src in sample_it:
         dst: dict[str, Any] = {}
         for k in src:
-            item = src.metaitem(k)
+            dst_data = _link_or_load(src, k, assets_path, link_type)
+            dst[k] = _maybe_write_data(dst_data, len(filtered_samples), k, assets_path)
 
-            # link images, load everything else
-            dst_data = (
-                _link_file(Path(item.source()), assets_path, link_type)
-                if isinstance(item, FileSystemItem)
-                and FSToolkit.is_image_file(str(item.source()))
-                else src[k]  # this may load a file from disk
-            )
-
-            # dump image-like data to disk
-            if (
-                isinstance(dst_data, np.ndarray)
-                and dst_data.dtype == "uint8"
-                and (
-                    len(dst_data.shape) == 2  # (H, W) mono
-                    or (
-                        len(dst_data.shape) == 3  # mono, rgb, rgba
-                        and (
-                            dst_data.shape[0] in (1, 3, 4)  # (C, H, W)
-                            or dst_data.shape[-1] in (1, 3, 4)  # (H, W, C)
-                        )
-                    )
-                )
-            ):
-                if len(dst_data.shape) == 3:
-                    if dst_data.shape[0] in (1, 3, 4):
-                        dst_data = np.moveaxis(dst_data, -3, -1)
-                    if dst_data.shape[-1] == 1:
-                        dst_data = np.squeeze(dst_data, axis=-1)
-                trg_file = assets_path / Path(f"{len(filtered_samples)}-{k}.png")
-                imageio.imwrite(trg_file, dst_data)
-                dst_data = str(trg_file)
-
-            # store in the destination map
-            dst[k] = dst_data
-
-        filtered_samples.append(dst)
+        filtered_samples.append((index, dst))
+        progress.update(task, advance=1)
 
     return filtered_samples
 
@@ -289,13 +325,11 @@ def _print_line(first_col: Any, others: str, file: Optional[Any]):
 
 
 def dump_data(
-    output_assets_path: Union[Path, str],
     samples: Sequence[Sample],
-    key_filters: Optional[Sequence[str]] = None,
-    negate_key_filter: bool = False,
-    start: int = 0,
-    stop: int = -1,
-    step: int = 1,
+    output_assets_path: Optional[Union[Path, str]] = None,
+    start: Optional[int] = None,
+    stop: Optional[int] = None,
+    step: Optional[int] = None,
     format: str = "orange",
     link_type: LinkType = LinkType.HARD_LINK,
     file: Optional[Any] = None,
@@ -303,83 +337,92 @@ def dump_data(
     """Sample data dumping to console or file.
 
     Args:
-        output_assets_path (Union[Path, str]): where images and assets will be saved.
         samples (Sequence[Sample]): the sequence of samples.
-        key_filters (Optional[Sequence[str]], optional): an optional list of keys.
-            Defaults to None.
-        negate_key_filter (bool, optional): if True, keys in key_filters are excluded,
-            otherwise are taken. Defaults to False.
-        start (int, optional): first sample index. Defaults to 0.
-        stop (int, optional): last sample index. Defaults to -1.
-        step (int, optional): range step. Defaults to 1.
-        format (str, optional): output format ('csv', 'orange'). Defaults to "orange".
+        output_assets_path (Optional[Union[Path, str]]): where images and other file
+            assets will be saved.
+        start (Optional[int], optional): first sample index. Defaults to None.
+        stop (Optional[int], optional): last sample index (excluded). Defaults to None.
+        step (Optional[int], optional): range step. Defaults to None.
+        format (str, optional): output format ('csv', 'orange'). Defaults to 'orange'.
         link_type (LinkType, optional): if soft/hard links should be used whenever
-            possible. Defaults to LinkType.HARD_LINK.
+            possible when writing assets. Defaults to LinkType.HARD_LINK.
         file (Optional[Any], optional): an optional opened file stream, if None it
             prints to stdout. Defaults to None.
     """
-    output_assets_path = Path(output_assets_path).resolve()
-    output_assets_path.mkdir(parents=True, exist_ok=True)
+    if output_assets_path is not None:
+        output_assets_path = Path(output_assets_path).resolve()
+        output_assets_path.mkdir(parents=True, exist_ok=True)
 
-    filtered_samples = _extract_samples(
-        output_assets_path,
-        link_type,
-        samples,
-        StageIdentity()
-        if key_filters is None
-        else StageKeysFilter(key_list=key_filters, negate=negate_key_filter),
-        start,
-        stop,
-        step,
-    )
+    with Progress(console=Console(file=stderr)) as progress:
+        filtered_samples = _extract_samples(
+            output_assets_path,
+            link_type,
+            samples,
+            start,
+            stop,
+            step,
+            progress,
+        )
 
-    format = format.lower()
-    separator = "\t" if format == "orange" else ","
-    samples_it = enumerate(filtered_samples)
+        format = format.lower()
+        separator = "\t" if format == "orange" else ","
+        samples_it = iter(filtered_samples)
 
-    # write header from a prototype
-    first_idx, first_sample = next(samples_it)
+        # write header from a prototype
+        first_idx, first_sample = next(samples_it)
 
-    _print_line(
-        "$index",
-        _dump_collection(first_sample, HeaderDataWriter(prefix="", sep=separator)),
-        file,
-    )
+        task = progress.add_task("Writing data...", total=len(filtered_samples) + 1)
 
-    if format == "orange":
         _print_line(
-            "d",
-            _dump_collection(
-                first_sample,
-                HeaderDataTypeWriter(node_name="", sep=separator, type_map={}),
-            ),
+            "$index",
+            _dump_collection(first_sample, HeaderDataWriter(prefix="", sep=separator)),
             file,
         )
-        _print_line(
-            "meta",
-            _dump_collection(
-                first_sample,
-                HeaderDataRoleWriter(
-                    node_name="", sep=separator, output_path=output_assets_path, role_map={}
+
+        if format == "orange":
+            _print_line(
+                "c",
+                _dump_collection(
+                    first_sample,
+                    HeaderDataTypeWriter(node_name="", sep=separator, type_map={}),
                 ),
-            ),
-            file,
-        )
+                file,
+            )
+            _print_line(
+                "meta",
+                _dump_collection(
+                    first_sample,
+                    HeaderDataRoleWriter(
+                        node_name="",
+                        sep=separator,
+                        output_path=output_assets_path,
+                        role_map={},
+                    ),
+                ),
+                file,
+            )
 
-    # write values
-    _print_line(
-        first_idx,
-        _dump_collection(
-            first_sample, ValueDataWriter(sep=separator, output_path=output_assets_path)
-        ),
-        file,
-    )
+        progress.update(task, advance=1)
 
-    for sample_idx, sample_data in samples_it:
+        # write values
         _print_line(
-            sample_idx,
+            first_idx,
             _dump_collection(
-                sample_data, ValueDataWriter(sep=separator, output_path=output_assets_path)
+                first_sample,
+                ValueDataWriter(sep=separator, output_path=output_assets_path),
             ),
             file,
         )
+
+        progress.update(task, advance=1)
+
+        for sample_idx, sample_data in samples_it:
+            _print_line(
+                sample_idx,
+                _dump_collection(
+                    sample_data,
+                    ValueDataWriter(sep=separator, output_path=output_assets_path),
+                ),
+                file,
+            )
+            progress.update(task, advance=1)
