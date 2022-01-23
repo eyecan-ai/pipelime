@@ -3,12 +3,12 @@ nodes:
   empty:
     command: empty
     outputs:
-      fake_output: 'miao'
+      fake_output: 'empty_dataset'
   conversion:
     foreach:
       items: "@var(params.input_folders)"
       do:
-        command: myconvert
+        command: convert.py
         inputs:
           input_folder: '@iter(item)'
         outputs:
@@ -20,7 +20,7 @@ nodes:
         foreach:
           items: '@var(params.input_folders)'
           do: '@var(params.converted_folder)/@iter(item)'
-      fake_input: 'miao'
+      fake_input: 'empty_dataset'
     outputs:
       output_folder: '@var(params.summed_folder)'
   filter:
