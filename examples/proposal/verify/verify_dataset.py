@@ -7,6 +7,13 @@ from pipelime.sequences.operations import OperationStage
 import rich
 
 
+#  ___ _  _ ____    _  _  __   __  ____ _
+#   |  |__| |___    |\/| |  | |  \ |___ |
+#   |  |  | |___    |  | |__| |__/ |___ |___
+
+# The Pydantic ecosystem: https://pydantic-docs.helpmanual.io/usage/validators/
+
+
 class MetadataModel(BaseModel):
     a: bool
     b: float
@@ -29,6 +36,14 @@ class SampleModel(BaseModel):
             raise ValueError("image must be a numpy array")
 
 
+#  __ __ __ __ __ __ __ __ __ __ __ __
+
+
+#  ___ _  _ ____     ___ ___ __   ___ ____
+#   |  |__| |___    [__   | |__| | __ |___
+#   |  |  | |___    ___]  | |  | |__] |___
+
+
 class StageVerify(SampleStage):
     class StageVerifyException(Exception):
         pass
@@ -44,12 +59,25 @@ class StageVerify(SampleStage):
         return x
 
 
+#  __ __ __ __ __ __ __ __ __ __ __ __
+
+
+#  ___ _  _ ____     __   __  ____  __  __  ___ _  __  _  _
+#   |  |__| |___    |  | |__] |___ |__/|__|  |  | |  | |\ |
+#   |  |  | |___    |__| |    |___ |  \|  |  |  | |__| | \|
+
+
 class OperationVerify(OperationStage):
     def __init__(self, sample_model: type, **kwargs):
         super().__init__(stage=StageVerify(sample_model), **kwargs)
 
 
+#  __ __ __ __ __ __ __ __ __ __ __ __
+
+
 def main():
+
+    # 🅳🅰🆃🅰🆂🅴🆃 🅲🆁🅴🅰🆃🅸🅾🅽
     samples = [
         PlainSample(
             {
@@ -69,12 +97,14 @@ def main():
     samples = [PlainSample(x, id=x["sample_id"]) for x in samples]
     sequence = SamplesSequence(samples=samples)
 
+    # 🆅🅴🆁🅸🅵🆈 🅾🅿🅴🆁🅰🆃🅸🅾🅽
     verify_op = OperationVerify(
         sample_model=SampleModel,
         num_workers=4,
         progress_bar=True,
     )
 
+    # 🆃🆁🅰🅿 🅲🆄🆂🆃🅾🅼 🅴🆇🅲🅴🅿🆃🅸🅾🅽
     try:
         verify_op(sequence)
         rich.print("[green] Verified! [/green]")
