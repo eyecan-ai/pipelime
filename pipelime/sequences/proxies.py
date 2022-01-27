@@ -1,12 +1,12 @@
 from pipelime.sequences.samples import Sample, SamplesSequence
 from pipelime.sequences.stages import SampleStage, StageCompose
+from collections import OrderedDict
 from bisect import bisect_right
 
 from typing import (
     Optional,
     Union,
     Any,
-    Set,
     MutableMapping,
     Sequence,
     Collection,
@@ -17,45 +17,123 @@ from abc import ABC, abstractmethod
 
 class CachedSamplesSequence(SamplesSequence):
     class SampleCache(ABC):
-        @abstractmethod
-        def get_sample(self, idx: int) -> Optional[Sample]:
-            ...  # pragma: no cover
+        @property
+        def get_fn(self) -> Callable[[int], Sample]:
+            return self._get_fn
+
+        @get_fn.setter
+        def get_fn(self, fn: Callable[[int], Sample]):
+            self._get_fn = fn
+
+        @property
+        def key_list(self) -> Optional[Collection[str]]:
+            return self._key_list
+
+        @key_list.setter
+        def key_list(self, kk: Optional[Collection[str]]):
+            self._key_list = kk
+
+        def eval_sample(self, idx: int) -> Sample:
+            item = self.get_fn(idx)
+            for k in self.key_list if self.key_list is not None else item.keys():
+                _ = item[k]
+            return item
 
         @abstractmethod
-        def add_sample(self, idx: int, s: Sample):
-            ...  # pragma: no cover
+        def get_sample(self, idx: int) -> Sample:
+            pass
+
+        @abstractmethod
+        def clear_cache(self):
+            pass
 
     class EndlessCachePolicy(SampleCache):
         """Store items in cache with no limit."""
 
         def __init__(self):
-            self._cache_map: MutableMapping[int, Sample] = {}
+            self.init_cache()
 
-        def get_sample(self, idx: int) -> Optional[Sample]:
-            return self._cache_map.get(idx, None)
+        def get_sample(self, idx: int) -> Sample:
+            item = self._cache_map.get(idx, None)
+            if item is None:
+                item = self.eval_sample(idx)  # NB: use `self` here, NOT `super()`!!!!
+                self.add_sample(idx, item)
+            return item
 
         def add_sample(self, idx: int, s: Sample):
             self._cache_map[idx] = s
 
+        def init_cache(self):
+            self._cache_map: MutableMapping[int, Sample] = {}
+
+        def clear_cache(self):
+            self._cache_map.clear()
+
     class BoundedCachePolicy(EndlessCachePolicy):
         def __init__(self, max_cache_size: int):
-            """Store up to max_cache_size items in cache.
+            """Store only the last max_cache_size items in cache.
 
             Args:
-                max_cache_size (int): maximum items to store.
+                max_cache_size (int): maximum items to store in the FIFO queue.
             """
             super().__init__()
             self._max_cache_size = max_cache_size
 
         def add_sample(self, idx: int, s: Sample):
-            if len(self._cache_map) < self._max_cache_size:
-                super().add_sample(idx, s)
+            if self._max_cache_size > 0:
+                self._cache_map[idx] = s
+                self._cache_map.move_to_end(idx)  # ensure s is the last Sample
+                if len(self._cache_map) > self._max_cache_size:
+                    self._cache_map.popitem(False)
+
+        def init_cache(self):
+            self._cache_map: OrderedDict[int, Sample] = OrderedDict()
+
+    class PersistentCachePolicy(BoundedCachePolicy):
+        def __init__(
+            self,
+            cache_dir: Optional[str],
+            compress: Union[bool, int] = False,
+            verbose: bool = False,
+            clear_cache: bool = False,
+            max_buffer_size: int = 0,
+        ):
+            """Dump items to disk.
+
+            Args:
+                cache_dir (Optional[str]): the path to the cache folder; use None to
+                    disable caching.
+                compress (Union[bool, int], optional): whether to compress the stored
+                    data on disk; if an integer [1-9], sets the amount of compression.
+                    Defaults to False.
+                verbose (bool, optional): whether to print debug messages when data is
+                    evaluated. Defaults to False.
+                clear_cache (bool, optional): whether to clear the cache before using
+                    it, otherwise existing values will be used. Defaults to False.
+                max_buffer_size (int, optional): maximum items to store in a FIFO queue
+                    on system memory. Defaults to 0.
+            """
+            super().__init__(max_buffer_size)
+            from joblib import Memory
+
+            self._memory = Memory(
+                location=cache_dir, compress=compress, verbose=1 if verbose else 0
+            )
+            self.eval_sample = self._memory.cache(  # type: ignore
+                self.eval_sample, ignore=["self"]
+            )
+            if clear_cache:
+                self.clear_cache()
+
+        def clear_cache(self):
+            super().clear_cache()
+            self._memory.clear()
 
     def __init__(
         self,
         source: Sequence[Sample],
         sample_cache: SampleCache,  # don't make a default, jsonargparse would complain
-        forced_keys: Set[str] = set(),
+        forced_keys: Optional[Collection[str]] = None,
         stage: Optional[SampleStage] = None,
     ):
         """A proxy to cache previous outputs.
@@ -63,28 +141,22 @@ class CachedSamplesSequence(SamplesSequence):
         Args:
             source (Sequence[Sample]): the source sequence.
             sample_cache (SampleCache): the cache of samples.
-            forced_keys (Set[str], optional): always access (and load) these keys from
-                any retrieved Sample. Defaults to set().
+            forced_keys (Optional[Collection[str]], optional): always access (and load)
+                these keys from any retrieved Sample before caching; if None, all keys
+                are accessed. Defaults to None.
             stage (Optional[SampleStage], optional): a Stage to apply to samples.
                 Defaults to None.
         """
         super().__init__(source, stage)
         self._sample_cache = sample_cache
-        self._forced_keys = forced_keys
+        self._sample_cache.get_fn = super().__getitem__
+        self._sample_cache.key_list = forced_keys
 
     def __getitem__(self, idx: int) -> Sample:
-        item = self._sample_cache.get_sample(idx)
-
-        if item is None:
-            item = super().__getitem__(idx)
-            for k in self._forced_keys:
-                _ = item[k]
-            self._sample_cache.add_sample(idx, item)
-
-        return item
+        return self._sample_cache.get_sample(idx)
 
     def merge(self, other: SamplesSequence) -> SamplesSequence:
-        self._cache_map = {}
+        self._sample_cache.clear_cache()
         return super().merge(other)
 
 
