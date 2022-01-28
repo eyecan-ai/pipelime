@@ -30,6 +30,8 @@ class FSToolkit(object):
 
     PICKLE_EXT = ("pkl", "pickle")
 
+    REMOTE_EXT = ("remote",)
+
     # Declare TREE structure
     @classmethod
     def tree(cls):
