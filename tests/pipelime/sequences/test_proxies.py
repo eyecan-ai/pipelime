@@ -34,6 +34,7 @@ class TestSequenceProxy:
             samples=[
                 PlainSample(
                     {
+                        "idx": i,
                         "data_1": rnd_fn(),
                         "data_2": rnd_fn(),
                         "data_3": rnd_fn(),
@@ -42,7 +43,7 @@ class TestSequenceProxy:
                 )
                 for i in range(0, max_idx)
             ],
-            stage=StageKeysFilter(["data_1", "data_2", "data_3"]),
+            stage=StageKeysFilter(["idx", "data_1", "data_2", "data_3"]),
         )
 
     def _make_cached_sequence(
@@ -181,23 +182,23 @@ class TestSequenceProxy:
             for f in dcmp.common_files:
                 left_f = left_path / Path(f)
                 right_f = right_path / Path(f)
-                if f == 'func_code.py':
+                if f == "func_code.py":
                     assert f in dcmp.same_files
-                elif f == 'metadata.json':
+                elif f == "metadata.json":
                     with left_f.open() as file:
                         left_data = json.load(file)
-                        assert 'input_args' in left_data
+                        assert "input_args" in left_data
                     with right_f.open() as file:
                         right_data = json.load(file)
-                        assert 'input_args' in right_data
-                    assert left_data['input_args'] == right_data['input_args']
+                        assert "input_args" in right_data
+                    assert left_data["input_args"] == right_data["input_args"]
                 else:
-                    assert f == 'output.pkl'
+                    assert f == "output.pkl"
                     left_obj = joblib.load(left_f)
                     right_obj = joblib.load(right_f)
                     assert isinstance(left_obj, SideEffectSample)
                     assert isinstance(right_obj, SideEffectSample)
-                    for k in (left_obj.keys() | right_obj.keys()):
+                    for k in left_obj.keys() | right_obj.keys():
                         assert left_obj.get_bypass(k) == right_obj.get_bypass(k)
             for sub_dcmp in dcmp.subdirs.values():
                 file_diff(sub_dcmp)
@@ -222,17 +223,21 @@ class TestSequenceProxy:
         n_items = 5
         src = self._make_random_source(n_items)
 
-        filter = [2, 4]
+        def filter_fn(x: Sample) -> bool:
+            return x["idx"] in (2, 4)
+
         flt_sseq = sp.FilteredSamplesSequence(
-            src, filter, StageKeysFilter(["data_1", "data_2"])
+            src, filter_fn, StageKeysFilter(["data_1", "data_2"])
         )
 
-        assert len(filter) == len(flt_sseq)
-        for idx, item in zip(filter, flt_sseq):
-            src_item = src[idx]
-            for k, v in item.items():
-                assert k in src_item
-                assert v == src_item[k]
+        assert len(flt_sseq) == 2
+        flt_iter = iter(flt_sseq)
+        for src_item in src:
+            if filter_fn(src_item):
+                flt_item = next(flt_iter)
+                for k, v in flt_item.items():
+                    assert k in src_item
+                    assert v == src_item[k]
 
     def test_sorted_seq_proxy(self):
         n_items = 5

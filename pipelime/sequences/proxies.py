@@ -194,27 +194,23 @@ class FilteredSamplesSequence(SamplesSequence):
     def __init__(
         self,
         source: SamplesSequence,
-        filter: Union[Collection[int], Callable[[int], bool]],
+        filter_fn: Callable[[Sample], bool],
         stage: Optional[SampleStage] = None,
     ):
         """A filtered view of an input SamplesSequence.
 
         Args:
             source (SamplesSequence): the SamplesSequence to filter.
-            filter (Union[Collection[int], Callable[[int], bool]]): a collection of
-                valid indixes or a callable returning True for any valid index.
+            filter_fn (Callable[[Sample], bool]): a callable returning True for any
+                valid sample.
             stage (Optional[SampleStage], optional): a Stage to apply to samples.
                 Defaults to None.
         """
-        fn = filter if isinstance(filter, Callable) else lambda idx: idx in filter
-        filterd_samples = [source.samples[idx] for idx in range(len(source)) if fn(idx)]
-
         if stage is None:
             stage = source.stage
         elif source.stage is not None:
             stage = StageCompose([source.stage, stage])
-
-        super().__init__(filterd_samples, stage)
+        super().__init__(list(filter(filter_fn, source.samples)), stage)
 
 
 class SortedSamplesSequence(SamplesSequence):
