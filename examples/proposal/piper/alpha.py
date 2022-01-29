@@ -1,9 +1,5 @@
-from typing import Optional, Sequence
 import click
-from pydash.predicates import is_float
-import rich
 from pipelime.pipes.piper import Piper
-from pathlib import Path
 import time
 
 
@@ -25,10 +21,10 @@ def two(
     outuput_folder: str,
     times: int,
     sleep: float,
-    **piper,
+    # **piper,
 ):
 
-    piper = Piper(**piper)
+    # piper = Piper(**piper)
 
     print(click.get_current_context().meta)
     print(input_folders, type(input_folders))
@@ -36,7 +32,7 @@ def two(
 
     for i in range(times):
         print(i)
-        piper.log_value("progress", i)
+        # piper.log_value("progress", i)
         time.sleep(sleep)
 
 

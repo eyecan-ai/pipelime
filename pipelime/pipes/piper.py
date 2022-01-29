@@ -1,3 +1,4 @@
+import functools
 from typing import Optional, Sequence, Union
 import click
 import yaml
@@ -6,7 +7,6 @@ import subprocess
 from loguru import logger
 import inspect
 import uuid
-from pyarrow import plasma
 from choixe.bulletins import BulletinBoard, Bulletin
 
 
@@ -49,22 +49,30 @@ class Piper:
             logger.debug(f"\tPiper outputs: {self._outputs}")
             logger.debug(f"\tPiper token: {self._token}")
 
-            self._client = BulletinBoard(self._token)
+            self._client = self._create_client(token=self._token)
+
+    def _create_client(self, token: str):
+        try:
+            return BulletinBoard(session_id=token)
+        except Exception as e:
+            logger.error(f"{self._id}|{e}")
+            return None
 
     def is_active(self):
         return self._token is not None
 
     def log_value(self, key: str, value: any):
         if self.is_active():
-            self._client.hang(
-                Bulletin(
-                    metadata={
-                        "id": self._id,
-                        "token": self._token,
-                        "payload": {key: value},
-                    }
+            if self._client is not None:
+                self._client.hang(
+                    Bulletin(
+                        metadata={
+                            "id": self._id,
+                            "token": self._token,
+                            "payload": {key: value},
+                        }
+                    )
                 )
-            )
             logger.debug(f"{self._id}|{key}:{value}|TOKEN[{self._token}]")
 
     @staticmethod
@@ -98,6 +106,7 @@ class Piper:
                 callback=Piper.piper_info_callback,
                 hidden=True,
             )(func)
+
             return func
 
         return _add_options
