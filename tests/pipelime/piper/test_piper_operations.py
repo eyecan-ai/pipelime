@@ -8,6 +8,7 @@ class TestPiperOperations:
     def test_operations_infos(self):
 
         operations = [
+            {"command": "pipelime underfolder remap_keys", "valid": True},
             {"command": "pipelime underfolder filter_by_query", "valid": True},
             {"command": "pipelime underfolder filter_by_script", "valid": True},
             {"command": "pipelime underfolder filter_keys", "valid": True},

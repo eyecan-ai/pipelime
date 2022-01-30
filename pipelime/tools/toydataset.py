@@ -166,6 +166,7 @@ class ToyDatasetGenerator(object):
                 f"keypoints{suffix}": sample["keypoints"],
                 f"label{suffix}": sample["label"],
                 f"id{suffix}": sample["id"],
+                f"index{suffix}": idx,
             }
 
             metadata = json.loads(json.dumps(metadata))

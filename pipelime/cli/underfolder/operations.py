@@ -785,3 +785,77 @@ def summary(
     print_summary(
         reader, order_by=order_by, reversed_=reversed_, max_samples=max_samples
     )
+
+
+@click.command("remap_keys", help="Remap sample keys")
+@click.option(
+    "-i",
+    "--input_folder",
+    required=True,
+    type=click.Path(exists=True),
+    help="Input Underfolder",
+)
+@click.option(
+    "-k",
+    "--keys",
+    required=True,
+    type=str,
+    multiple=True,
+    nargs=2,
+    help="Mapping (source key, remapped key)",
+)
+@click.option(
+    "-R",
+    "--remove",
+    "remove_",
+    is_flag=True,
+    help="TRUE to remove not mapped keys",
+)
+@click.option(
+    "-o",
+    "--output_folder",
+    required=True,
+    type=click.Path(),
+    help="Output Underfolder for positive matches",
+)
+@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+def operation_remap_keys(
+    input_folder: str,
+    keys: Sequence[str],
+    remove_: bool,
+    output_folder: str,
+    **piper_kwargs,
+):
+
+    from pipelime.sequences.operations import (
+        OperationRemapKeys,
+    )
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+
+    PiperCommand()
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+
+    # operations
+    keys_map = {k0: k1 for k0, k1 in keys}
+
+    # update root files and extensions map
+    for k0, k1 in keys_map.items():
+        if k0 in template.root_files_keys:
+            template.root_files_keys.append(k1)
+        if k0 in template.extensions_map:
+            template.extensions_map[k1] = template.extensions_map[k0]
+
+    op = OperationRemapKeys(remap=keys_map, remove_missing=remove_)
+    output_dataset = op(dataset)
+
+    writer = UnderfolderWriter(
+        folder=output_folder,
+        copy_files=True,
+        root_files_keys=template.root_files_keys,
+        extensions_map=template.extensions_map,
+        progress_callback=PiperCommand().generate_progress_callback(),
+    )
+    writer(output_dataset)

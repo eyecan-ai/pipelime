@@ -462,3 +462,48 @@ class TestCLIUnderfolderOperationMix:
         assert len(output_reader) == len(input_dataset)
         keys = set(output_reader[0].keys())
         assert keys == {"pose", "label", "image", "points"}
+
+
+class TestCLIUnderfolderOperationRemapKeys:
+    def test_remapkeys(self, tmpdir, sample_underfolder_minimnist):
+
+        import uuid
+        from pathlib import Path
+
+        from pipelime.cli.underfolder.operations import operation_remap_keys
+
+        input_folder = sample_underfolder_minimnist["folder"]
+        input_reader = UnderfolderReader(folder=input_folder)
+
+        for remove_missing in [True, False]:
+            keys = {"metadata": "newmetadata", "image": "newimage"}
+
+            # Samples whose double is <= 10 adn half <= 2.5 are  6! Check it!
+            # expected_size = 6
+
+            output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+
+            options = []
+            options.extend(["-i", str(input_folder)])
+            options.extend(["-o", f"{str(output_folder)}"])
+            for k0, k1 in keys.items():
+                options.extend(["-k", k0, k1])
+            if remove_missing:
+                options.extend(["-R"])
+
+            runner = CliRunner()
+            result = runner.invoke(operation_remap_keys, options)
+            print(result)
+
+            assert result.exit_code == 0
+
+            output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
+            assert len(output_reader) == len(input_reader)
+            for sample in output_reader:
+                for k0, k1 in keys.items():
+                    assert k0 not in sample.keys()
+                    assert k1 in sample.keys()
+                if remove_missing:
+                    assert len(sample.keys()) == len(keys)
+                else:
+                    assert len(sample.keys()) > len(keys)

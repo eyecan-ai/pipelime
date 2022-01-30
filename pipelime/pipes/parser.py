@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, Dict, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 import re
 from pydantic import BaseModel
 import pydash
@@ -7,17 +7,7 @@ import rich
 from pipelime.tools.dictionaries import DictionaryUtils
 import networkx as nx
 import itertools
-
-
-class NodeModel(BaseModel):
-    command: str
-    args: dict = {}
-    inputs: dict = {}
-    outputs: dict = {}
-
-
-class NodesModel(BaseModel):
-    nodes: Dict[str, NodeModel]
+from pipelime.pipes.model import NodeModel, NodesModel
 
 
 class PipesConfigParser:
@@ -26,9 +16,12 @@ class PipesConfigParser:
     PLACEHOLDER_REGEX = r = f"{PLACEHOLDER_CHAR}(\\w*)\\(([^)]+)\\)"  # @methodName(arg)
     PLACEHOLDER_VARIABLE_NAME = "var"
     PLACEHOLDER_ITERATION_NAME = "iter"
+    PLACEHOLDER_ARG_ITERATION_NAME = "argiter"
     PLACEHOLDER_FOREACH_NAME = "foreach"
+    PLACEHOLDER_FOREACHARG_NAME = "foreach_arg"
     PLACEHOLDER_FOREACH_DO_NAME = "do"
     PLACEHOLDER_FOREACH_ITEMS_NAME = "items"
+    PLACEHOLDER_ARG_SPLIT_CHAR = "@"
 
     def __init__(self) -> None:
         self._regex = re.compile(self.PLACEHOLDER_REGEX)
@@ -86,6 +79,28 @@ class PipesConfigParser:
         else:
             return m.group()
 
+    def _convert_match_to_argitem_data(self, m: re.Match, index: int, item: any) -> any:
+        """This is a callable, used in the _parse_string function. It will be called on
+        nodes in a foreach loop FOR ARGUMENTS only. It converts the regex match to the corresponding value/s
+        of the current item.
+
+        :param m: re.Match object
+        :type m: re.Match
+        :param index: current index in the foreach loop
+        :type index: int
+        :param item: current item in the foreach loop
+        :type item: any
+        :return: parsed value
+        :rtype: any
+        """
+        local_data = {"item": item, "index": index}
+        command, content = m.groups()
+        if command.lower() == PipesConfigParser.PLACEHOLDER_ARG_ITERATION_NAME:
+            value = pydash.get(local_data, content)
+            return value
+        else:
+            return m.group()
+
     def _parse_foreach_node(self, node: dict, item: any, index: int) -> dict:
         """Parse a foreach node (a dict). This is a node containing some @iter(index) and @iter(item)
         placeholder which will be replaced by the current item and index values in a foreach
@@ -107,13 +122,14 @@ class PipesConfigParser:
         :return: parsed node
         :rtype: dict
         """
-        empty = {}
+        empty = copy.deepcopy(node)
         flat_node = DictionaryUtils.flatten(node)
         for key, value in flat_node.items():
             flat_node[key] = self._parse_string(
                 value, lambda m: self._convert_match_to_item_data(m, index, item)
             )
             pydash.set_(empty, key, flat_node[key])
+
         return empty
 
     def _parse_string(
@@ -139,7 +155,10 @@ class PipesConfigParser:
         """
 
         # How many matches?
-        occurrences = len(self._regex.findall(s))
+        try:
+            occurrences = len(self._regex.findall(s))
+        except:
+            occurrences = 0
 
         # If one match and the match is the same as the string, return the value
         # this is used to replace values with any type other than a string. This is
@@ -254,7 +273,7 @@ class PipesConfigParser:
                             parsed_list.append(
                                 self._parse_string(
                                     pseudo_node,
-                                    lambda m: self._convert_match_to_item_data(
+                                    lambda m: self._convert_match_to_argitem_data(
                                         m, value_index, value
                                     ),
                                 )
@@ -360,15 +379,82 @@ class PipesConfigParser:
 
         return nodes_cfg
 
-    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> dict:
+    def _merge_multiple_arguments(self, nodes_cfg: dict) -> dict:
+        """Merge node input/output/arguments with a name containing a '@' inside.
+        For example:
+
+        {
+            'args': {
+                'par@0': [1,2,3],
+                'par@1': [4,5,6]
+            }
+        }
+
+        becomes:
+
+        {
+            'args': {
+                'par': [(1,2), (3,4), (5,6)]],
+            }
+        }
+
+        Args:
+            nodes_cfg (dict): nodes config {node_name: node_config}
+
+        Returns:
+            dict: merged config {node_name: node_config}
+        """
+        nodes_cfg = copy.deepcopy(nodes_cfg)
+
+        for node_name in nodes_cfg:
+            node = nodes_cfg[node_name]
+
+            to_replace = {}
+            for key, subnode in node.items():
+                if isinstance(subnode, dict):
+                    rephrased_args = {}
+                    for arg_name, value in subnode.items():
+                        if PipesConfigParser.PLACEHOLDER_ARG_SPLIT_CHAR in arg_name:
+                            arg_name, arg_index = arg_name.split(
+                                PipesConfigParser.PLACEHOLDER_ARG_SPLIT_CHAR
+                            )
+                            if arg_name not in rephrased_args:
+                                rephrased_args[arg_name] = {}
+                            rephrased_args[arg_name][arg_index] = value
+
+                        else:
+                            rephrased_args[arg_name] = value
+
+                    for arg_name, value in list(rephrased_args.items()):
+                        if isinstance(value, dict):
+                            raw_values = list(value.values())
+                            l = len(raw_values)
+                            row_size = -1
+                            if l > 0:
+                                row_size = len(raw_values[0])
+
+                            if row_size > 0:
+                                remapped = []
+                                for r in range(row_size):
+                                    row = [raw_values[i][r] for i in range(l)]
+                                    remapped.append(tuple(row))
+                                rephrased_args[arg_name] = remapped
+                    to_replace[key] = rephrased_args
+
+            for k, v in to_replace.items():
+                node[k] = v
+
+        return nodes_cfg
+
+    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> NodesModel:
         """Parse the configuration
 
         :param cfg: configuration to parse
         :type cfg: dict
         :param global_variables: global variables
         :type global_variables: Optional[dict], default None
-        :return: parsed configuration
-        :rtype: dict
+        :return: nodes model
+        :rtype: NodesModel
         """
 
         # sets global variables
@@ -386,17 +472,27 @@ class PipesConfigParser:
         # Parse the branches. AKA foreach nodes inside nodes inputs/outputs values.
         parsed["nodes"] = self._expand_nodes_arguments(parsed["nodes"])
 
-        m = NodesModel(**parsed)
-        rich.print(m.dict())
+        # Merge multiple arguments as tuples
+        parsed["nodes"] = self._merge_multiple_arguments(parsed["nodes"])
 
-        return parsed
+        return NodesModel(**parsed)
 
 
 class PipeGraph(nx.DiGraph):
     class PipeGraphNode:
-        def __init__(self, name: str, type: str = "operation"):
+        def __init__(
+            self,
+            name: str,
+            type: str = "operation",
+            user_model: Optional[NodeModel] = None,
+        ):
             self.name = name
             self.type = type
+            self._user_model = user_model
+
+        @property
+        def user_model(self) -> Optional[NodeModel]:
+            return self._user_model
 
         @property
         def id(self):
@@ -411,10 +507,10 @@ class PipeGraph(nx.DiGraph):
         def __eq__(self, o: object) -> bool:
             return self.id == o.id
 
-    def __init__(self, cfg: dict):
+    def __init__(self, nodes_model: NodesModel):
         super().__init__()
-        self._cfg = cfg
-        PipeGraph.build_nodes_graph(self._cfg, self)
+        self._nodes_model = nodes_model
+        PipeGraph.build_nodes_graph(self._nodes_model, self)
 
     @property
     def operations_graph(self):
@@ -482,15 +578,18 @@ class PipeGraph(nx.DiGraph):
 
     @classmethod
     def build_nodes_graph(
-        cls, cfg: dict, target_graph: Optional[nx.DiGraph] = None
+        cls,
+        nodes_model: NodesModel,
+        target_graph: Optional[nx.DiGraph] = None,
     ) -> dict:
 
         g = nx.DiGraph() if target_graph is None else target_graph
-        nodes = cfg["nodes"]
 
-        for node_name, node in nodes.items():
-            inputs = node.get("inputs", {})
-            outputs = node.get("outputs", {})
+        for node_name, node in nodes_model.nodes.items():
+            node: NodeModel
+
+            inputs = node.inputs
+            outputs = node.outputs
 
             for input_key, input_value in inputs.items():
                 if isinstance(input_value, str):
@@ -498,7 +597,11 @@ class PipeGraph(nx.DiGraph):
                 [
                     g.add_edge(
                         PipeGraph.PipeGraphNode(str(x), "data"),
-                        PipeGraph.PipeGraphNode(node_name, "operation"),
+                        PipeGraph.PipeGraphNode(
+                            node_name,
+                            "operation",
+                            user_model=node,
+                        ),
                     )
                     for x in input_value
                 ]
@@ -508,7 +611,11 @@ class PipeGraph(nx.DiGraph):
                     output_value = [output_value]
                 [
                     g.add_edge(
-                        PipeGraph.PipeGraphNode(node_name, "operation"),
+                        PipeGraph.PipeGraphNode(
+                            node_name,
+                            "operation",
+                            user_model=node,
+                        ),
                         PipeGraph.PipeGraphNode(x, "data"),
                     )
                     for x in output_value
