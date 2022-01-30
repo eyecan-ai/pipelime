@@ -117,8 +117,6 @@ class NaiveGraphExecutor(NodesGraphExecutor):
         parser = NaiveNodeModelExecutionParser()
 
         for layer in graph.build_execution_stack():
-            print("Layer")
-            processes = []
             for node in layer:
                 node: GraphNodeOperation
                 command_chunks = parser.build_command_chunks(node_model=node.node_model)
@@ -132,7 +130,7 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                     )
                 except Exception as e:
                     rich.print("[red]Node Failed[/red]:", node)
-                    raise RuntimeError()
+                    raise RuntimeError(e)
 
     # def build_full_command(self) -> str:
     #     return " ".join(self.build_chunks())

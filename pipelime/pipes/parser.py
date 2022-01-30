@@ -1,9 +1,7 @@
 import copy
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Callable, Optional, Sequence, Set, Tuple
 import re
-from pydantic import BaseModel
 import pydash
-import rich
 from pipelime.tools.dictionaries import DictionaryUtils
 import networkx as nx
 import itertools
@@ -157,7 +155,7 @@ class PipesConfigParser:
         # How many matches?
         try:
             occurrences = len(self._regex.findall(s))
-        except:
+        except Exception:
             occurrences = 0
 
         # If one match and the match is the same as the string, return the value
@@ -428,15 +426,15 @@ class PipesConfigParser:
                     for arg_name, value in list(rephrased_args.items()):
                         if isinstance(value, dict):
                             raw_values = list(value.values())
-                            l = len(raw_values)
+                            raw_size = len(raw_values)
                             row_size = -1
-                            if l > 0:
+                            if raw_size > 0:
                                 row_size = len(raw_values[0])
 
                             if row_size > 0:
                                 remapped = []
                                 for r in range(row_size):
-                                    row = [raw_values[i][r] for i in range(l)]
+                                    row = [raw_values[i][r] for i in range(raw_size)]
                                     remapped.append(tuple(row))
                                 rephrased_args[arg_name] = remapped
                     to_replace[key] = rephrased_args

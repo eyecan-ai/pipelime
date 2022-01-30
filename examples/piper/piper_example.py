@@ -1,5 +1,3 @@
-from email.policy import default
-import os
 from choixe.configurations import XConfig
 import click
 import cv2
