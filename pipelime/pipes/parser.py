@@ -23,7 +23,7 @@ class NodesModel(BaseModel):
 class PipesConfigParser:
 
     PLACEHOLDER_CHAR = "@"
-    PLACEHOLDER_REGEX = r = f"{PLACEHOLDER_CHAR}(\w*)\(([^)]+)\)"  # @methodName(arg)
+    PLACEHOLDER_REGEX = r = f"{PLACEHOLDER_CHAR}(\\w*)\\(([^)]+)\\)"  # @methodName(arg)
     PLACEHOLDER_VARIABLE_NAME = "var"
     PLACEHOLDER_ITERATION_NAME = "iter"
     PLACEHOLDER_FOREACH_NAME = "foreach"

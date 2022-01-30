@@ -1,14 +1,9 @@
-from black import os
 from choixe.configurations import XConfig
 import cv2
-import numpy as np
 import rich
 from pipelime.pipes.parser import PipeGraph, PipesConfigParser
-import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.drawing.nx_agraph import to_agraph
-import random
-import string
 from faker import Faker
 from tempfile import NamedTemporaryFile
 import imageio
@@ -25,13 +20,9 @@ class MyNode(Custom):
 
 def draw_graph(graph: nx.DiGraph, agraph: bool = False):
 
-    if agraph == False:
+    if agraph is False:
 
         from diagrams import Diagram, Cluster
-        from diagrams.aws.compute import EC2
-        from diagrams.aws.compute import EC2
-        from diagrams.aws.database import RDS
-        from diagrams.aws.network import ELB
         from diagrams.programming.language import Python as OperationNode
 
         f = NamedTemporaryFile(suffix="")

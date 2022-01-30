@@ -1,9 +1,9 @@
+import functools
 from pipelime.pipes.communication import PiperCommunicationChannelFactory
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 from yaml.scanner import ScannerError
 from loguru import logger
 import subprocess
-import inspect
 import inspect
 import click
 import yaml
@@ -21,7 +21,7 @@ class PiperNamespace:
     NAME_TOKEN = "token"
     NAME_INFO = "info"
     NAME_ARGS = "args"
-    COMMAND_KWARGS_NAME = "pipergs"
+    COMMAND_KWARGS_NAME = "piper_kwargs"
 
     """ Names of kwargs variable """
     OPTION_NAME_INPUTS = f"{PRIVATE_OPTION_PREFIX}{PIPER_PREFIX}{NAME_INPUTS}"
@@ -40,7 +40,7 @@ class PiperCommandSingleton(type):
     _instance = None
 
     def __call__(cls, *args, **kwargs):
-        if cls._instance is None:
+        if PiperCommandSingleton._instance is None:
 
             # Search the piper kwarg in the kwargs of the click command and add it to
             # the kwargs
@@ -61,9 +61,13 @@ class PiperCommandSingleton(type):
             kwargs.update({"caller_name": caller_name})
 
             # Creates the PiperCommand instance
-            cls._instance = super().__call__(*args, **kwargs)
+            PiperCommandSingleton._instance = super().__call__(*args, **kwargs)
 
-        return cls._instance
+        return PiperCommandSingleton._instance
+
+    @classmethod
+    def destroy(cls):
+        PiperCommandSingleton._instance = None
 
 
 class PiperCommand(metaclass=PiperCommandSingleton):
@@ -81,24 +85,63 @@ class PiperCommand(metaclass=PiperCommandSingleton):
         self._token = kwargs.get(PiperNamespace.OPTION_NAME_TOKEN, "")
         self._token = self._token if len(self._token) > 0 else None
 
-        # Token check, if not provided, raise an error because it is not possible
-        # to track the execution of the command
-        if self._token is None:
-            raise RuntimeError(f"Token is required!")
+        # progress callbacks list
+        self._progress_callbacks = []
 
-        # Builds an unique id for the command, multiple instances of same command
-        # are allowed, for this reason an unique id is required
-        self._unique_identifier = str(uuid.uuid1())
-        self._id = f"{self._caller_name}:{self._unique_identifier}"
+        # Token check, if not provided, the command is disabled
+        self._active = self._token is not None
 
-        # Creates the communication channel among commands
-        self._channel = PiperCommunicationChannelFactory.create_channel(self._token)
+        if self._active:
+            # Builds an unique id for the command, multiple instances of same command
+            # are allowed, for this reason an unique id is required
+            self._unique_identifier = str(uuid.uuid1())
+            self._id = f"{self._caller_name}:{self._unique_identifier}"
 
-        # Logs the command creation
-        logger.debug(f"{self._log_header}New Piper created from: {self._id}")
-        logger.debug(f"{self._log_header}\tPiper inputs: {self._inputs}")
-        logger.debug(f"{self._log_header}\tPiper outputs: {self._outputs}")
-        logger.debug(f"{self._log_header}\tPiper token: {self._token}")
+            # Creates the communication channel among commands
+            self._channel = PiperCommunicationChannelFactory.create_channel(self._token)
+
+            # Logs the command creation
+            logger.debug(f"{self._log_header}New Piper created from: {self._id}")
+            logger.debug(f"{self._log_header}\tPiper inputs: {self._inputs}")
+            logger.debug(f"{self._log_header}\tPiper outputs: {self._outputs}")
+            logger.debug(f"{self._log_header}\tPiper token: {self._token}")
+
+    def _progress_callback(self, chunk_index: int, total_chunks: int, payload: dict):
+        self.log(
+            "_progress",
+            {
+                "chunk_index": chunk_index,
+                "total_chunks": total_chunks,
+                "progress_data": payload,
+            },
+        )
+
+    def generate_progress_callback(
+        self,
+        chunk_index: int = 0,
+        total_chunks: int = 1,
+    ) -> Callable[[dict], None]:
+        """Generates a progress callback function to send back to the caller. The callback
+        should be called every time the external progress is updated. Internally the callback
+        will log the progress (also in the communication channel).
+
+        Args:
+            chunk_index (int, optional): index for multiple user tasks. Defaults to 0.
+            total_chunks (int, optional): total number of chunks. Defaults to 1.
+
+        Returns:
+            Callable[[dict], None]: the callback function
+        """
+        callback = functools.partial(self._progress_callback, chunk_index, total_chunks)
+        self._progress_callbacks.append(callback)
+        return callback
+
+    def clear_progress_callbacks(self):
+        self._progress_callbacks = []
+
+    @property
+    def active(self) -> bool:
+        return self._active
 
     @property
     def _log_header(self) -> str:
@@ -111,8 +154,15 @@ class PiperCommand(metaclass=PiperCommandSingleton):
             key (str): The key to log.
             value (any): The value to log. Can be any picklable object.
         """
-        logger.debug(f"{self._log_header}Logging {key}={value}")
-        self._channel.send(self._id, {key: value})
+        if self.active:
+            logger.debug(f"{self._log_header}Logging {key}={value}")
+            self._channel.send(self._id, {key: value})
+
+    def __del__(self):
+        self.destroy()
+
+    def destroy(self):
+        PiperCommandSingleton.destroy()
 
 
 class Piper:
@@ -211,7 +261,7 @@ class Piper:
             # Reader the stdout to retrieve the Piper info if any
             info = yaml.safe_load(pipe.stdout)
         except ScannerError as e:
-            logger.error(f"{command} is not a valid Piper command!")
+            logger.error(f"{command} is not a valid Piper command! {str(e)}")
             info = None
         return info
 
@@ -282,3 +332,11 @@ class Piper:
         description[PiperNamespace.NAME_ARGS] = commands_map
 
         return description
+
+    @classmethod
+    def piper_info_argument(cls):
+        return PiperNamespace.ARGUMENT_NAME_INFO
+
+    @classmethod
+    def piper_token_argument(cls):
+        return PiperNamespace.ARGUMENT_NAME_TOKEN

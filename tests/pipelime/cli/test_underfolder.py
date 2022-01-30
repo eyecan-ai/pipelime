@@ -152,7 +152,7 @@ class TestCLIUnderfolderOperationSplit:
         options = []
         options.extend(["-i", str(input_folder)])
         for k, v in splits_map.items():
-            options.extend(["-s", f"{str(k)}", f"{str(v)}"])
+            options.extend(["-o", f"{str(k)}", "-s", f"{str(v)}"])
 
         runner = CliRunner()
         result = runner.invoke(operation_split, options)

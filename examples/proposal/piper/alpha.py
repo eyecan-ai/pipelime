@@ -1,6 +1,4 @@
 import click
-import numpy as np
-import torch
 from pipelime.pipes.piper import Piper, PiperCommand
 import time
 
@@ -41,7 +39,7 @@ def two(
     outuput_folder: str,
     times: int,
     sleep: float,
-    **pipergs,
+    **piper_kwargs,
 ):
 
     PiperCommand()
