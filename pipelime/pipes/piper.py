@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import functools
-from pipelime.pipes.communication import PiperCommunicationChannelFactory
-from typing import Callable, Optional, Sequence, Union
-from yaml.scanner import ScannerError
-from loguru import logger
 import subprocess
-import inspect
+import uuid
+from typing import Any, Callable, Dict, Optional, Sequence, Union
+
 import click
 import yaml
-import uuid
+from loguru import logger
+from yaml.scanner import ScannerError
+
+from pipelime.pipes.communication import PiperCommunicationChannelFactory
 
 
 class PiperNamespace:
@@ -36,75 +39,23 @@ class PiperNamespace:
     ARGUMENT_NAME_INFO = f"{PRIVATE_ARGUMENT_PREFIX}{PIPER_PREFIX}{NAME_INFO}"
 
 
-class PiperCommandSingleton(type):
-    _instance = None
+class PiperCommand:
+    instance: PiperCommand = None
 
-    def __call__(cls, *args, **kwargs):
-        if PiperCommandSingleton._instance is None:
-
-            # Search the piper kwarg in the kwargs of the click command and add it to
-            # the kwargs
-            parent_variables = inspect.currentframe().f_back.f_locals
-            if PiperNamespace.COMMAND_KWARGS_NAME in parent_variables:
-                kwargs.update(parent_variables[PiperNamespace.COMMAND_KWARGS_NAME])
-            else:
-                raise ValueError(
-                    f"{PiperNamespace.COMMAND_KWARGS_NAME} not found among command kwargs"
-                )
-
-            # Builds the caller name based on Module/Filename/Function path and add
-            # it to the kwargs
-            frame = inspect.stack()[1]
-            module = inspect.getmodule(frame[0])
-            filename = module.__file__
-            caller_name = f"{filename}:{module.__name__}:{frame.function}"
-            kwargs.update({"caller_name": caller_name})
-
-            # Creates the PiperCommand instance
-            PiperCommandSingleton._instance = super().__call__(*args, **kwargs)
-
-        return PiperCommandSingleton._instance
-
-    @classmethod
-    def destroy(cls):
-        PiperCommandSingleton._instance = None
-
-
-class PiperCommand(metaclass=PiperCommandSingleton):
-    def __init__(self, **kwargs) -> None:
-        """Creates a new PiperCommand instance.
-
-        Raises:
-            RuntimeError: If the token is not provided.
-        """
-
+    def __init__(
+        self,
+        fn: Callable,
+        inputs: Sequence[str],
+        outputs: Sequence[str],
+    ) -> None:
         # Extract default values from the kwargs
-        self._caller_name = kwargs.get("caller_name", "Unknown")
-        self._inputs = kwargs.get(PiperNamespace.OPTION_NAME_INPUTS, [])
-        self._outputs = kwargs.get(PiperNamespace.OPTION_NAME_OUTPUTS, [])
-        self._token = kwargs.get(PiperNamespace.OPTION_NAME_TOKEN, "")
-        self._token = self._token if len(self._token) > 0 else None
+        self._fn = fn
+        self._caller_name = f"{fn.__module__}:{fn.__name__}"
+        self._inputs = inputs
+        self._outputs = outputs
 
         # progress callbacks list
         self._progress_callbacks = []
-
-        # Token check, if not provided, the command is disabled
-        self._active = self._token is not None
-
-        if self._active:
-            # Builds an unique id for the command, multiple instances of same command
-            # are allowed, for this reason an unique id is required
-            self._unique_identifier = str(uuid.uuid1())
-            self._id = f"{self._caller_name}:{self._unique_identifier}"
-
-            # Creates the communication channel among commands
-            self._channel = PiperCommunicationChannelFactory.create_channel(self._token)
-
-            # Logs the command creation
-            logger.debug(f"{self._log_header}New Piper created from: {self._id}")
-            logger.debug(f"{self._log_header}\tPiper inputs: {self._inputs}")
-            logger.debug(f"{self._log_header}\tPiper outputs: {self._outputs}")
-            logger.debug(f"{self._log_header}\tPiper token: {self._token}")
 
     def _progress_callback(self, chunk_index: int, total_chunks: int, payload: dict):
         self.log(
@@ -158,11 +109,46 @@ class PiperCommand(metaclass=PiperCommandSingleton):
             logger.debug(f"{self._log_header}Logging {key}={value}")
             self._channel.send(self._id, {key: value})
 
-    def __del__(self):
-        self.destroy()
+    def _init_state(self, token: str) -> None:
+        self.__class__.instance = self
+        self._token = token if len(token) > 0 else None
 
-    def destroy(self):
-        PiperCommandSingleton.destroy()
+        # Token check, if not provided, the command is disabled
+        self._active = self._token is not None
+
+        if self._active:
+            # Builds an unique id for the command, multiple instances of same command
+            # are allowed, for this reason an unique id is required
+            self._unique_identifier = str(uuid.uuid1())
+            self._id = f"{self._caller_name}:{self._unique_identifier}"
+
+            # Creates the communication channel among commands
+            self._channel = PiperCommunicationChannelFactory.create_channel(self._token)
+
+    def _log_state(self) -> None:
+        if self._active:
+            # Logs the command creation
+            logger.debug(f"{self._log_header}New Piper created from: {self._id}")
+            logger.debug(f"{self._log_header}\tPiper inputs: {self._inputs}")
+            logger.debug(f"{self._log_header}\tPiper outputs: {self._outputs}")
+            logger.debug(f"{self._log_header}\tPiper token: {self._token}")
+
+    def _filter_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        to_remove = {
+            PiperNamespace.OPTION_NAME_TOKEN,
+            PiperNamespace.OPTION_NAME_INFO,
+            PiperNamespace.OPTION_NAME_OUTPUTS,
+            PiperNamespace.OPTION_NAME_INPUTS,
+        }
+        return {k: v for k, v in kwargs.items() if k not in to_remove}
+
+    def __call__(self, *args, **kwargs):
+        token = kwargs.get(PiperNamespace.OPTION_NAME_TOKEN, "")
+        kwargs = self._filter_kwargs(kwargs)
+        self._init_state(token)
+        self._log_state()
+        self._fn(*args, **kwargs)
+        self.__class__.instance = None
 
 
 class Piper:
@@ -183,7 +169,7 @@ class Piper:
             ctx.exit()
 
     @staticmethod
-    def piper_command_options(
+    def command(
         inputs: Optional[Sequence[str]] = None,
         outputs: Optional[Sequence[str]] = None,
     ):
@@ -197,37 +183,28 @@ class Piper:
             treated as output . Defaults to None.
         """
 
-        def _add_options(func):
-
-            # Add the token option
-            func = click.option(
+        def _wrapped(func):
+            cmd = PiperCommand(func, inputs, outputs)
+            cmd = click.option(
                 PiperNamespace.ARGUMENT_NAME_TOKEN, default="", hidden=True
-            )(func)
-
-            # Add the inputs options
-            func = click.option(
+            )(cmd)
+            cmd = click.option(
                 PiperNamespace.ARGUMENT_NAME_INPUTS, default=inputs, hidden=True
-            )(func)
-
-            # Add the output options
-            func = click.option(
+            )(cmd)
+            cmd = click.option(
                 PiperNamespace.ARGUMENT_NAME_OUTPUTS, default=outputs, hidden=True
-            )(func)
-
-            # Add the info option. This is the eager option, if set to True, the
-            # execution will exit printing the Piper info into the pipe.
-            func = click.option(
+            )(cmd)
+            cmd = click.option(
                 PiperNamespace.ARGUMENT_NAME_INFO,
                 is_flag=True,
                 is_eager=True,
                 expose_value=False,
                 callback=Piper._piper_info_callback,
                 hidden=True,
-            )(func)
+            )(cmd)
+            return cmd
 
-            return func
-
-        return _add_options
+        return _wrapped
 
     @classmethod
     def piper_command_raw_info(cls, command: str) -> Union[None, dict]:
@@ -289,12 +266,6 @@ class Piper:
             raise RuntimeError(f"Command '{command}' is not a piper!")
 
         commands_map = {x["name"]: x for x in raw_info["params"]}
-
-        # Checks for the mandatory piper options
-        assert PiperNamespace.OPTION_NAME_INPUTS in commands_map, "No inputs!"
-        assert PiperNamespace.OPTION_NAME_OUTPUTS in commands_map, "No outputs!"
-        assert PiperNamespace.OPTION_NAME_TOKEN in commands_map, "token is not present"
-        assert PiperNamespace.OPTION_NAME_INFO in commands_map, "info is not present"
 
         piper_inputs = commands_map[PiperNamespace.OPTION_NAME_INPUTS]
         piper_outputs = commands_map[PiperNamespace.OPTION_NAME_OUTPUTS]

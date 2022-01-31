@@ -21,7 +21,7 @@ from pipelime.pipes.piper import Piper, PiperCommand
 @click.option(
     "--suffix", type=str, default="", help="Suffix to add to the output files"
 )
-@Piper.piper_command_options(outputs=["output_folder"])
+@Piper.command(outputs=["output_folder"])
 def generate_toy_dataset(
     output_folder,
     size,

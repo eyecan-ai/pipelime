@@ -26,7 +26,7 @@ from pipelime.pipes.piper import Piper, PiperCommand
     default=0.01,
     help="Fake delay time",
 )
-@Piper.piper_command_options(
+@Piper.command(
     inputs=["input_folders"],
     outputs=["outuput_folder"],
 )
