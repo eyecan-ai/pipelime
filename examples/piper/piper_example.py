@@ -52,7 +52,7 @@ def piper_example(
     else:
         # Executor
         executor = NaiveGraphExecutor()
-        executor.exec(graph)
+        executor.exec(graph, token="miao")
 
 
 if __name__ == "__main__":

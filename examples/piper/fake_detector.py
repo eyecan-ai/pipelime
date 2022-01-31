@@ -1,5 +1,6 @@
 import click
 from pipelime.pipes.piper import Piper, PiperCommand
+from pipelime.tools.progress import pipelime_track
 
 
 @click.command("fake_detector")
@@ -34,7 +35,6 @@ def fake_detector(
     input_folders: str,
     output_folders: str,
     fake_time: float,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -42,8 +42,6 @@ def fake_detector(
     from pipelime.sequences.samples import SamplesSequence
     import time
     import numpy as np
-
-    PiperCommand()
 
     # checks size of input/output folders
     if len(input_folders) != len(output_folders):
@@ -57,7 +55,13 @@ def fake_detector(
 
         # ADD fake detections to each sample
         out_samples = []
-        for sample in reader:
+        for sample in pipelime_track(
+            reader,
+            track_callback=PiperCommand.instance.generate_progress_callback(
+                index * 2,
+                len(reader),
+            ),
+        ):
             sample["fake_detection"] = {
                 "keypoints": [np.random.randint(0, 100, (10, 4)).tolist()]
             }
@@ -77,8 +81,9 @@ def fake_detector(
             reader_template=template,
             file_handling=UnderfolderWriterV2.FileHandling.COPY_IF_NOT_CACHED,
             copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
-            progress_callback=PiperCommand().generate_progress_callback(
-                chunk_index=index, total_chunks=len(input_folders)
+            progress_callback=PiperCommand.instance.generate_progress_callback(
+                chunk_index=index * 2 + 1,
+                total_chunks=len(input_folders),
             ),
         )
         writer(out_sequence)

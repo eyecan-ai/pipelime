@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
 import subprocess
 from typing import Any, Dict, List, Sequence, Tuple
-
 import rich
 from pipelime.pipes.graph import GraphNodeOperation, NodesGraph
-
 from pipelime.pipes.model import NodeModel
+from pipelime.pipes.piper import PiperCommand, PiperNamespace
 
 
 class NodeModelExecutionParser(ABC):
@@ -112,15 +111,19 @@ class NaiveGraphExecutor(NodesGraphExecutor):
     def __init__(self) -> None:
         super().__init__()
 
-    def exec(self, graph: NodesGraph) -> bool:
+    def exec(self, graph: NodesGraph, token: str = "") -> bool:
 
         parser = NaiveNodeModelExecutionParser()
 
         for layer in graph.build_execution_stack():
             for node in layer:
                 node: GraphNodeOperation
-                command_chunks = parser.build_command_chunks(node_model=node.node_model)
-                command = parser.build_plain_command(node_model=node.node_model)
+                command_chunks: List = parser.build_command_chunks(
+                    node_model=node.node_model
+                )
+                command_chunks.append(PiperNamespace.ARGUMENT_NAME_TOKEN)
+                command_chunks.append(token)
+                command = " ".join(command_chunks)
                 rich.print("Exec", command)
 
                 try:

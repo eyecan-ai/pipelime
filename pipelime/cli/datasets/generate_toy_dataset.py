@@ -30,14 +30,11 @@ def generate_toy_dataset(
     max_label,
     nr_objs,
     suffix,
-    **piper_kwargs,
 ):
 
     from pathlib import Path
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.tools.toydataset import ToyDatasetGenerator
-
-    PiperCommand()
 
     output_folder = Path(output_folder) / UnderfolderReader.DATA_SUBFOLDER
     ToyDatasetGenerator.generate_toy_dataset(
@@ -48,7 +45,7 @@ def generate_toy_dataset(
         suffix=suffix,
         max_label=max_label,
         objects_number_range=(nr_objs[0], nr_objs[1] + 1),
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
 
 

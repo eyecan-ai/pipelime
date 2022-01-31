@@ -7,7 +7,7 @@ params:
   - A
   - B
   - C
-  generated_dataset_size: 100
+  generated_dataset_size: 250
   generated_output_folder: /tmp/pipe/generated
   output_folder: /tmp/pipe/output
   splits:
