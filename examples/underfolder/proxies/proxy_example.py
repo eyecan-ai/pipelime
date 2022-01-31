@@ -7,8 +7,6 @@ from pipelime.sequences.proxies import (
     CachedSamplesSequence,
 )
 from pipelime.sequences.stages import StageKeysFilter, StageAugmentations
-
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter_ns

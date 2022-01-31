@@ -4,7 +4,7 @@ import copy
 import multiprocessing
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
 
 import dictquery as dq
 import numpy as np
@@ -16,7 +16,7 @@ from rich.progress import track
 from schema import Or, Schema
 
 from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
-from pipelime.sequences.stages import SampleStage
+from pipelime.sequences.stages import SampleStage, StageRemap
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
 
 
@@ -871,3 +871,17 @@ class OperationStage(MappableOperation, Spook):
     def from_dict(cls, d: dict) -> OperationStage:
         stage = Spook.create(d.pop("stage"))
         return cls(stage, **d)
+
+
+class OperationRemapKeys(OperationStage):
+    def __init__(
+        self, remap: Mapping[str, str], remove_missing: bool = True, **kwargs
+    ) -> None:
+        """Creates an `OperationRemapKeys` from keys str:str map .
+
+        :param remap: mapping from old keys to new keys
+        :type remap: Mapping[str, str]
+        :param remove_missing: if True, missing keys will be removed from the sample
+        :type remove_missing: bool
+        """
+        super().__init__(stage=StageRemap(remap, remove_missing), **kwargs)

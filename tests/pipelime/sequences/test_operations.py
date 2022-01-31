@@ -19,6 +19,7 @@ from pipelime.sequences.operations import (
     # OperationMix,
     OperationOrderBy,
     OperationPort,
+    OperationRemapKeys,
     OperationResetIndices,
     OperationShuffle,
     OperationSplitByQuery,
@@ -654,3 +655,27 @@ class TestOperationStage(object):
         for x in out:
             assert key_2 in x
             assert key not in x
+
+
+class TestOperationRemapKeys(object):
+    def test_operation_stage(self, plain_samples_sequence_generator):
+        N = 32
+        key = "number"
+        key_2 = "number_2"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        for remove_missing in [True, False]:
+            op = OperationRemapKeys(remap={key: key_2}, remove_missing=remove_missing)
+            _plug_test(op, check_serialization=False)
+            out = op(dataset)
+
+            assert isinstance(out, SamplesSequence)
+            assert N == len(out)
+            for x in out:
+                assert key_2 in x
+                assert key not in x
+                if remove_missing:
+                    assert len(x.keys()) == 1
+                else:
+                    assert len(x.keys()) > 1
