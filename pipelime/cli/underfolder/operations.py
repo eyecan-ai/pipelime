@@ -38,6 +38,8 @@ def operation_sum(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
+    pipercmd = PiperCommand.instance
+
     if len(input_folders) > 0:
         datasets = [
             UnderfolderReader(folder=x, lazy_samples=True) for x in input_folders
