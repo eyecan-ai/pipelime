@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, WindowsPath
-from typing import Tuple, Union, Optional, BinaryIO
-
+from typing import Any, Tuple, Union, Optional, BinaryIO
+import hashlib
 from urllib.parse import urlparse, unquote_plus, ParseResult
 
 import os
@@ -19,16 +19,20 @@ class RemoteRegister(ABCMeta):
         super().__init__(name, bases, dct)
 
     @classmethod
-    def get_instance(cls, scheme: str, netloc: str):
+    def get_instance(cls, scheme: str, netloc: str, **kwargs):
         remote_instance = cls.REMOTE_INSTANCES.get((scheme, netloc))
         if remote_instance is None:
             remote_class = cls.REMOTE_CLASSES.get(scheme)
             if remote_class is not None:
-                remote_instance = remote_class(netloc)
+                remote_instance = remote_class(netloc, **kwargs)
                 cls.REMOTE_INSTANCES[(scheme, netloc)] = remote_instance
             else:
                 logger.warning(f"Unknown remote scheme {scheme}.")
         return remote_instance
+
+
+def create_remote(scheme: str, netloc: str, **kwargs):
+    return RemoteRegister.get_instance(scheme, netloc, **kwargs)
 
 
 def create_remote_from_url(
@@ -50,10 +54,7 @@ def create_remote_from_url(
 
 
 class BaseRemote(metaclass=RemoteRegister):  # type: ignore
-    def __init__(self, netloc: str, hash_gen=None):
-        import hashlib
-
-        self._hash_gen = hashlib.sha256 if hash_gen is None else hash_gen
+    def __init__(self, netloc: str):
         self._netloc = netloc
 
     def upload_file(
@@ -73,7 +74,7 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         target_path: str,
         target_suffix: str,
     ) -> Optional[str]:
-        hash_name = self._compute_hash(stream)
+        hash_name = self._compute_hash(stream, self._get_hash_fn(target_path))
         target_name = hash_name + target_suffix
         if self._upload(stream, stream_size, target_path, target_name):
             return self._make_url(f"{target_path}/{target_name}")
@@ -119,25 +120,34 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
     ) -> bool:
         return self._download(stream, source_path, source_name, source_offset)
 
-    def _compute_hash(self, stream: BinaryIO) -> str:
-        h = self._hash_gen()
+    def _compute_hash(self, stream: BinaryIO, hash_fn: Any = None) -> str:
+        if hash_fn is None:
+            hash_fn = hashlib.sha256()
         b = bytearray(1024 * 1024)
         mv = memoryview(b)
         fpos = stream.tell()
         for n in iter(lambda: stream.readinto(mv), 0):  # type: ignore
-            h.update(mv[:n])
+            hash_fn.update(mv[:n])
         stream.seek(fpos)
-        return h.hexdigest()
+        return hash_fn.hexdigest()
 
     def _make_url(self, target_path: str):
-        return ParseResult(
-            scheme=self.scheme(),
-            netloc=self.netloc,
-            path=target_path,
-            params="",
-            query="",
-            fragment="",
-        ).geturl()
+        return (
+            ParseResult(
+                scheme=self.scheme(),
+                netloc=self.netloc,
+                path=target_path,
+                params="",
+                query="",
+                fragment="",
+            )
+            .geturl()
+            .replace("\\", "/")
+        )
+
+    @abstractmethod
+    def _get_hash_fn(self, target_path: str) -> Any:
+        ...
 
     @abstractmethod
     def _upload(
@@ -149,6 +159,7 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
     ) -> bool:
         ...
 
+    @abstractmethod
     def _download(
         self,
         target: BinaryIO,
@@ -174,6 +185,9 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
 
 
 class S3Remote(BaseRemote):
+    _HASH_FN_KEY_ = "__HASH_FN__"
+    _DEFAULT_HASH_FN_ = "sha256"
+
     def __init__(
         self,
         endpoint: str,
@@ -182,9 +196,8 @@ class S3Remote(BaseRemote):
         session_token: Optional[str] = None,
         secure_connection: bool = True,
         region: Optional[str] = None,
-        hash_gen=None,
     ):
-        super().__init__(endpoint, hash_gen)
+        super().__init__(endpoint)
 
         try:
             from minio import Minio
@@ -203,24 +216,56 @@ class S3Remote(BaseRemote):
                 session_token=session_token,
                 secure=secure_connection,
                 region=region,
-                credentials=ChainedProvider(
-                    [
-                        # AWS_ACCESS_KEY_ID|AWS_ACCESS_KEY,
-                        # AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY,
-                        # AWS_SESSION_TOKEN
-                        EnvAWSProvider(),
-                        # MINIO_ACCESS_KEY, MINIO_SECRET_KEY
-                        EnvMinioProvider(),
-                        # ~/.aws/credentials
-                        AWSConfigProvider(),
-                        # ~/[.]mc/config.json
-                        MinioClientConfigProvider(),
-                    ]
-                ),
+                # credentials=ChainedProvider(
+                #     [
+                #         # AWS_ACCESS_KEY_ID|AWS_ACCESS_KEY,
+                #         # AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY,
+                #         # AWS_SESSION_TOKEN
+                #         EnvAWSProvider(),
+                #         # MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+                #         EnvMinioProvider(),
+                #         # ~/.aws/credentials
+                #         AWSConfigProvider(),
+                #         # ~/[.]mc/config.json
+                #         MinioClientConfigProvider(),
+                #     ]
+                # ),
             )
         except ModuleNotFoundError:  # pragma: no cover
             logger.error("S3 remote needs `minio` python package.")
             self._client = None
+
+    def _maybe_create_bucket(self, target_path: str):
+        if not self._client.bucket_exists(target_path):  # type: ignore
+            logger.info(f"Creating bucket {target_path} on S3 remote {self.netloc}.")
+            self._client.make_bucket(target_path)  # type: ignore
+
+    def _get_hash_fn(self, target_path: str) -> Any:
+        if self.is_valid:
+            try:
+                self._maybe_create_bucket(target_path)
+                tags = self._client.get_bucket_tags(target_path)  # type: ignore
+                if tags is None:
+                    from minio.commonconfig import Tags
+                    tags = Tags()
+                hash_fn_name = tags.get(self._HASH_FN_KEY_)
+
+                # try-get
+                if isinstance(hash_fn_name, str) and len(hash_fn_name) > 0:
+                    try:
+                        hash_fn = getattr(hashlib, hash_fn_name)
+                        return hash_fn()
+                    except AttributeError:
+                        pass
+
+                tags[self._HASH_FN_KEY_] = self._DEFAULT_HASH_FN_
+                self._client.set_bucket_tags(target_path, tags)  # type: ignore
+
+                hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
+                return hash_fn()
+            except Exception as exc:
+                logger.warning(str(exc))
+        return None
 
     def _upload(
         self,
@@ -231,12 +276,7 @@ class S3Remote(BaseRemote):
     ) -> bool:
         if self.is_valid:
             try:
-                if not self._client.bucket_exists(target_path):  # type: ignore
-                    logger.info(
-                        f"Creating bucket {target_path} on S3 remote {self.netloc}."
-                    )
-                    self._client.make_bucket(target_path)  # type: ignore
-
+                self._maybe_create_bucket(target_path)
                 self._client.put_object(  # type: ignore
                     bucket_name=target_path,
                     object_name=target_name,
@@ -297,10 +337,61 @@ class S3Remote(BaseRemote):
 
 
 class FileRemote(BaseRemote):
-    def __init__(self, netloc: str, hash_gen=None):
+    _PL_FOLDER_ = ".pl"
+    _HASH_FN_KEY_ = "__HASH_FN__"
+    _DEFAULT_HASH_FN_ = "sha256"
+
+    def __init__(self, netloc: str):
         if netloc == "localhost" or netloc == "127.0.0.1":
             netloc = ""
-        super().__init__(netloc, hash_gen)
+        super().__init__(netloc)
+
+    def _maybe_create_root(self, target_path: Path):
+        if not target_path.exists():
+            logger.info(f"Creating folder tree {target_path}.")
+            target_path.mkdir(parents=True, exist_ok=True)
+        pldir = target_path / self._PL_FOLDER_
+        if not pldir.is_dir():
+            pldir.mkdir(parents=True, exist_ok=True)
+
+    def _get_hash_fn(self, target_path: str) -> Any:
+        if self.is_valid:
+            try:
+                import json
+
+                full_target_path = self._make_file_path(target_path, "")
+                self._maybe_create_root(full_target_path)
+
+                tags = {}
+                try:
+                    with open(
+                        full_target_path / self._PL_FOLDER_ / "tags.json", "r"
+                    ) as jtags:
+                        tags = json.load(jtags)
+                except Exception:
+                    pass
+
+                hash_fn_name = tags.get(self._HASH_FN_KEY_)
+
+                # try-get
+                if isinstance(hash_fn_name, str) and len(hash_fn_name) > 0:
+                    try:
+                        hash_fn = getattr(hashlib, hash_fn_name)
+                        return hash_fn()
+                    except AttributeError:
+                        pass
+
+                tags[self._HASH_FN_KEY_] = self._DEFAULT_HASH_FN_
+                with open(
+                    full_target_path / self._PL_FOLDER_ / "tags.json", "w"
+                ) as jtags:
+                    json.dump(tags, jtags)
+
+                hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
+                return hash_fn()
+            except Exception as exc:
+                logger.warning(str(exc))
+        return None
 
     def _upload(
         self,
@@ -312,9 +403,7 @@ class FileRemote(BaseRemote):
         if self.is_valid:
             try:
                 full_target_path = self._make_file_path(target_path, target_name)
-                if not full_target_path.parent.exists():
-                    logger.info(f"Creating folder tree {full_target_path.parent}.")
-                    full_target_path.parent.mkdir(parents=True, exist_ok=True)
+                self._maybe_create_root(full_target_path.parent)
 
                 with full_target_path.open("wb") as target:
                     shutil.copyfileobj(source, target)
