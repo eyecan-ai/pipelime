@@ -35,7 +35,7 @@ def create_remote(scheme: str, netloc: str, **kwargs) -> Optional["BaseRemote"]:
     return RemoteRegister.get_instance(scheme, netloc, **kwargs)
 
 
-def parse_url(url: str) -> Tuple[Optional[str], Optional[str]]:
+def parse_url(url: str) -> Union[Tuple[str, str], Tuple[None, None]]:
     parsed_url = urlparse(url)
     if len(parsed_url.path) > 1:
         file_full_path = Path(unquote_plus(parsed_url.path)[1:])
