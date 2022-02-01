@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, WindowsPath
-from typing import Any, Tuple, Union, Optional, BinaryIO
+from typing import Type, Mapping, MutableMapping, Any, Tuple, Union, Optional, BinaryIO
 import hashlib
 from urllib.parse import urlparse, unquote_plus, ParseResult
 
@@ -11,15 +11,15 @@ from loguru import logger
 
 
 class RemoteRegister(ABCMeta):
-    REMOTE_CLASSES = {}
-    REMOTE_INSTANCES = {}
+    REMOTE_CLASSES: MutableMapping[str, Type["BaseRemote"]] = {}
+    REMOTE_INSTANCES: MutableMapping[Tuple[str, str], "BaseRemote"] = {}
 
     def __init__(cls, name, bases, dct):
         cls.REMOTE_CLASSES[cls.scheme()] = cls  # type: ignore
         super().__init__(name, bases, dct)
 
     @classmethod
-    def get_instance(cls, scheme: str, netloc: str, **kwargs):
+    def get_instance(cls, scheme: str, netloc: str, **kwargs) -> Optional["BaseRemote"]:
         remote_instance = cls.REMOTE_INSTANCES.get((scheme, netloc))
         if remote_instance is None:
             remote_class = cls.REMOTE_CLASSES.get(scheme)
@@ -31,26 +31,30 @@ class RemoteRegister(ABCMeta):
         return remote_instance
 
 
-def create_remote(scheme: str, netloc: str, **kwargs):
+def create_remote(scheme: str, netloc: str, **kwargs) -> Optional["BaseRemote"]:
     return RemoteRegister.get_instance(scheme, netloc, **kwargs)
 
 
-def create_remote_from_url(
-    url: str,
-) -> Tuple[Optional["BaseRemote"], Optional[str], Optional[str]]:
+def parse_url(url: str) -> Tuple[Optional[str], Optional[str]]:
     parsed_url = urlparse(url)
-
     if len(parsed_url.path) > 1:
         file_full_path = Path(unquote_plus(parsed_url.path)[1:])
-        file_path, file_name = file_full_path.parent, file_full_path.name
+        return str(file_full_path.parent.as_posix()), str(file_full_path.name)
     else:
-        file_path, file_name = None, None
+        return None, None
 
+
+def get_remote_and_paths(
+    url: str, remotes_kwargs: Mapping[str, Mapping[str, Any]] = {}
+) -> Tuple[Optional["BaseRemote"], Optional[str], Optional[str]]:
+    parsed_url = urlparse(url)
     return (
-        RemoteRegister.get_instance(parsed_url.scheme, parsed_url.netloc),
-        str(file_path),
-        str(file_name),
-    )
+        create_remote(
+            parsed_url.scheme,
+            parsed_url.netloc,
+            **(remotes_kwargs.get(parsed_url.scheme, {})),
+        ),
+    ) + parse_url(url)
 
 
 class BaseRemote(metaclass=RemoteRegister):  # type: ignore
@@ -58,42 +62,44 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         self._netloc = netloc
 
     def upload_file(
-        self, file_path: Union[Path, str], target_path: str
+        self, local_file: Union[Path, str], target_base_path: str
     ) -> Optional[str]:
-        file_path = Path(file_path)
-        file_size = file_path.stat().st_size
-        with open(file_path, "rb") as file_data:
+        local_file = Path(local_file)
+        file_size = local_file.stat().st_size
+        with open(local_file, "rb") as file_data:
             return self.upload_stream(
-                file_data, file_size, target_path, "".join(file_path.suffixes)
+                file_data, file_size, target_base_path, "".join(local_file.suffixes)
             )
 
     def upload_stream(
         self,
-        stream: BinaryIO,
-        stream_size: int,
-        target_path: str,
+        local_stream: BinaryIO,
+        local_stream_size: int,
+        target_base_path: str,
         target_suffix: str,
     ) -> Optional[str]:
-        hash_name = self._compute_hash(stream, self._get_hash_fn(target_path))
+        hash_name = self._compute_hash(
+            local_stream, self._get_hash_fn(target_base_path)
+        )
         target_name = hash_name + target_suffix
-        if self._upload(stream, stream_size, target_path, target_name):
-            return self._make_url(f"{target_path}/{target_name}")
+        if self._upload(local_stream, local_stream_size, target_base_path, target_name):
+            return self._make_url(f"{target_base_path}/{target_name}")
         return None
 
     def download_file(
         self,
-        file_path: Union[Path, str],
-        source_path: str,
+        local_file: Union[Path, str],
+        source_base_path: str,
         source_name: str,
     ) -> bool:
-        file_path = Path(file_path)
-        if file_path.suffixes != Path(source_name).suffixes:
-            file_path = file_path.with_suffix(
-                "".join([file_path.suffix] + Path(source_name).suffixes)
+        local_file = Path(local_file)
+        if local_file.suffixes != Path(source_name).suffixes:
+            local_file = local_file.with_suffix(
+                "".join([local_file.suffix] + Path(source_name).suffixes)
             )
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        local_file.parent.mkdir(parents=True, exist_ok=True)
 
-        part_file = file_path.with_suffix(file_path.suffix + ".part")
+        part_file = local_file.with_suffix(local_file.suffix + ".part")
 
         offset: int = 0
         try:
@@ -103,22 +109,26 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
 
         ok = False
         with open(part_file, "ab") as part_stream:
-            ok = self.download_stream(part_stream, source_path, source_name, offset)
+            ok = self.download_stream(
+                part_stream, source_base_path, source_name, offset
+            )
 
         if ok:
-            file_path.unlink(missing_ok=True)
-            part_file.rename(file_path)
+            local_file.unlink(missing_ok=True)
+            part_file.rename(local_file)
 
         return ok
 
     def download_stream(
         self,
-        stream: BinaryIO,
-        source_path: str,
+        local_stream: BinaryIO,
+        source_base_path: str,
         source_name: str,
         source_offset: int = 0,
     ) -> bool:
-        return self._download(stream, source_path, source_name, source_offset)
+        return self._download(
+            local_stream, source_base_path, source_name, source_offset
+        )
 
     def _compute_hash(self, stream: BinaryIO, hash_fn: Any = None) -> str:
         if hash_fn is None:
@@ -131,30 +141,26 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         stream.seek(fpos)
         return hash_fn.hexdigest()
 
-    def _make_url(self, target_path: str):
-        return (
-            ParseResult(
-                scheme=self.scheme(),
-                netloc=self.netloc,
-                path=target_path,
-                params="",
-                query="",
-                fragment="",
-            )
-            .geturl()
-            .replace("\\", "/")
-        )
+    def _make_url(self, target_full_path: str):
+        return ParseResult(
+            scheme=self.scheme(),
+            netloc=self.netloc,
+            path=target_full_path.replace("\\", "/"),
+            params="",
+            query="",
+            fragment="",
+        ).geturl()
 
     @abstractmethod
-    def _get_hash_fn(self, target_path: str) -> Any:
+    def _get_hash_fn(self, target_base_path: str) -> Any:
         ...
 
     @abstractmethod
     def _upload(
         self,
-        source: BinaryIO,
-        source_size: int,
-        target_path: str,
+        local_stream: BinaryIO,
+        local_stream_size: int,
+        target_base_path: str,
         target_name: str,
     ) -> bool:
         ...
@@ -162,8 +168,8 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
     @abstractmethod
     def _download(
         self,
-        target: BinaryIO,
-        source_path: str,
+        local_stream: BinaryIO,
+        source_base_path: str,
         source_name: str,
         source_offset: int,
     ) -> bool:
@@ -201,13 +207,14 @@ class S3Remote(BaseRemote):
 
         try:
             from minio import Minio
-            from minio.credentials import (
-                ChainedProvider,
-                EnvAWSProvider,
-                EnvMinioProvider,
-                AWSConfigProvider,
-                MinioClientConfigProvider,
-            )
+
+            # from minio.credentials import (
+            #     ChainedProvider,
+            #     EnvAWSProvider,
+            #     EnvMinioProvider,
+            #     AWSConfigProvider,
+            #     MinioClientConfigProvider,
+            # )
 
             self._client = Minio(
                 endpoint=endpoint,
@@ -235,18 +242,21 @@ class S3Remote(BaseRemote):
             logger.error("S3 remote needs `minio` python package.")
             self._client = None
 
-    def _maybe_create_bucket(self, target_path: str):
-        if not self._client.bucket_exists(target_path):  # type: ignore
-            logger.info(f"Creating bucket {target_path} on S3 remote {self.netloc}.")
-            self._client.make_bucket(target_path)  # type: ignore
+    def _maybe_create_bucket(self, target_base_path: str):
+        if not self._client.bucket_exists(target_base_path):  # type: ignore
+            logger.info(
+                f"Creating bucket {target_base_path} on S3 remote {self.netloc}."
+            )
+            self._client.make_bucket(target_base_path)  # type: ignore
 
-    def _get_hash_fn(self, target_path: str) -> Any:
+    def _get_hash_fn(self, target_base_path: str) -> Any:
         if self.is_valid:
             try:
-                self._maybe_create_bucket(target_path)
-                tags = self._client.get_bucket_tags(target_path)  # type: ignore
+                self._maybe_create_bucket(target_base_path)
+                tags = self._client.get_bucket_tags(target_base_path)  # type: ignore
                 if tags is None:
                     from minio.commonconfig import Tags
+
                     tags = Tags()
                 hash_fn_name = tags.get(self._HASH_FN_KEY_)
 
@@ -259,7 +269,7 @@ class S3Remote(BaseRemote):
                         pass
 
                 tags[self._HASH_FN_KEY_] = self._DEFAULT_HASH_FN_
-                self._client.set_bucket_tags(target_path, tags)  # type: ignore
+                self._client.set_bucket_tags(target_base_path, tags)  # type: ignore
 
                 hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
                 return hash_fn()
@@ -269,19 +279,19 @@ class S3Remote(BaseRemote):
 
     def _upload(
         self,
-        source: BinaryIO,
-        source_size: int,
-        target_path: str,
+        local_stream: BinaryIO,
+        local_stream_size: int,
+        target_base_path: str,
         target_name: str,
     ) -> bool:
         if self.is_valid:
             try:
-                self._maybe_create_bucket(target_path)
+                self._maybe_create_bucket(target_base_path)
                 self._client.put_object(  # type: ignore
-                    bucket_name=target_path,
+                    bucket_name=target_base_path,
                     object_name=target_name,
-                    data=source,
-                    length=source_size,
+                    data=local_stream,
+                    length=local_stream_size,
                 )
                 return True
             except Exception as exc:
@@ -292,15 +302,15 @@ class S3Remote(BaseRemote):
 
     def _download(
         self,
-        target: BinaryIO,
-        source_path: str,
+        local_stream: BinaryIO,
+        source_base_path: str,
         source_name: str,
         source_offset: int,
     ) -> bool:
         if self.is_valid:
-            if not self._client.bucket_exists(source_path):  # type: ignore
+            if not self._client.bucket_exists(source_base_path):  # type: ignore
                 logger.warning(
-                    f"Bucket {source_path} does not exist "
+                    f"Bucket {source_base_path} does not exist "
                     f"on S3 remote {self.netloc}."
                 )
                 return False
@@ -309,12 +319,12 @@ class S3Remote(BaseRemote):
             ok = False
             try:
                 response = self._client.get_object(  # type: ignore
-                    bucket_name=source_path,
+                    bucket_name=source_base_path,
                     object_name=source_name,
                     offset=source_offset,
                 )
                 for data in response.stream(amt=1024 * 1024):
-                    target.write(data)
+                    local_stream.write(data)
                 ok = True
             except Exception as exc:
                 logger.warning(str(exc))
@@ -338,6 +348,7 @@ class S3Remote(BaseRemote):
 
 class FileRemote(BaseRemote):
     _PL_FOLDER_ = ".pl"
+    _TAGS_FILE_ = "tags.json"
     _HASH_FN_KEY_ = "__HASH_FN__"
     _DEFAULT_HASH_FN_ = "sha256"
 
@@ -346,26 +357,26 @@ class FileRemote(BaseRemote):
             netloc = ""
         super().__init__(netloc)
 
-    def _maybe_create_root(self, target_path: Path):
-        if not target_path.exists():
-            logger.info(f"Creating folder tree {target_path}.")
-            target_path.mkdir(parents=True, exist_ok=True)
-        pldir = target_path / self._PL_FOLDER_
+    def _maybe_create_root(self, target_base_path: Path):
+        if not target_base_path.exists():
+            logger.info(f"Creating folder tree {target_base_path}.")
+            target_base_path.mkdir(parents=True, exist_ok=True)
+        pldir = target_base_path / self._PL_FOLDER_
         if not pldir.is_dir():
             pldir.mkdir(parents=True, exist_ok=True)
 
-    def _get_hash_fn(self, target_path: str) -> Any:
+    def _get_hash_fn(self, target_base_path: str) -> Any:
         if self.is_valid:
             try:
                 import json
 
-                full_target_path = self._make_file_path(target_path, "")
-                self._maybe_create_root(full_target_path)
+                target_root = self._make_file_path(target_base_path, "")
+                self._maybe_create_root(target_root)
 
                 tags = {}
                 try:
                     with open(
-                        full_target_path / self._PL_FOLDER_ / "tags.json", "r"
+                        target_root / self._PL_FOLDER_ / self._TAGS_FILE_, "r"
                     ) as jtags:
                         tags = json.load(jtags)
                 except Exception:
@@ -383,7 +394,7 @@ class FileRemote(BaseRemote):
 
                 tags[self._HASH_FN_KEY_] = self._DEFAULT_HASH_FN_
                 with open(
-                    full_target_path / self._PL_FOLDER_ / "tags.json", "w"
+                    target_root / self._PL_FOLDER_ / self._TAGS_FILE_, "w"
                 ) as jtags:
                     json.dump(tags, jtags)
 
@@ -395,18 +406,18 @@ class FileRemote(BaseRemote):
 
     def _upload(
         self,
-        source: BinaryIO,
-        source_size: int,
-        target_path: str,
+        local_stream: BinaryIO,
+        local_stream_size: int,
+        target_base_path: str,
         target_name: str,
     ) -> bool:
         if self.is_valid:
             try:
-                full_target_path = self._make_file_path(target_path, target_name)
-                self._maybe_create_root(full_target_path.parent)
+                target_full_path = self._make_file_path(target_base_path, target_name)
+                self._maybe_create_root(target_full_path.parent)
 
-                with full_target_path.open("wb") as target:
-                    shutil.copyfileobj(source, target)
+                with target_full_path.open("wb") as target:
+                    shutil.copyfileobj(local_stream, target)
 
                 return True
             except Exception as exc:
@@ -417,21 +428,21 @@ class FileRemote(BaseRemote):
 
     def _download(
         self,
-        target: BinaryIO,
-        source_path: str,
+        local_stream: BinaryIO,
+        source_base_path: str,
         source_name: str,
         source_offset: int,
     ) -> bool:
         if self.is_valid:
             try:
-                full_source_path = self._make_file_path(source_path, source_name)
-                if not full_source_path.exists():
-                    logger.warning(f"File {full_source_path} does not exist.")
+                source_full_path = self._make_file_path(source_base_path, source_name)
+                if not source_full_path.exists():
+                    logger.warning(f"File {source_full_path} does not exist.")
                     return False
 
-                with full_source_path.open("rb") as source:
+                with source_full_path.open("rb") as source:
                     source.seek(source_offset)
-                    shutil.copyfileobj(source, target)
+                    shutil.copyfileobj(source, local_stream)
 
                 return True
             except Exception as exc:
