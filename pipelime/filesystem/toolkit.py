@@ -37,7 +37,7 @@ class FSToolkit(object):
 
     PICKLE_EXT = ("pkl", "pickle")
 
-    REMOTE_EXT = ("remote",)
+    REMOTE_EXT = ("plr", "rmt", "remote")
 
     # Declare TREE structure
     @classmethod
@@ -88,9 +88,7 @@ class FSToolkit(object):
     @classmethod
     def get_file_extension(cls, filename, with_dot=False):
         ext = Path(filename).suffix.lower()
-        if not with_dot and len(ext) > 0:
-            ext = ext[1:]
-        return ext
+        return ext if with_dot else ext.lstrip('.')
 
     @classmethod
     def is_metadata_file(cls, filename: str) -> bool:
@@ -152,6 +150,7 @@ class FSToolkit(object):
                 if data_stream is None:
                     logger.debug(f"unknown or unreachable remote: {line}")
                 else:
+                    data_stream.seek(0)
                     break
             else:  # no remote loaded
                 raise Exception(f"Remote loading error: {filename}")
@@ -217,17 +216,14 @@ class FSToolkit(object):
         raise NotImplementedError(f"Unknown file extension: {filename}")
 
     @classmethod
-    def store_data(cls, filename: str, data: Any):
-        data_stream = None
+    def store_data_to_stream(cls, data_stream: BinaryIO, extension: str, data: Any):
         try:
-
             def _write_remote_file(filestream, data):
                 if isinstance(data, Iterable):
                     data = "\n".join(data)
                 filestream.write(data)
 
-            extension = cls.get_file_extension(filename)
-            data_stream = open(filename, "wb")
+            extension = extension.lstrip('.')
 
             switches = (
                 (
@@ -271,12 +267,24 @@ class FSToolkit(object):
 
             for cond, fn in switches:
                 if cond():
-                    return fn()
+                    fn()
+                    return
         except Exception as e:
             raise Exception(f"Loading data error: {e}")
+
+        # extension not found in switches
+        raise NotImplementedError(f"Unknown file extension: {extension}")
+
+    @classmethod
+    def store_data(cls, filename: str, data: Any):
+        data_stream = None
+        try:
+            extension = cls.get_file_extension(filename)
+            data_stream = open(filename, "wb")
+        except Exception as e:
+            raise Exception(f"Loading data error: {e}")
+        else:
+            return cls.store_data_to_stream(data_stream, extension, data)
         finally:
             if data_stream is not None:
                 data_stream.close()
-
-        # extension not found in switches
-        raise NotImplementedError(f"Unknown file extension: {filename}")

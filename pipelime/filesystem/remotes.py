@@ -82,7 +82,9 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
             local_stream, self._get_hash_fn(target_base_path)
         )
         target_name = hash_name + target_suffix
-        if self._upload(local_stream, local_stream_size, target_base_path, target_name):
+        if self.target_exists(target_base_path, target_name) or self._upload(
+            local_stream, local_stream_size, target_base_path, target_name
+        ):
             return self._make_url(f"{target_base_path}/{target_name}")
         return None
 
@@ -153,6 +155,10 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
 
     @abstractmethod
     def _get_hash_fn(self, target_base_path: str) -> Any:
+        ...
+
+    @abstractmethod
+    def target_exists(self, target_base_path: str, target_name: str) -> bool:
         ...
 
     @abstractmethod
@@ -276,6 +282,20 @@ class S3Remote(BaseRemote):
             except Exception as exc:
                 logger.warning(str(exc))
         return None
+
+    def target_exists(self, target_base_path: str, target_name: str) -> bool:
+        if self.is_valid:
+            try:
+                objlist = self._client.list_objects(    # type: ignore
+                    target_base_path, prefix=target_name
+                )
+                _ = next(objlist)
+                return True
+            except StopIteration:
+                return False
+            except Exception as exc:
+                logger.warning(str(exc))
+        return False
 
     def _upload(
         self,
@@ -403,6 +423,11 @@ class FileRemote(BaseRemote):
             except Exception as exc:
                 logger.warning(str(exc))
         return None
+
+    def target_exists(self, target_base_path: str, target_name: str) -> bool:
+        if self.is_valid:
+            return self._make_file_path(target_base_path, target_name).exists()
+        return False
 
     def _upload(
         self,

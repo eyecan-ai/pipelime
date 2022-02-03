@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Union, Sequence, Mapping
+from dataclasses import dataclass, field
+from typing import Union, Sequence, Mapping, Tuple, Optional
+import io
+from pathlib import Path
 
 import albumentations as A
 from choixe.spooks import Spook
-from pipelime.sequences.samples import Sample
+from pipelime.sequences.samples import Sample, FileSystemSample
+from pipelime.filesystem.toolkit import FSToolkit
 
 
 class SampleStage(ABC, Spook):
@@ -166,3 +170,83 @@ class StageAugmentations(SampleStage):
 
     def to_dict(self):
         return {"transform_cfg": self._transform_cfg, "targets": self._targets}
+
+
+class StageUploadToRemote(SampleStage):
+    @dataclass
+    class RemoteParams:
+        """Remote parameters.
+
+        Args:
+            scheme (str): the protocol used, eg, 'file', 's3' etc.
+            netloc (str): the ip address and port or 'localhost'.
+            base_path (str): the base path for all uploads, eg, the name of the bucket.
+            init_args (Mapping[str, str], optional): keyword arguments forwarded to the
+                remote initializer. Defaults to {}.
+        """
+
+        scheme: str
+        netloc: str
+        base_path: str
+        init_args: Mapping[str, str] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        remotes: Union[RemoteParams, Sequence[RemoteParams]],
+        key_ext_map: Mapping[str, Optional[str]] = {},
+    ):
+        """Upload sample data to one or more remotes. The uploaded items are then
+        managed through a RemoteMetaItem.
+
+        Args:
+            remotes (Sequence[RemoteParams]): list of remotes.
+            key_ext_map (Mapping[str, str], optional): the item keys to upload and the
+                associated file extension to use. If no extension is given, the item is
+                pickled. Defaults to {}.
+        """
+        from pipelime.filesystem.remotes import BaseRemote, create_remote
+
+        def _check_ext(e: Optional[str]) -> str:
+            if isinstance(e, str) and len(e) > 0:
+                return ("." + e) if e[0] != "." else e
+            return ".pickle"
+
+        self._key_ext_map = {k: _check_ext(e) for k, e in key_ext_map.items()}
+        self._remotes: Sequence[Tuple[BaseRemote, str]] = []
+        for rm in remotes if isinstance(remotes, Sequence) else [remotes]:
+            rm_instance = create_remote(rm.scheme, rm.netloc, **rm.init_args)
+            if rm_instance is not None:
+                self._remotes.append((rm_instance, rm.base_path))
+
+    def __call__(self, x: Sample) -> Sample:
+        x = x.copy()
+        for k, ext in self._key_ext_map.items():
+            if k in x:
+                url_list = []
+                if (
+                    isinstance(x, FileSystemSample)
+                    and not x.is_cached(k)
+                    and ext == "".join(Path(x.filesmap[k]).suffixes)
+                ):
+                    for rm, base_path in self._remotes:
+                        target = rm.upload_file(x.filesmap[k], base_path)
+                        if target is not None:
+                            url_list.append(target)
+                else:
+                    data_stream = io.BytesIO()
+                    FSToolkit.store_data_to_stream(data_stream, ext, x[k])
+
+                    data_stream.seek(0, io.SEEK_END)
+                    data_size = data_stream.tell()
+                    data_stream.seek(0, io.SEEK_SET)
+
+                    for rm, base_path in self._remotes:
+                        target = rm.upload_stream(
+                            data_stream, data_size, base_path, ext
+                        )
+                        if target is not None:
+                            url_list.append(target)
+
+                # replace item value with the list of remote urls
+                x[k] = url_list
+        return x

@@ -1,6 +1,8 @@
 from choixe.spooks import Spook
 
 from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+from pipelime.sequences.readers.base import ReaderTemplate
 from pipelime.sequences.samples import PlainSample, SamplesSequence
 from pipelime.sequences.stages import (
     SampleStage,
@@ -9,6 +11,7 @@ from pipelime.sequences.stages import (
     StageIdentity,
     StageKeysFilter,
     StageRemap,
+    StageUploadToRemote,
 )
 
 
@@ -92,7 +95,6 @@ class TestStageKeysFilter(object):
 
 class TestStageAugmentations(object):
     def test_augmentations(self, toy_dataset_small, tmp_path):
-
         import albumentations as A
 
         folder = toy_dataset_small["folder"]
@@ -174,7 +176,6 @@ class TestStageCompose(object):
 
 class TestSampleSequenceStaged:
     def test_samplessequence_staged(self):
-
         samples = []
         for index in range(10):
             samples.append(
@@ -199,3 +200,54 @@ class TestSampleSequenceStaged:
             assert "b" in sample
             assert "c" not in sample
             assert "tail" not in sample
+
+
+class TestStageUploadToRemote:
+    def test_file_upload(self, toy_dataset_small, tmp_path):
+        # data lake
+        remote_root = tmp_path / "remote"
+        remote_root.mkdir(parents=True)
+        remote_root = str(remote_root).replace("\\", "/")
+
+        # read and upload
+        reader = UnderfolderReader(toy_dataset_small["folder"])
+        sseq = SamplesSequence(
+            reader,
+            StageUploadToRemote(
+                StageUploadToRemote.RemoteParams(
+                    scheme="file", netloc="localhost", base_path=remote_root
+                ),
+                {"image": "png", "mask": "png"},
+            ),
+        )
+
+        # save after uploading
+        reader_template = reader.get_reader_template()
+        assert isinstance(reader_template, ReaderTemplate)
+        reader_template.extensions_map["image"] = "remote"
+        reader_template.extensions_map["mask"] = "remote"
+
+        out_folder = tmp_path / "output"
+        out_folder.mkdir(parents=True)
+        writer = UnderfolderWriterV2(
+            out_folder,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
+            reader_template=reader_template,
+        )
+
+        writer(sseq)
+
+        # high-level check
+        import numpy as np
+
+        reader_out = UnderfolderReader(out_folder)
+        for x, y in zip(reader, reader_out):
+            assert y.metaitem("image").source().suffix == ".remote"
+            assert y.metaitem("mask").source().suffix == ".remote"
+
+            assert x.keys() == y.keys()
+            for k, v in x.items():
+                if isinstance(v, np.ndarray):
+                    assert np.array_equal(v, y[k])
+                else:
+                    assert v == y[k]
