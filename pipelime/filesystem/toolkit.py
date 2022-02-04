@@ -88,7 +88,7 @@ class FSToolkit(object):
     @classmethod
     def get_file_extension(cls, filename, with_dot=False):
         ext = Path(filename).suffix.lower()
-        return ext if with_dot else ext.lstrip('.')
+        return ext if with_dot else ext.lstrip(".")
 
     @classmethod
     def is_metadata_file(cls, filename: str) -> bool:
@@ -140,7 +140,7 @@ class FSToolkit(object):
         with open(filename, "r") as fd:
             for line in fd:  # download from first available remote
                 remote, rm_base, rm_name = plr.get_remote_and_paths(
-                    line, cls.REMOTE_INIT_OPTIONS
+                    line.rstrip("\n"), cls.REMOTE_INIT_OPTIONS
                 )
                 if remote and rm_base and rm_name:
                     extension = cls.get_file_extension(rm_name)
@@ -218,12 +218,13 @@ class FSToolkit(object):
     @classmethod
     def store_data_to_stream(cls, data_stream: BinaryIO, extension: str, data: Any):
         try:
+
             def _write_remote_file(filestream, data):
                 if isinstance(data, Iterable):
                     data = "\n".join(data)
                 filestream.write(data)
 
-            extension = extension.lstrip('.')
+            extension = extension.lstrip(".")
 
             switches = (
                 (
