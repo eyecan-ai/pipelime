@@ -525,5 +525,87 @@ def summary(path, order_by, reversed_, max_samples):
     )
 
 
-if __name__ == "__main__":
-    operation_filterbyquery()
+@click.command("upload", help="Upload underfolder data to remote")
+@click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
+@click.option(
+    "-r",
+    "--remote",
+    required=True,
+    multiple=True,
+    help="For each remote you must provide "
+    "'<scheme>://<netloc>/<base_path>"
+    "[?<init-kw>=<init-value>:<init-kw>=<init-value>...]'"
+    " (repeat for each remote)",
+)
+@click.option(
+    "-k",
+    "--key",
+    required=True,
+    multiple=True,
+    help="Keys to upload (repeat for each key)",
+)
+@click.option(
+    "--copy",
+    "copy_mode",
+    flag_value="copy",
+    help="Always deep copy source data (default)",
+    default=True,
+)
+@click.option(
+    "--symlink", "copy_mode", flag_value="symlink", help="Sym-link source data"
+)
+@click.option(
+    "--hardlink", "copy_mode", flag_value="hardlink", help="Hard-link source data"
+)
+@click.option(
+    "-o", "--output_folder", required=True, type=str, help="Output Underfolder"
+)
+def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+    from pipelime.sequences.samples import SamplesSequence
+    from pipelime.sequences.stages import StageUploadToRemote
+    from urllib.parse import urlparse, unquote_plus
+
+    remote_params = [urlparse(rm) for rm in remote]
+    remote_params = [
+        StageUploadToRemote.RemoteParams(
+            scheme=rm.scheme,
+            netloc=rm.netloc,
+            base_path=unquote_plus(rm.path)[1:],
+            init_args={
+                kw.split("=", 1)[0]: kw.split("=", 1)[1]
+                for kw in rm.query.split(":")
+                if len(kw) >= 3 and "=" in kw
+            },
+        )
+        for rm in remote_params
+    ]
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+
+    sseq = SamplesSequence(
+        dataset,
+        stage=StageUploadToRemote(
+            remotes=remote_params,
+            key_ext_map={k: template.extensions_map.get(k) for k in key},
+        ),
+    )
+
+    # save uploaded keys with .remote extension
+    for k in key:
+        template.extensions_map[k] = "remote"
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+        if copy_mode == "hardlink"
+        else (
+            UnderfolderWriterV2.CopyMode.SYM_LINK
+            if copy_mode == "symlink"
+            else UnderfolderWriterV2.CopyMode.DEEP_COPY
+        ),
+        reader_template=template,
+    )
+    writer(sseq)

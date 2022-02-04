@@ -1,5 +1,7 @@
-from click.testing import CliRunner
 import math
+
+from click.testing import CliRunner
+
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 
 
@@ -462,3 +464,106 @@ class TestCLIUnderfolderOperationMix:
         assert len(output_reader) == len(input_dataset)
         keys = set(output_reader[0].keys())
         assert keys == {"pose", "label", "image", "points"}
+
+
+class TestCLIUnderfolderOperationUpload:
+    def test_upload(self, tmp_path, sample_underfolder_minimnist):
+        import filecmp
+        import numpy as np
+        from pathlib import Path
+        from urllib.parse import ParseResult
+        from pipelime.cli.underfolder.operations import upload_to_remote
+
+        # data lakes
+        remote_root_a = tmp_path / "remote_a"
+        remote_root_a.mkdir(parents=True)
+        remote_root_a = remote_root_a.as_posix()
+
+        remote_root_b = tmp_path / "remote_b"
+        remote_root_b.mkdir(parents=True)
+        remote_root_b = remote_root_b.as_posix()
+
+        # input/output
+        input_folder = sample_underfolder_minimnist["folder"]
+        output_folder = tmp_path / "output"
+        output_folder.mkdir(parents=True)
+
+        keys_to_upload = ["numbers", "image", "image_mask", "metadata", "metadatay"]
+
+        # run CLI
+        options = [
+            "-i",
+            str(input_folder),
+            "-o",
+            str(output_folder),
+            "-r",
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_root_a,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+            "-r",
+            ParseResult(
+                scheme="file",
+                netloc="",
+                path=remote_root_b,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+            "--hardlink",
+        ] + [a for k in keys_to_upload for a in ["-k", k]]
+
+        runner = CliRunner()
+        result = runner.invoke(upload_to_remote, options)
+        assert result.exit_code == 0
+
+        # check remote data
+        def _diff_files(dcmp: filecmp.dircmp):
+            assert len(dcmp.left_only) == 0
+            assert len(dcmp.right_only) == 0
+            for name in dcmp.common_files:
+                assert filecmp.cmp(
+                    str(Path(dcmp.left) / name),
+                    str(Path(dcmp.right) / name),
+                    shallow=False,
+                )
+            for sub_dcmp in dcmp.subdirs.values():
+                _diff_files(sub_dcmp)
+
+        _diff_files(filecmp.dircmp(remote_root_a, remote_root_b))
+
+        # get back data
+        def _dataset_cmp():
+            input_reader = UnderfolderReader(input_folder)
+            output_reader = UnderfolderReader(output_folder)
+            for x, y in zip(input_reader, output_reader):
+                for k in keys_to_upload:
+                    assert y.metaitem(k).source().suffix == ".remote"
+
+                assert x.keys() == y.keys()
+                for k, v in x.items():
+                    if isinstance(v, np.ndarray):
+                        assert np.array_equal(v, y[k])
+                    else:
+                        assert v == y[k]
+
+        _dataset_cmp()
+
+        # make remote_a unavailable and repeat
+        Path(remote_root_a).rename(remote_root_a + "_")
+        _dataset_cmp()
+
+        # make remote_b unavailable and repeat
+        Path(remote_root_a + "_").rename(remote_root_a)
+        Path(remote_root_b).rename(remote_root_b + "_")
+        _dataset_cmp()
+
+        # make both unavailable and repeat
+        import pytest
+        Path(remote_root_a).rename(remote_root_a + "_")
+        with pytest.raises(Exception):
+            _dataset_cmp()

@@ -11,6 +11,10 @@ from loguru import logger
 
 
 class RemoteRegister(ABCMeta):
+    """A factory class managing a single remote instance
+    for any (scheme, netloc) pair.
+    """
+
     REMOTE_CLASSES: MutableMapping[str, Type["BaseRemote"]] = {}
     REMOTE_INSTANCES: MutableMapping[Tuple[str, str], "BaseRemote"] = {}
 
@@ -20,6 +24,16 @@ class RemoteRegister(ABCMeta):
 
     @classmethod
     def get_instance(cls, scheme: str, netloc: str, **kwargs) -> Optional["BaseRemote"]:
+        """Return a remote instance for this scheme and netloc.
+
+        :param scheme: the protocol name, eg, 's3' or 'file'.
+        :type scheme: str
+        :param netloc: the address of the endpoint.
+        :type netloc: str
+        :param **kwargs: arguments forwarded to the remote instance `__init__()`
+        :return: the remote instance or None if the scheme is unknown.
+        :rtype: Optional[BaseRemote]
+        """
         remote_instance = cls.REMOTE_INSTANCES.get((scheme, netloc))
         if remote_instance is None:
             remote_class = cls.REMOTE_CLASSES.get(scheme)
@@ -32,10 +46,27 @@ class RemoteRegister(ABCMeta):
 
 
 def create_remote(scheme: str, netloc: str, **kwargs) -> Optional["BaseRemote"]:
+    """Return a remote instance for this scheme and netloc.
+
+    :param scheme: the protocol name, eg, 's3' or 'file'.
+    :type scheme: str
+    :param netloc: the address of the endpoint.
+    :type netloc: str
+    :param **kwargs: arguments forwarded to the remote instance's `__init__()`
+    :return: the remote instance or None if the scheme is unknown.
+    :rtype: Optional[BaseRemote]
+    """
     return RemoteRegister.get_instance(scheme, netloc, **kwargs)
 
 
 def parse_url(url: str) -> Union[Tuple[str, str], Tuple[None, None]]:
+    """Extract base path and target name from the path component of a given url.
+
+    :param url: the url to split.
+    :type url: str
+    :return: the base path and the target name.
+    :rtype: Union[Tuple[str, str], Tuple[None, None]]
+    """
     parsed_url = urlparse(url)
     if len(parsed_url.path) > 1:
         file_full_path = Path(unquote_plus(parsed_url.path)[1:])
@@ -47,6 +78,16 @@ def parse_url(url: str) -> Union[Tuple[str, str], Tuple[None, None]]:
 def get_remote_and_paths(
     url: str, remotes_kwargs: Mapping[str, Mapping[str, Any]] = {}
 ) -> Tuple[Optional["BaseRemote"], Optional[str], Optional[str]]:
+    """Create a remote and extract base and target path from a given url.
+
+    :param url: the url to split.
+    :type url: str
+    :param remotes_kwargs: keys are the scheme names and values are the arguments
+        that must be forwarded to the remote instance's `__init__()`.
+    :type remotes_kwargs: Mapping[str, Mapping[str, Any]]
+    :return: (remote, base path, target name)
+    :rtype: Tuple[Optional["BaseRemote"], Optional[str], Optional[str]]
+    """
     parsed_url = urlparse(url)
     return (
         create_remote(
@@ -58,12 +99,28 @@ def get_remote_and_paths(
 
 
 class BaseRemote(metaclass=RemoteRegister):  # type: ignore
+    """Base class for any remote."""
+
     def __init__(self, netloc: str):
+        """Set the network address.
+
+        :param netloc: the network address.
+        :type netloc: str
+        """
         self._netloc = netloc
 
     def upload_file(
         self, local_file: Union[Path, str], target_base_path: str
     ) -> Optional[str]:
+        """Upload an existing file to remote storage.
+
+        :param local_file: local file path.
+        :type local_file: Union[Path, str]
+        :param target_base_path: the remote base path, eg, the bucket name.
+        :type target_base_path: str
+        :return: a url to get back the file.
+        :rtype: Optional[str]
+        """
         local_file = Path(local_file)
         file_size = local_file.stat().st_size
         with open(local_file, "rb") as file_data:
@@ -78,6 +135,19 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         target_base_path: str,
         target_suffix: str,
     ) -> Optional[str]:
+        """Upload data from a readable stream.
+
+        :param local_stream: a binary data stream.
+        :type local_stream: BinaryIO
+        :param local_stream_size: the byte size to upload.
+        :type local_stream_size: int
+        :param target_base_path: the remote base path, eg, the bucket name.
+        :type target_base_path: str
+        :param target_suffix: the remote file suffix.
+        :type target_suffix: str
+        :return: a url to get back the file.
+        :rtype: Optional[str]
+        """
         hash_name = self._compute_hash(
             local_stream, self._get_hash_fn(target_base_path)
         )
@@ -94,15 +164,35 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         source_base_path: str,
         source_name: str,
     ) -> bool:
+        """Download and write data to a local file.
+
+        :param local_file: the file to write to.
+        :type local_file: Union[Path, str]
+        :param source_base_path: the remote base path, eg, the bucket name.
+        :type source_base_path: str
+        :param source_name: the remote object name.
+        :type source_name: str
+        :return: True if no error occurred.
+        :rtype: bool
+        """
         local_file = Path(local_file)
-        if local_file.suffixes != Path(source_name).suffixes:
-            local_file = local_file.with_suffix(
-                "".join([local_file.suffix] + Path(source_name).suffixes)
-            )
+        source_name_path = Path(source_name)
+        if local_file.suffixes != source_name_path.suffixes:
+            local_file = local_file.with_suffix("".join(source_name_path.suffixes))
+        if local_file.is_file():
+            with open(local_file, "rb") as local_stream:
+                hash_name = self._compute_hash(
+                    local_stream, self._get_hash_fn(source_base_path)
+                )
+                if (
+                    hash_name
+                    == source_name_path.name[: -len("".join(source_name_path.suffixes))]
+                ):
+                    # local file is up-to-date
+                    return True
+
         local_file.parent.mkdir(parents=True, exist_ok=True)
-
         part_file = local_file.with_suffix(local_file.suffix + ".part")
-
         offset: int = 0
         try:
             offset = part_file.stat().st_size
@@ -128,11 +218,47 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         source_name: str,
         source_offset: int = 0,
     ) -> bool:
+        """Download and write data to a writable stream.
+
+        :param local_stream: a writable stream.
+        :type local_stream: BinaryIO
+        :param source_base_path: the remote base path, eg, the bucket name.
+        :type source_base_path: str
+        :param source_name: the remote object name.
+        :type source_name: str
+        :param source_offset: where to start reading the remote data, defaults to 0
+        :type source_offset: int, optional
+        :return: True if no error occurred.
+        :rtype: bool
+        """
         return self._download(
             local_stream, source_base_path, source_name, source_offset
         )
 
+    @abstractmethod
+    def target_exists(self, target_base_path: str, target_name: str) -> bool:
+        """Check if a remote object exists.
+
+        :param target_base_path: the remote base path, eg, the bucket name.
+        :type target_base_path: str
+        :param target_name: the remote object name.
+        :type target_name: str
+        :return: True if <target_base_path>/<target_name> exists on this remote.
+        :rtype: bool
+        """
+        ...
+
     def _compute_hash(self, stream: BinaryIO, hash_fn: Any = None) -> str:
+        """Compute a hash value based on the content of a readable stream.
+
+        :param stream: the stream to hash.
+        :type stream: BinaryIO
+        :param hash_fn: the hash funtion, if None `hashlib.sha256()` will be used,
+            defaults to None
+        :type hash_fn: Any, optional
+        :return: the computed hash
+        :rtype: str
+        """
         if hash_fn is None:
             hash_fn = hashlib.sha256()
         b = bytearray(1024 * 1024)
@@ -143,11 +269,18 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         stream.seek(fpos)
         return hash_fn.hexdigest()
 
-    def _make_url(self, target_full_path: str):
+    def _make_url(self, target_full_path: str) -> str:
+        """Make a complete url for this remote path.
+
+        :param target_full_path: the remote path.
+        :type target_full_path: str
+        :return: the url
+        :rtype: str
+        """
         return ParseResult(
             scheme=self.scheme(),
             netloc=self.netloc,
-            path=target_full_path.replace("\\", "/"),
+            path=Path(target_full_path).as_posix(),
             params="",
             query="",
             fragment="",
@@ -155,10 +288,13 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
 
     @abstractmethod
     def _get_hash_fn(self, target_base_path: str) -> Any:
-        ...
+        """Return the hash function used for the object in the give remote base path.
 
-    @abstractmethod
-    def target_exists(self, target_base_path: str, target_name: str) -> bool:
+        :param target_base_path: the remote base path, eg, the bucket name.
+        :type target_base_path: str
+        :return: the hash function, eg, `hashlib.sha256()`.
+        :rtype: Any
+        """
         ...
 
     @abstractmethod
@@ -169,6 +305,19 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         target_base_path: str,
         target_name: str,
     ) -> bool:
+        """Upload data from a readable stream.
+
+        :param local_stream: a binary data stream.
+        :type local_stream: BinaryIO
+        :param local_stream_size: the byte size to upload.
+        :type local_stream_size: int
+        :param target_base_path: the remote base path, eg, the bucket name.
+        :type target_base_path: str
+        :param target_name: the remote object name.
+        :type target_name: str
+        :return: True if no error occurred.
+        :rtype: bool
+        """
         ...
 
     @abstractmethod
@@ -179,20 +328,48 @@ class BaseRemote(metaclass=RemoteRegister):  # type: ignore
         source_name: str,
         source_offset: int,
     ) -> bool:
+        """Download and write data to a writable stream.
+
+        :param local_stream: a writable stream.
+        :type local_stream: BinaryIO
+        :param source_base_path: the remote base path, eg, the bucket name.
+        :type source_base_path: str
+        :param source_name: the remote object name.
+        :type source_name: str
+        :param source_offset: where to start reading the remote data, defaults to 0
+        :type source_offset: int, optional
+        :return: True if no error occurred.
+        :rtype: bool
+        """
         ...
 
     @classmethod
     @abstractmethod
     def scheme(cls) -> str:
+        """Return the scheme name, eg, 's3' or 'file'.
+
+        :return: the scheme name.
+        :rtype: str
+        """
         pass
 
     @property
     def netloc(self) -> str:
+        """Return the remote network address.
+
+        :return: the remote network address.
+        :rtype: str
+        """
         return self._netloc
 
     @property
     @abstractmethod
     def is_valid(self) -> bool:
+        """Check if this remote instance is valid and usable.
+
+        :return: True if this instance is valid.
+        :rtype: bool
+        """
         pass
 
 
@@ -209,18 +386,40 @@ class S3Remote(BaseRemote):
         secure_connection: bool = True,
         region: Optional[str] = None,
     ):
+        """S3-compatible remote. Credential can be passed or retrieved from:
+            * env var:
+                ** access key: AWS_ACCESS_KEY_ID, AWS_ACCESS_KEY, MINIO_ACCESS_KEY
+                ** secret key: AWS_SECRET_ACCESS_KEY, AWS_SECRET_KEY, MINIO_SECRET_KEY
+                ** session token: AWS_SESSION_TOKEN
+            * config files:
+                ** ~/.aws/credentials
+                ** ~/[.]mc/config.json
+
+        :param endpoint: the endpoint address
+        :type endpoint: str
+        :param access_key: optional user id, defaults to None
+        :type access_key: Optional[str], optional
+        :param secret_key: optional user password, defaults to None
+        :type secret_key: Optional[str], optional
+        :param session_token: optional session token, defaults to None
+        :type session_token: Optional[str], optional
+        :param secure_connection: should use a secure connection, defaults to True
+        :type secure_connection: bool, optional
+        :param region: optional region, defaults to None
+        :type region: Optional[str], optional
+        """
         super().__init__(endpoint)
 
         try:
             from minio import Minio
 
-            # from minio.credentials import (
-            #     ChainedProvider,
-            #     EnvAWSProvider,
-            #     EnvMinioProvider,
-            #     AWSConfigProvider,
-            #     MinioClientConfigProvider,
-            # )
+            from minio.credentials import (
+                ChainedProvider,
+                EnvAWSProvider,
+                EnvMinioProvider,
+                AWSConfigProvider,
+                MinioClientConfigProvider,
+            )
 
             self._client = Minio(
                 endpoint=endpoint,
@@ -229,20 +428,20 @@ class S3Remote(BaseRemote):
                 session_token=session_token,
                 secure=secure_connection,
                 region=region,
-                # credentials=ChainedProvider(
-                #     [
-                #         # AWS_ACCESS_KEY_ID|AWS_ACCESS_KEY,
-                #         # AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY,
-                #         # AWS_SESSION_TOKEN
-                #         EnvAWSProvider(),
-                #         # MINIO_ACCESS_KEY, MINIO_SECRET_KEY
-                #         EnvMinioProvider(),
-                #         # ~/.aws/credentials
-                #         AWSConfigProvider(),
-                #         # ~/[.]mc/config.json
-                #         MinioClientConfigProvider(),
-                #     ]
-                # ),
+                credentials=ChainedProvider(
+                    [
+                        # AWS_ACCESS_KEY_ID|AWS_ACCESS_KEY,
+                        # AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY,
+                        # AWS_SESSION_TOKEN
+                        EnvAWSProvider(),
+                        # MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+                        EnvMinioProvider(),
+                        # ~/.aws/credentials
+                        AWSConfigProvider(),
+                        # ~/[.]mc/config.json
+                        MinioClientConfigProvider(),
+                    ]
+                ),
             )
         except ModuleNotFoundError:  # pragma: no cover
             logger.error("S3 remote needs `minio` python package.")
@@ -286,7 +485,7 @@ class S3Remote(BaseRemote):
     def target_exists(self, target_base_path: str, target_name: str) -> bool:
         if self.is_valid:
             try:
-                objlist = self._client.list_objects(    # type: ignore
+                objlist = self._client.list_objects(  # type: ignore
                     target_base_path, prefix=target_name
                 )
                 _ = next(objlist)
@@ -373,6 +572,11 @@ class FileRemote(BaseRemote):
     _DEFAULT_HASH_FN_ = "sha256"
 
     def __init__(self, netloc: str):
+        """Filesystem-based remote.
+
+        :param netloc: the ip address, can be empty.
+        :type netloc: str
+        """
         if netloc == "localhost" or netloc == "127.0.0.1":
             netloc = ""
         super().__init__(netloc)

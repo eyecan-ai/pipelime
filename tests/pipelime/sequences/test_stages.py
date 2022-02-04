@@ -207,7 +207,7 @@ class TestStageUploadToRemote:
         # data lake
         remote_root = tmp_path / "remote"
         remote_root.mkdir(parents=True)
-        remote_root = str(remote_root).replace("\\", "/")
+        remote_root = remote_root.as_posix()
 
         # read and upload
         reader = UnderfolderReader(toy_dataset_small["folder"])
