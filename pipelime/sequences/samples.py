@@ -2,7 +2,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Hashable, Sequence, MutableMapping, Union, Optional
+from typing import Any, Mapping, Hashable, Sequence, MutableMapping, Union, Optional
 import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
@@ -30,7 +30,7 @@ class FileSystemItem(MetaItem):
         super().__init__()
         self._path = Path(path)
 
-    def source(self) -> Any:
+    def source(self) -> Path:
         return self._path
 
 
@@ -51,7 +51,7 @@ class Sample(MutableMapping):
         pass
 
     @abstractmethod
-    def copy(self):
+    def copy(self) -> "Sample":
         pass
 
     @abstractmethod
@@ -187,7 +187,7 @@ class PlainSample(Sample):
 
 
 class FileSystemSample(Sample):
-    def __init__(self, data_map: dict, lazy: bool = True, id: Hashable = None):
+    def __init__(self, data_map: MutableMapping[str, str], lazy: bool = True, id: Hashable = None):
         """Creates a FileSystemSample based on a key/filename map
 
         :param data_map: key/filename map
@@ -198,7 +198,7 @@ class FileSystemSample(Sample):
         :type id: Hashable, optional
         """
         super().__init__(id=id)
-        self._filesmap = data_map
+        self._filesmap: MutableMapping[str, str] = data_map
         self._cached = {}
         if not lazy:
             for k in self.keys():
@@ -223,10 +223,8 @@ class FileSystemSample(Sample):
         self._cached[key] = value
 
     def __delitem__(self, key):
-        if key in self._cached:
-            del self._cached[key]
-        if key in self._filesmap:
-            del self._filesmap[key]
+        self._cached.pop(key, None)
+        self._filesmap.pop(key, None)
 
     def __iter__(self):
         return iter(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
@@ -272,7 +270,7 @@ class FileSystemSample(Sample):
         for k in keys:
             del self._cached[k]
 
-    def update(self, other: Dict[str, Any]) -> None:
+    def update(self, other: Mapping[str, Any]) -> None:
         if isinstance(other, FileSystemSample):
             self.filesmap.update(other.filesmap)
             for k in other.keys():
