@@ -147,27 +147,36 @@ def h5_datasets(data_folder):
         "minimnist_h5": {
             "filename": Path(data_folder) / "datasets" / "underfolder_minimnist.h5",
             "type": "H5",
-            # 'schemas': {
-            #     'simple': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'simple.schema',
-            #         'valid': True,
-            #         'should_pass': True
-            #     },
-            #     'deep': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'deep.schema',
-            #         'valid': True,
-            #         'should_pass': True
-            #     },
-            #     'invalid': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'invalid.schema',
-            #         'valid': True,
-            #         'should_pass': False
-            #     },
-            #     'bad_file': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'bad.schema',
-            #         'valid': False,
-            #         'should_pass': False
-            #     }
-            # }
         }
+    }
+
+
+@pytest.fixture(scope="session")
+def piper_commands(data_folder):
+    return {
+        "fake_detector": {
+            "filename": Path(data_folder) / "piper_commands" / "fake_detector.py",
+            "valid": True,
+            "exception": None,
+        },
+        "wrong_outputs": {
+            "filename": Path(data_folder) / "piper_commands" / "wrong_outputs.py",
+            "valid": False,
+            "exception": KeyError,
+        },
+        "wrong_inputs": {
+            "filename": Path(data_folder) / "piper_commands" / "wrong_inputs.py",
+            "valid": False,
+            "exception": KeyError,
+        },
+        "not_a_piper": {
+            "filename": Path(data_folder) / "piper_commands" / "not_a_piper.py",
+            "valid": False,
+            "exception": TypeError,
+        },
+        "no_command_name": {
+            "filename": Path(data_folder) / "piper_commands" / "no_command_name.py",
+            "valid": True,
+            "exception": None,
+        },
     }

@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import click
+from pytest import raises
 import yaml
 from loguru import logger
 from yaml.scanner import ScannerError
@@ -50,6 +51,7 @@ class PiperCommand:
     ) -> None:
         # Extract default values from the kwargs
         self._fn = fn
+        self.__name__ = fn.__name__
         self._caller_name = f"{fn.__module__}:{fn.__name__}"
         self._inputs = inputs
         self._outputs = outputs
@@ -223,23 +225,23 @@ class Piper:
 
         # Append the piper eager option to the command
         command += f" {PiperNamespace.ARGUMENT_NAME_INFO}"
-
         info = None
-        try:
 
-            # Execute the command and retrieve the output into the PIPE
-            pipe = subprocess.Popen(
-                command.split(" "),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE,
-            )
+        pipe = subprocess.Popen(
+            command.split(" "),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = pipe.communicate()
+        if pipe.returncode == 0:
+            try:
+                info = yaml.safe_load(stdout)
+            except ScannerError as e:
+                logger.error(f"{command} is not a valid Piper command!")
+                info = None
+        else:
+            raise TypeError(stderr)
 
-            # Reader the stdout to retrieve the Piper info if any
-            info = yaml.safe_load(pipe.stdout)
-        except ScannerError as e:
-            logger.error(f"{command} is not a valid Piper command! {str(e)}")
-            info = None
         return info
 
     @classmethod
@@ -263,7 +265,7 @@ class Piper:
 
         raw_info = cls.piper_command_raw_info(command)
         if raw_info is None:
-            raise RuntimeError(f"Command '{command}' is not a piper!")
+            raise TypeError(f"Command '{command}' is not a piper!")
 
         commands_map = {x["name"]: x for x in raw_info["params"]}
 
@@ -289,13 +291,15 @@ class Piper:
 
         # For each inputs check if a corresponding click command option is present
         for i in inputs_list:
-            assert i in commands_map, f"{i} is not a valid input"
+            if i not in commands_map:
+                raise KeyError(f"Input '{i}' is not a valid Piper command option!")
             description[PiperNamespace.NAME_INPUTS][i] = commands_map[i]
             del commands_map[i]
 
         # For each outputs check if a corresponding click command option is present
         for o in outputs_list:
-            assert o in commands_map, f"{o} is not a valid output"
+            if o not in commands_map:
+                raise KeyError(f"Output '{o}' is not a valid Piper command option!")
             description[PiperNamespace.NAME_OUTPUTS][o] = commands_map[o]
             del commands_map[o]
 

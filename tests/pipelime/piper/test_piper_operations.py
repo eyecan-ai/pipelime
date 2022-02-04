@@ -35,7 +35,7 @@ class TestPiperOperations:
                 description = Piper.piper_command_description(op["command"])
                 assert isinstance(description, dict)
             else:
-                with pytest.raises(RuntimeError):
+                with pytest.raises(TypeError):
                     Piper.piper_command_description(op["command"])
 
 
