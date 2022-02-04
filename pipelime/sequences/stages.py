@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Union, Sequence, Mapping, Tuple, Optional
+from typing import Union, Collection, Sequence, Mapping, Tuple, Optional
 import io
 from pathlib import Path
-
 import albumentations as A
 from choixe.spooks import Spook
 from pipelime.sequences.samples import Sample, FileSystemSample
@@ -88,11 +87,11 @@ class StageRemap(SampleStage):
 
 
 class StageKeysFilter(SampleStage):
-    def __init__(self, key_list: Sequence[str], negate: bool = False):
+    def __init__(self, key_list: Collection[str], negate: bool = False):
         """Filter sample keys
 
         :param key_list: list of keys to preserve
-        :type key_list: Sequence[str]
+        :type key_list: Collection[str]
         :param negate: TRUE to delete input keys, FALSE delete all but keys
         :type negate: bool
         """

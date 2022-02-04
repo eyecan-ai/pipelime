@@ -2,8 +2,7 @@ import multiprocessing
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Sequence, Optional, Any
-from rich.progress import track
+from typing import Callable, Dict, Sequence, Optional, Any
 from schema import Or
 from enum import Enum
 from loguru import logger
@@ -16,6 +15,7 @@ from pipelime.sequences.samples import (
     SamplesSequence,
 )
 from pipelime.sequences.writers.base import BaseWriter
+from pipelime.tools.progress import pipelime_track
 
 
 class UnderfolderWriter(BaseWriter):
@@ -33,6 +33,7 @@ class UnderfolderWriter(BaseWriter):
         force_copy_keys: Optional[Sequence[str]] = None,
         remove_duplicates: bool = False,
         num_workers: int = 0,  # typing is here because 'schema.Optional' conflicts
+        progress_callback: Optional[Callable[[dict], None]] = None,
     ) -> None:
         """UnderfolderWriter for an input SamplesSequence
 
@@ -68,6 +69,9 @@ class UnderfolderWriter(BaseWriter):
         pool with all available processors, if > 0 use Multiprocessing using as many
         processes
         :type num_workers: int, optional
+        :param progress_callback: callback function to call with progress information,
+        defaults to None
+        :type progress_callback: Optional[Callable[[dict], None]], optional
         """
         self._folder = Path(folder)
 
@@ -79,6 +83,7 @@ class UnderfolderWriter(BaseWriter):
         self._force_copy_keys = force_copy_keys if force_copy_keys is not None else []
         self._remove_duplicates = remove_duplicates
         self._num_workers = num_workers
+        self._progress_callback = progress_callback
 
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         self._datafolder.mkdir(parents=True, exist_ok=True)
@@ -153,15 +158,20 @@ class UnderfolderWriter(BaseWriter):
                 processes=None if self._num_workers == -1 else self._num_workers
             )
             list(
-                track(
+                pipelime_track(
                     pool.imap_unordered(self._process_sample, x),
                     total=len(x),
                     description="Writing Underfolder",
+                    track_callback=self._progress_callback,
                 )
             )
         else:
             self._saved_root_keys = {}
-            for sample in track(x, description="Writing Underfolder"):
+            for sample in pipelime_track(
+                x,
+                description="Writing Underfolder",
+                track_callback=self._progress_callback,
+            ):
                 self._process_sample(sample)
 
     def _copy_filesystem_item(self, output_file: Path, item: FileSystemItem) -> None:
@@ -248,6 +258,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
         reader_template: Optional[ReaderTemplate] = None,
         remove_duplicates: bool = False,
         num_workers: int = 0,
+        progress_callback: Optional[Callable[[dict], None]] = None,
     ):
         root_file_keys, extensions_map, zfill = (
             (
@@ -267,6 +278,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
             force_copy_keys=force_copy_keys,
             remove_duplicates=remove_duplicates,
             num_workers=num_workers,
+            progress_callback=progress_callback,
         )
 
         self._file_handling = file_handling

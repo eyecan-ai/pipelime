@@ -1,13 +1,12 @@
 import json
 import uuid
 from pathlib import Path
-from rich.progress import track
 import numpy as np
 from PIL import Image, ImageDraw
-from typing import Tuple
-
+from typing import Callable, Tuple
 from pipelime.filesystem.toolkit import FSToolkit
 from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.tools.progress import pipelime_track
 
 
 class ToyDatasetGenerator(object):
@@ -144,6 +143,7 @@ class ToyDatasetGenerator(object):
         as_underfolder: bool = False,
         max_label: int = 5,
         objects_number_range: Tuple[int, int] = (1, 5),
+        progress_callback: Callable[[dict], None] = None,
     ):
 
         output_folder = Path(output_folder)
@@ -153,7 +153,7 @@ class ToyDatasetGenerator(object):
 
         generator = ToyDatasetGenerator()
 
-        for idx in track(range(size)):
+        for idx in pipelime_track(range(size), track_callback=progress_callback):
 
             # Generate sample
             sample = generator.generate_image_sample(
@@ -166,6 +166,7 @@ class ToyDatasetGenerator(object):
                 f"keypoints{suffix}": sample["keypoints"],
                 f"label{suffix}": sample["label"],
                 f"id{suffix}": sample["id"],
+                f"index{suffix}": idx,
             }
 
             metadata = json.loads(json.dumps(metadata))

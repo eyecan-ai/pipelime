@@ -551,7 +551,7 @@ class UnderfolderAPI(APIRouter):
                     return EntitySampleSearchResponse(
                         samples=filtered, pagination=search_entity.pagination
                     )
-            except Exception as e:
+            except Exception:
                 import traceback
 
                 raise HTTPException(status_code=500, detail=f"{traceback.format_exc()}")

@@ -7,6 +7,7 @@ from pipelime.cli.underfolder.operations import (
     operation_groupby,
     operation_mix,
     operation_orderby,
+    operation_remap_keys,
     operation_shuffle,
     operation_split,
     operation_split_by_value,
@@ -35,5 +36,6 @@ underfolder.add_command(operation_orderby)
 underfolder.add_command(operation_split_by_value)
 underfolder.add_command(operation_groupby)
 underfolder.add_command(operation_mix)
+underfolder.add_command(operation_remap_keys)
 underfolder.add_command(summary)
 underfolder.add_command(upload_to_remote)
