@@ -607,7 +607,7 @@ class TestCLIUnderfolderOperationUpload:
 
         # make both unavailable and repeat
         import pytest
+
         Path(remote_root_a).rename(remote_root_a + "_")
         with pytest.raises(Exception):
             _dataset_cmp()
-
