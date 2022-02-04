@@ -34,6 +34,7 @@ class TestSequenceProxy:
             samples=[
                 PlainSample(
                     {
+                        "idx": i,
                         "data_1": rnd_fn(),
                         "data_2": rnd_fn(),
                         "data_3": rnd_fn(),
@@ -42,7 +43,7 @@ class TestSequenceProxy:
                 )
                 for i in range(0, max_idx)
             ],
-            stage=StageKeysFilter(["data_1", "data_2", "data_3"]),
+            stage=StageKeysFilter(["idx", "data_1", "data_2", "data_3"]),
         )
 
     def _make_cached_sequence(
@@ -86,14 +87,15 @@ class TestSequenceProxy:
             for k in ksrc - kset:
                 assert s.get_bypass(k) is None  # type: ignore
 
-    def _check_cache(
+    def _check_cache_buffer(
         self, sseq: sp.CachedSamplesSequence, max_idx: int, cached_idx: Set[int]
     ):
         for idx in range(1, max_idx):
+            item = sseq._sample_cache._cache_map.get(idx)  # type: ignore
             if idx in cached_idx:
-                assert sseq._sample_cache.get_sample(idx) is not None
+                assert item is not None
             else:
-                assert sseq._sample_cache.get_sample(idx) is None
+                assert item is None
 
     def test_endless_cache_proxy(self):
         max_idx = 5
@@ -111,7 +113,7 @@ class TestSequenceProxy:
         self._check_samples(k1, k0, sseq.samples, set())
 
         # all samples have been cached
-        self._check_cache(sseq, max_idx, {i for i in range(max_idx - 1)})
+        self._check_cache_buffer(sseq, max_idx, {i for i in range(len(sseq))})
 
     def test_bounded_cache_proxy(self):
         cache_size = 2
@@ -129,8 +131,79 @@ class TestSequenceProxy:
         # these have never been accessed
         self._check_samples(k1, k0, sseq.samples, set())
 
-        # only first samples have been cached
-        self._check_cache(sseq, max_idx, {i for i in range(cache_size)})
+        # only last samples have been cached
+        self._check_cache_buffer(
+            sseq, max_idx, {i for i in range(len(sseq) - cache_size, len(sseq))}
+        )
+
+    def test_persistent_cache_proxy(self, tmp_path):
+        def make_cache_test(cache_name):
+            cache_dir = tmp_path / cache_name
+            cache_dir.mkdir(parents=True, exist_ok=True)
+
+            buffer_size = 2
+            max_idx = 5
+            sseq, k0, k1, k2, fk = self._make_cached_sequence(
+                sp.CachedSamplesSequence.PersistentCachePolicy(
+                    cache_dir=cache_dir, max_buffer_size=buffer_size, verbose=True
+                ),
+                max_idx,
+            )
+
+            # raw source
+            self._check_samples(k0, k0, sseq.samples.samples, set())  # type: ignore
+            # copy after first stage
+            self._check_samples(k1, k0, sseq.samples, set())
+            # copy after second stage, then accessed and cached
+            self._check_samples(k2, k0, sseq, fk)
+            # these have never been accessed
+            self._check_samples(k1, k0, sseq.samples, set())
+
+            # only last samples have been cached
+            self._check_cache_buffer(
+                sseq, max_idx, {i for i in range(len(sseq) - buffer_size, len(sseq))}
+            )
+
+            return cache_dir
+
+        cache0_full_path = make_cache_test("cache0")
+        cache1_full_path = make_cache_test("cache1")
+        make_cache_test("cache1")
+
+        from filecmp import dircmp
+        from pathlib import Path
+        import json
+        import joblib
+
+        def file_diff(dcmp: dircmp):
+            assert len(dcmp.left_only) == 0
+            assert len(dcmp.right_only) == 0
+            left_path, right_path = Path(dcmp.left), Path(dcmp.right)
+            for f in dcmp.common_files:
+                left_f = left_path / Path(f)
+                right_f = right_path / Path(f)
+                if f == "func_code.py":
+                    assert f in dcmp.same_files
+                elif f == "metadata.json":
+                    with left_f.open() as file:
+                        left_data = json.load(file)
+                        assert "input_args" in left_data
+                    with right_f.open() as file:
+                        right_data = json.load(file)
+                        assert "input_args" in right_data
+                    assert left_data["input_args"] == right_data["input_args"]
+                else:
+                    assert f == "output.pkl"
+                    left_obj = joblib.load(left_f)
+                    right_obj = joblib.load(right_f)
+                    assert isinstance(left_obj, SideEffectSample)
+                    assert isinstance(right_obj, SideEffectSample)
+                    for k in left_obj.keys() | right_obj.keys():
+                        assert left_obj.get_bypass(k) == right_obj.get_bypass(k)
+            for sub_dcmp in dcmp.subdirs.values():
+                file_diff(sub_dcmp)
+
+        file_diff(dircmp(str(cache0_full_path), str(cache1_full_path)))
 
     def test_concat_seq_proxy(self):
         n_seq = 3
@@ -150,17 +223,21 @@ class TestSequenceProxy:
         n_items = 5
         src = self._make_random_source(n_items)
 
-        filter = [2, 4]
+        def filter_fn(x: Sample) -> bool:
+            return x["idx"] in (2, 4)
+
         flt_sseq = sp.FilteredSamplesSequence(
-            src, filter, StageKeysFilter(["data_1", "data_2"])
+            src, filter_fn, StageKeysFilter(["data_1", "data_2"])
         )
 
-        assert len(filter) == len(flt_sseq)
-        for idx, item in zip(filter, flt_sseq):
-            src_item = src[idx]
-            for k, v in item.items():
-                assert k in src_item
-                assert v == src_item[k]
+        assert len(flt_sseq) == 2
+        flt_iter = iter(flt_sseq)
+        for src_item in src:
+            if filter_fn(src_item):
+                flt_item = next(flt_iter)
+                for k, v in flt_item.items():
+                    assert k in src_item
+                    assert v == src_item[k]
 
     def test_sorted_seq_proxy(self):
         n_items = 5

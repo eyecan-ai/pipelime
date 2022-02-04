@@ -1,0 +1,21 @@
+params:
+  filter_keys:
+  - image
+  - inst
+  - metadata
+  flags:
+  - A
+  - B
+  - C
+  generated_dataset_size: 100
+  generated_output_folder: /tmp/pipe/generated
+  output_folder: /tmp/pipe/output
+  splits:
+  - name: train
+    p: 0.9
+  - name: validation
+    p: 0.08
+  - name: test
+    p: 0.02
+  subsampled_folder: /tmp/pipe/subsampled
+  summed_folder: /tmp/pipe/summed

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Union, Collection, Sequence, Mapping
-
 import albumentations as A
 from choixe.spooks import Spook
 from pipelime.sequences.samples import Sample

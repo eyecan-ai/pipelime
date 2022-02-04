@@ -124,9 +124,10 @@ class Subfolders2Underfolder(UnderfolderConverter):
                 }
                 classmap[category] = category_item
                 items.append(data)
+
         return {
             "items": items,
-            "classmap": classmap,
+            "classmap": {"classes": [v for k, v in classmap.items()]},
         }
 
     def convert(self, output_folder: str):

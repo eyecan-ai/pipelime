@@ -15,24 +15,32 @@ def new_sample(i) -> PlainSample:
     )
 
 
-# ➡️➡️➡️ Reader
-N = 1000
-pool = multiprocessing.Pool()
-samples = list(track(pool.imap_unordered(new_sample, range(N)), total=N))
-sequence = SamplesSequence(samples=samples)
+def main():
 
-print(len(sequence))
+    # ➡️➡️➡️ Reader
+    N = 1000
+    pool = multiprocessing.Pool()
+    samples = list(track(pool.imap_unordered(new_sample, range(N)), total=N))
+    sequence = SamplesSequence(samples=samples)
 
-workers_options = [0, 1, 2, 3, 4, -1]
+    print(len(sequence))
 
-for num_workers in workers_options:
-    # ➡️➡️➡️ Writer with manual template input
-    writer_folder = tempfile.mkdtemp()
-    writer = UnderfolderWriter(
-        folder=writer_folder, extensions_map={"image": "png"}, num_workers=num_workers
-    )
-    t1 = time.perf_counter()
-    writer(sequence)
-    t2 = time.perf_counter()
-    rich.print(f"num_workers={num_workers} -> Time: {t2-t1} s")
-    shutil.rmtree(writer_folder)
+    workers_options = [0, 1, 2, 3, 4, -1]
+
+    for num_workers in workers_options:
+        # ➡️➡️➡️ Writer with manual template input
+        writer_folder = tempfile.mkdtemp()
+        writer = UnderfolderWriter(
+            folder=writer_folder,
+            extensions_map={"image": "png"},
+            num_workers=num_workers,
+        )
+        t1 = time.perf_counter()
+        writer(sequence)
+        t2 = time.perf_counter()
+        rich.print(f"num_workers={num_workers} -> Time: {t2-t1} s")
+        shutil.rmtree(writer_folder)
+
+
+if __name__ == "__main__":
+    main()
