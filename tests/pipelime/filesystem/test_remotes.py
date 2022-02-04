@@ -27,6 +27,9 @@ class TestRemotes:
         local_root = temp_folder / "local"
         local_root.mkdir(parents=True)
 
+        if remote_base_path.startswith('/'):
+            remote_base_path = remote_base_path[1:]
+
         for original, rm_url in source_to_remote.items():
             rm, rm_base_path, rm_name = plr.get_remote_and_paths(rm_url)
             assert isinstance(rm, type(remote))
@@ -46,6 +49,6 @@ class TestRemotes:
 
         remote_root = tmp_path / "remote"
         remote_root.mkdir(parents=True)
-        remote_root = str(remote_root).replace("\\", "/")
+        remote_root = remote_root.as_posix()
 
         self._upload_download(tmp_path, srcdata_folder, file_remote, remote_root)
