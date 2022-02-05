@@ -7,6 +7,7 @@ from pipelime.sequences.validation import (
     StageValidate,
     OperationValidate,
 )
+from schema import Schema
 
 
 class TestSampleSchemaValidation(object):

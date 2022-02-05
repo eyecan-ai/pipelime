@@ -11,7 +11,7 @@ from pipelime.pipes.model import NodeModel, DAGModel
 
 class DAGSimpleParser(DAGConfigParser):
 
-    PLACEHOLDER_CHAR = "@"
+    PLACEHOLDER_CHAR = "\$"
     PLACEHOLDER_REGEX = r = f"{PLACEHOLDER_CHAR}(\\w*)\\(([^)]+)\\)"  # @methodName(arg)
     PLACEHOLDER_VARIABLE_NAME = "var"
     PLACEHOLDER_ITERATION_NAME = "iter"
@@ -23,6 +23,7 @@ class DAGSimpleParser(DAGConfigParser):
     PLACEHOLDER_ARG_SPLIT_CHAR = "@"
 
     def __init__(self) -> None:
+        print("REGEX" * 20, "\n", self.PLACEHOLDER_REGEX)
         self._regex = re.compile(self.PLACEHOLDER_REGEX)
         self._global_data = {}
 

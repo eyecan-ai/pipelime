@@ -19,3 +19,5 @@ params:
     p: 0.02
   subsampled_folder: /tmp/pipe/subsampled
   summed_folder: /tmp/pipe/summed
+  schemas:
+    generated: /path/to/validation.schema
