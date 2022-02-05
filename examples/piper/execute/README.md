@@ -31,6 +31,10 @@ As described in **dag.yml** file. The Dag shows the execution of mixed underfold
 nodes and user nodes (as **fake_detector.py**). Each node has to be a **PiperCommand** in 
 order to be executed in a Piper Dag.
 
+The dag also has the capability to validate intermediate results. This is done by using *inputs_schema*/*outputs_schema* in nodes. See the *outputs_schema* in the *detection* node 
+in **dag.yml** file. 
+
+
 
 ## Monitoring Execution [EXPERIMENTAL]
 

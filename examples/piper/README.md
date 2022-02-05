@@ -1,7 +1,7 @@
 # Piper 
 
-## [Compile](compile/README.md)
-## [Draw](draw/README.md)
-## [Execute](execute/README.md)
+## [Compile](compile/)
+## [Draw](draw/)
+## [Execute](execute/)
 
 
