@@ -1,0 +1,11 @@
+nodes:
+  generator:
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder:
+        foreach:
+          items: [1,2,3]
+          dos: item_$iter(item)
+    args:
+      suffix: suffix
+      size: 50

@@ -147,27 +147,5 @@ def h5_datasets(data_folder):
         "minimnist_h5": {
             "filename": Path(data_folder) / "datasets" / "underfolder_minimnist.h5",
             "type": "H5",
-            # 'schemas': {
-            #     'simple': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'simple.schema',
-            #         'valid': True,
-            #         'should_pass': True
-            #     },
-            #     'deep': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'deep.schema',
-            #         'valid': True,
-            #         'should_pass': True
-            #     },
-            #     'invalid': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'invalid.schema',
-            #         'valid': True,
-            #         'should_pass': False
-            #     },
-            #     'bad_file': {
-            #         'filename': Path(data_folder) / 'datasets' / 'underfolder_minimnist_schemas' / 'bad.schema',
-            #         'valid': False,
-            #         'should_pass': False
-            #     }
-            # }
         }
     }

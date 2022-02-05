@@ -1,4 +1,4 @@
-from pipelime.pipes.piper import Piper, PiperCommandSingleton
+from pipelime.pipes.piper import Piper
 import pytest
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from click.testing import CliRunner
@@ -35,7 +35,7 @@ class TestPiperOperations:
                 description = Piper.piper_command_description(op["command"])
                 assert isinstance(description, dict)
             else:
-                with pytest.raises(RuntimeError):
+                with pytest.raises(TypeError):
                     Piper.piper_command_description(op["command"])
 
 
@@ -74,8 +74,6 @@ class TestCLIUnderfolderOperationSplitPiper:
             cumulative += len(output_reader)
         assert len(input_dataset) == cumulative
 
-        PiperCommandSingleton.destroy()
-
 
 class TestCLIUnderfolderOperationSumPiper:
     def test_sum(self, tmpdir, sample_underfolder_minimnist):
@@ -103,5 +101,3 @@ class TestCLIUnderfolderOperationSumPiper:
         output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
         print("OUTPUT", output_folder)
         assert len(output_reader) == len(input_dataset) * N
-
-        PiperCommandSingleton.destroy()

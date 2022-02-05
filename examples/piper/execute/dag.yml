@@ -1,0 +1,52 @@
+nodes:
+
+  ## GENERATE SAMPLES
+  generator:
+    foreach:
+      items: $var(params.flags)
+      do:
+        command: pipelime datasets generate_toy_dataset
+        outputs:
+          output_folder: $var(params.output_folder)/$iter(item)_generated
+        args:
+          size: $var(params.size)
+
+  ## SUBSAMPLE EACH DATASET
+  subsample:
+    foreach:
+      items: $var(params.flags)
+      do:
+        command: pipelime underfolder subsample
+        inputs:
+          input_folder: $var(params.output_folder)/$iter(item)_generated
+        outputs:
+          output_folder: $var(params.output_folder)/$iter(item)_subsampled
+        args:
+          factor: 0.5
+  
+  ## EXECUTE CUSTOM NODE ON EACH DATASET
+  detection:
+    foreach:
+        items: $var(params.flags)
+        do:
+          command: python fake_detector.py
+          inputs:
+            input_folder: $var(params.output_folder)/$iter(item)_subsampled 
+          outputs:
+            output_folder: $var(params.output_folder)/$iter(item)_detected
+          args:
+            fake_time: 0.01
+          outputs_schema:
+            output_folder: $var(params.schemas.detected)
+
+  ## SUM UP RESULTS
+  summation:
+    command: pipelime underfolder sum
+    inputs:
+      input_folders: 
+        foreach:
+          items: $var(params.flags)
+          do: $var(params.output_folder)/$argiter(item)_detected
+    outputs:
+      output_folder: $var(params.output_folder)/summed
+  

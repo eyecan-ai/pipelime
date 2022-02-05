@@ -1,0 +1,4 @@
+from schema import Optional, Regex
+
+deep = False
+schema = {Regex("image_*"): object, Optional(str): object}
