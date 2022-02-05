@@ -8,6 +8,7 @@ from pipelime.pipes.model import NodeModel
 from pipelime.pipes.piper import PiperNamespace
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.validation import OperationValidate, SampleSchema, SchemaLoader
+from loguru import logger
 
 
 class NaiveNodeModelExecutionParser(NodeModelExecutionParser):
@@ -45,6 +46,15 @@ class NaiveNodeModelExecutionParser(NodeModelExecutionParser):
             chunks.append(str(value))
 
     def build_command_chunks(self, node_model: NodeModel) -> Sequence[Any]:
+        """Builds the command chunks from the given node model parsing inputs, outputs
+        and arguments.
+
+        Args:
+            node_model (NodeModel): input node model
+
+        Returns:
+            Sequence[Any]: the command chunks (as a ' ' saperated string)
+        """
         chunks = node_model.command.split(" ")
 
         if node_model.inputs is not None:
@@ -74,6 +84,21 @@ class NaiveGraphExecutor(NodesGraphExecutor):
         value: any,
         schema_file: str,
     ) -> bool:
+        """Validates the given path and given schema.
+
+        Args:
+            node_model (NodeModel): input node model
+            name (str): input/output name
+            value (any): the port value, could be a path or a list of paths
+            schema_file (str): provided schema file
+
+        Raises:
+            NotImplementedError: if value is not a path or a list of paths
+            SampleSchema.ValidationError: if the validation fails
+
+        Returns:
+            bool: True if the validation succeeds
+        """
 
         # Iterate over list of values if any
         if isinstance(value, list):
@@ -98,17 +123,6 @@ class NaiveGraphExecutor(NodesGraphExecutor):
         if path in self._validated_paths:
             return
 
-        rich.print(
-            "Validating",
-            "\n",
-            node_model,
-            "\n",
-            name,
-            "\n",
-            path,
-            "\n",
-            schema_file,
-        )
         if Path(path).is_dir():
 
             try:
@@ -116,8 +130,15 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 if schema_file is not None:
 
                     schema_file = SchemaLoader.load(schema_file)
-                    op = OperationValidate(sample_schema=schema_file)
-                    op(reader)
+
+                    try:
+                        op = OperationValidate(sample_schema=schema_file)
+                        op(reader)
+                    except SampleSchema.ValidationError as e:
+                        logger.error(
+                            f"Validation error on node: {node_model.command}:{name}:{path} -> {e}"
+                        )
+                        raise SampleSchema.ValidationError
 
                     # Add path to validated paths to avoid validating it twice
                     self._validated_paths.add(path)
@@ -125,7 +146,17 @@ class NaiveGraphExecutor(NodesGraphExecutor):
             except FileNotFoundError:
                 pass
 
+        return True
+
     def _validate_node_inputs(self, node_model: NodeModel) -> bool:
+        """Validates the given node inputs.
+
+        Args:
+            node_model (NodeModel): input node model
+
+        Returns:
+            bool: True if the validation succeeds
+        """
 
         if node_model.inputs is not None:
             for input_name, value in node_model.inputs.items():
@@ -137,6 +168,14 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 )
 
     def _validate_node_outputs(self, node_model: NodeModel) -> bool:
+        """Validates the given node outputs.
+
+        Args:
+            node_model (NodeModel): input node model
+
+        Returns:
+            bool: True if the validation succeeds
+        """
 
         if node_model.outputs is not None:
             for output_name, value in node_model.outputs.items():
@@ -148,6 +187,18 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 )
 
     def exec(self, graph: DAGNodesGraph, token: str = "") -> bool:
+        """Executes the given graph.
+
+        Args:
+            graph (DAGNodesGraph): target graph
+            token (str, optional): execution token shared among nodes. Defaults to "".
+
+        Raises:
+            RuntimeError: if some node fails to execute
+
+        Returns:
+            bool: True if the execution succeeds
+        """
 
         parser = NaiveNodeModelExecutionParser()
         self._validated_paths.clear()
@@ -158,13 +209,21 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 command_chunks: List = parser.build_command_chunks(
                     node_model=node.node_model
                 )
-                command_chunks.append(PiperNamespace.ARGUMENT_NAME_TOKEN)
-                command_chunks.append(token)
+
+                if len(token) > 0:
+                    command_chunks.append(PiperNamespace.ARGUMENT_NAME_TOKEN)
+                    command_chunks.append(token)
+
                 command = " ".join(command_chunks)
-                rich.print("Exec", command)
+
+                logger.debug(f"Executing command: {command}")
 
                 # Validate inputs before call
-                self._validate_node_inputs(node.node_model)
+                try:
+                    self._validate_node_inputs(node.node_model)
+                except SampleSchema.ValidationError:
+                    logger.error("Execution aborted")
+                    raise SampleSchema.ValidationError
 
                 pipe = subprocess.Popen(
                     command_chunks,
@@ -176,8 +235,12 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 if pipe.returncode == 0:
 
                     # validate produced outputs
-                    self._validate_node_outputs(node.node_model)
+                    try:
+                        self._validate_node_outputs(node.node_model)
+                    except SampleSchema.ValidationError:
+                        logger.error("Execution aborted")
+                        raise SampleSchema.ValidationError
 
                 else:
-                    rich.print("[red]Node Failed[/red]:", node)
-                    raise RuntimeError(stderr)
+                    logger.error(f"Node {str(node)} failed -> {stderr}")
+                    raise RuntimeError(f"{stderr}")

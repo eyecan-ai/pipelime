@@ -50,7 +50,7 @@ class DAGSimpleParser(DAGConfigParser):
         :rtype: any
         """
         if not pydash.has(data, dotted_key):
-            raise KeyError(f"Key {dotted_key} not found in data")
+            raise KeyError(f"Key {dotted_key} not found among provided params/data")
         else:
             return pydash.get(data, dotted_key)
 

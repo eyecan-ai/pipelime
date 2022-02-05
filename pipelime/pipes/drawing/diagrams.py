@@ -70,5 +70,9 @@ class DiagramsNodesGraphDrawer(NodesGraphDrawer):
                 n1: GraphNode = edge[1]
                 nodes_map[n0.id] >> nodes_map[n1.id]
 
+        try:
+            f.close()
+        except:
+            pass
         img = imageio.imread(f"{f.name}.png")
         return img
