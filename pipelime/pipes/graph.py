@@ -46,25 +46,54 @@ class GraphNodeData(GraphNode):
         return self._path
 
 
-class NodesGraph:
+class DAGNodesGraph:
     def __init__(self, raw_graph: nx.DiGraph):
+        """Initialize the DAG graph starting from a raw directed graph (networkx).
+
+        Args:
+            raw_graph (nx.DiGraph): The raw graph to be converted to a DAG graph.
+        """
         super().__init__()
         self._raw_graph = raw_graph
 
     @property
     def raw_graph(self) -> nx.DiGraph:
+        """The raw graph (networkx) of the DAG.
+
+        Returns:
+            nx.DiGraph: The raw graph (networkx) of the DAG.
+        """
         return self._raw_graph
 
     @property
-    def operations_graph(self):
-        return NodesGraph.filter_node_graph(self, [GraphNode.GRAPH_NODE_TYPE_OPERATION])
+    def operations_graph(self) -> "DAGNodesGraph":
+        """The operations graph (networkx) of the DAG. It is a filtered version of the
+        raw graph with operations nodes only.
+
+        Returns:
+            DAGNodesGraph: The operations graph (networkx) of the DAG.
+        """
+        return DAGNodesGraph.filter_node_graph(
+            self, [GraphNode.GRAPH_NODE_TYPE_OPERATION]
+        )
 
     @property
-    def data_graph(self):
-        return NodesGraph.filter_node_graph(self, [GraphNode.GRAPH_NODE_TYPE_DATA])
+    def data_graph(self) -> "DAGNodesGraph":
+        """The data graph (networkx) of the DAG. It is a filtered version of the
+        raw graph with data nodes only.
+
+        Returns:
+            DAGNodesGraph: The data graph (networkx) of the DAG.
+        """
+        return DAGNodesGraph.filter_node_graph(self, [GraphNode.GRAPH_NODE_TYPE_DATA])
 
     @property
     def root_nodes(self) -> Sequence[GraphNode]:
+        """The root nodes of the DAG. They are the nodes that have no predecessors.
+
+        Returns:
+            Sequence[GraphNode]: The root nodes of the DAG.
+        """
         return [
             node
             for node in self.raw_graph.nodes
@@ -72,8 +101,19 @@ class NodesGraph:
         ]
 
     def consumable_operations(
-        self, produced_data: Set[GraphNodeData]
+        self,
+        produced_data: Set[GraphNodeData],
     ) -> Set[GraphNodeOperation]:
+        """Given a set of produced data, returns the set of operations that can be
+        consumed given the produced data, i.e. the operations that have inputs available
+
+        Args:
+            produced_data (Set[GraphNodeData]): The set of produced data.
+
+        Returns:
+            Set[GraphNodeOperation]: The set of operations that can be consumed given
+            the produced data.
+        """
 
         consumables = set()
         for node in self.operations_graph.raw_graph.nodes:
@@ -90,6 +130,16 @@ class NodesGraph:
         self,
         operation_nodes: Sequence[GraphNodeOperation],
     ) -> Set[GraphNodeData]:
+        """Given a set of operations, consume them and return the set of produced data,
+        i.e. the data are the outputs of the operations.
+
+        Args:
+            operation_nodes (Sequence[GraphNodeOperation]): The set of operations to be
+            consumed.
+
+        Returns:
+            Set[GraphNodeData]: The set of produced data.
+        """
         consumed_data = set()
         for node in operation_nodes:
             out_data = [
@@ -101,6 +151,13 @@ class NodesGraph:
         return consumed_data
 
     def build_execution_stack(self) -> Sequence[Sequence[GraphNodeOperation]]:
+        """Builds the execution stack of the DAG. The execution stack is a list of lists
+        of operations. Each list of operations is a virtual layer of operations that
+        can be executed in parallel because they have no dependencies.
+
+        Returns:
+            Sequence[Sequence[GraphNodeOperation]]: The execution stack of the DAG.
+        """
 
         # the execution stack is a list of lists of nodes. Each list represents a
         execution_stack: Sequence[Sequence[GraphNodeOperation]] = []
@@ -143,7 +200,12 @@ class NodesGraph:
     def build_nodes_graph(
         cls,
         dag_model: DAGModel,
-    ) -> "NodesGraph":
+    ) -> "DAGNodesGraph":
+        """Builds the nodes graph of the DAG starting from a plain DAG model.
+
+        Returns:
+            DAGNodesGraph: The nodes graph of the DAG.
+        """
 
         g = nx.DiGraph()
 
@@ -153,34 +215,47 @@ class NodesGraph:
             inputs = node.inputs
             outputs = node.outputs
 
-            for _, input_value in inputs.items():
-                if isinstance(input_value, str):
-                    input_value = [input_value]
-                [
-                    g.add_edge(
-                        GraphNodeData(str(x), str(x)),
-                        GraphNodeOperation(node_name, node),
-                    )
-                    for x in input_value
-                ]
+            if inputs is not None:
+                for _, input_value in inputs.items():
+                    if isinstance(input_value, str):
+                        input_value = [input_value]
+                    [
+                        g.add_edge(
+                            GraphNodeData(str(x), str(x)),
+                            GraphNodeOperation(node_name, node),
+                        )
+                        for x in input_value
+                    ]
 
-            for _, output_value in outputs.items():
-                if isinstance(output_value, str):
-                    output_value = [output_value]
-                [
-                    g.add_edge(
-                        GraphNodeOperation(node_name, node),
-                        GraphNodeData(str(x), str(x)),
-                    )
-                    for x in output_value
-                ]
+            if outputs is not None:
+                for _, output_value in outputs.items():
+                    if isinstance(output_value, str):
+                        output_value = [output_value]
+                    [
+                        g.add_edge(
+                            GraphNodeOperation(node_name, node),
+                            GraphNodeData(str(x), str(x)),
+                        )
+                        for x in output_value
+                    ]
 
-        return NodesGraph(raw_graph=g)
+        return DAGNodesGraph(raw_graph=g)
 
     @classmethod
     def filter_raw_graph(
-        cls, full_graph: nx.DiGraph, types: Sequence[str]
+        cls,
+        full_graph: nx.DiGraph,
+        types: Sequence[str],
     ) -> nx.DiGraph:
+        """Filters the raw graph of the DAG to keep only the nodes of the given types.
+
+        Args:
+            full_graph (nx.DiGraph): The raw graph of the DAG.
+            types (Sequence[str]): The types of the nodes to keep.
+
+        Returns:
+            nx.DiGraph: The filtered raw graph of the DAG.
+        """
 
         filtered_graph: nx.DiGraph = nx.DiGraph()
 
@@ -192,10 +267,31 @@ class NodesGraph:
                 for pair in pairs:
                     filtered_graph.add_edge(pair[0], pair[1])
 
+        # If filtered graph is empty could be a single layer graph without connections
+        # in this case all nodes are kept
+        if len(filtered_graph.nodes()) == 0:
+            for node in full_graph.nodes:
+                if node.type in types:
+                    filtered_graph.add_node(node)
+
         return filtered_graph
 
     @classmethod
     def filter_node_graph(
-        cls, nodes_graph: "NodesGraph", types: Sequence[str]
-    ) -> nx.DiGraph:
-        return NodesGraph(raw_graph=cls.filter_raw_graph(nodes_graph.raw_graph, types))
+        cls,
+        nodes_graph: "DAGNodesGraph",
+        types: Sequence[str],
+    ) -> "DAGNodesGraph":
+        """Filters the nodes graph of the DAG to keep only the nodes of the given types.
+        It wraps the raw graph into a DAGNodesGraph.
+
+        Args:
+            nodes_graph (DAGNodesGraph): The nodes graph of the DAG.
+            types (Sequence[str]): The types of the nodes to keep.
+
+        Returns:
+            DAGNodesGraph: The filtered nodes graph of the DAG.
+        """
+        return DAGNodesGraph(
+            raw_graph=cls.filter_raw_graph(nodes_graph.raw_graph, types)
+        )

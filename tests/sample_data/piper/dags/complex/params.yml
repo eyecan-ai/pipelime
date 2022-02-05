@@ -7,15 +7,18 @@ params:
   - A
   - B
   - C
-  generated_dataset_size: 250
-  generated_output_folder: /tmp/pipe/generated
+  custom_command: python fake_detector.py
   output_folder: /tmp/pipe/output
+  final_folder: /tmp/pipe/final
+  generated_dataset_size: 10
   splits:
   - name: train
-    p: 0.9
+    p: 0.8
   - name: validation
-    p: 0.08
+    p: 0.1
   - name: test
-    p: 0.02
-  subsampled_folder: /tmp/pipe/subsampled
-  summed_folder: /tmp/pipe/summed
+    p: 0.1
+  schemas:
+    generated: /path/to/validation.schema
+    remapped: /path/to/validation_remapped.schema
+    detected: /path/to/validation_detected.schema

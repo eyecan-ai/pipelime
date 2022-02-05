@@ -15,3 +15,5 @@ pydantic
 fastapi
 requests
 joblib
+deepdiff
+networkx

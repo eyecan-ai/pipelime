@@ -18,12 +18,13 @@ nodes:
       do:
         command: pipelime datasets generate_toy_dataset
         outputs:
-          output_folder: $var(params.generated_output_folder)/$iter(item)
+          output_folder: $var(params.output_folder)/$iter(item)_generated
         args:
           suffix: _$iter(item)
           size: $var(params.generated_dataset_size)
+        # ↓ these are the schemas of the outputs of the node
         outputs_schema:
-          output_folder: ciao
+          output_folder: $var(params.schemas.generated)
   # ------------------------------------------------------------------------------------
   # FILTER_KEYS NODE, filter some keys for each sample, for each dataset
   # ------------------------------------------------------------------------------------
@@ -33,9 +34,9 @@ nodes:
       do:
         command: pipelime underfolder filter_keys
         inputs:
-          input_folder: $var(params.generated_output_folder)/$iter(item)
+          input_folder: $var(params.output_folder)/$iter(item)_generated
         outputs:
-          output_folder: $var(params.generated_output_folder)/$iter(item)_filtered
+          output_folder: $var(params.output_folder)/$iter(item)_filtered
         args:
           keys:
             foreach:
@@ -50,11 +51,12 @@ nodes:
       do:
         command: pipelime underfolder subsample
         inputs:
-          input_folder: $var(params.generated_output_folder)/$iter(item)_filtered
+          input_folder: $var(params.output_folder)/$iter(item)_filtered
         outputs:
-          output_folder: $var(params.generated_output_folder)/$iter(item)_subsampled
+          output_folder: $var(params.output_folder)/$iter(item)_subsampled
         args:
           factor: 0.5
+        
   # ------------------------------------------------------------------------------------
   # REMAP_KEYS NODE, rename keys of each dataset into a common naming scheme
   # ------------------------------------------------------------------------------------
@@ -64,9 +66,9 @@ nodes:
       do:
         command: pipelime underfolder remap_keys
         inputs:
-          input_folder: $var(params.generated_output_folder)/$iter(item)_subsampled
+          input_folder: $var(params.output_folder)/$iter(item)_subsampled
         outputs:
-          output_folder: $var(params.generated_output_folder)/$iter(item)_remapped
+          output_folder: $var(params.output_folder)/$iter(item)_remapped
         args:
           keys@0:
             foreach:
@@ -77,12 +79,15 @@ nodes:
               items: $var(params.filter_keys)
               do: $argiter(item)
           remove: {}
+        # ↓ these are the schemas of the inputs of the node
+        inputs_schema:
+          input_folder: $var(params.schemas.generated)
   # ------------------------------------------------------------------------------------
   # DETECTION NODE, launch custom detection node on each input dataset
   # ------------------------------------------------------------------------------------
   detection:
     # ↓ this is the base command to be executed
-    command: python fake_detector.py
+    command: $var(params.custom_command)
     # ↓ this is mapping of inputs arguments {arg_name:str -> values:str}
     inputs:
       input_folders:
@@ -91,16 +96,20 @@ nodes:
         # ↓ above for nodes
         foreach:
           items: $var(params.flags)
-          do: $var(params.generated_output_folder)/$argiter(item)_remapped
+          do: $var(params.output_folder)/$argiter(item)_remapped
     # ↓ this is mapping of outputs arguments {arg_name:str -> values:str}
     outputs:
       output_folders:
         foreach:
           items: $var(params.flags)
-          do: $var(params.generated_output_folder)/$argiter(item)_detected
+          do: $var(params.output_folder)/$argiter(item)_detected
     # ↓ this is mapping of generic arguments {arg_name:str -> values:str}     
     args:
       fake_time: 0.01
+    inputs_schema:
+      input_folders: $var(params.schemas.remapped)
+    outputs_schema:
+      output_folders: $var(params.schemas.detected)
   # ------------------------------------------------------------------------------------
   # SUMMATION NODE, sum each dataset into a single dataset
   # ------------------------------------------------------------------------------------
@@ -110,9 +119,9 @@ nodes:
       input_folders: 
         foreach:
           items: $var(params.flags)
-          do: $var(params.generated_output_folder)/$argiter(item)_detected
+          do: $var(params.output_folder)/$argiter(item)_detected
     outputs:
-      output_folder: $var(params.summed_folder)
+      output_folder: $var(params.output_folder)/summed
   # ------------------------------------------------------------------------------------
   # SPLIT NODE, split datasets into train, validation and test
   # ------------------------------------------------------------------------------------
@@ -124,12 +133,12 @@ nodes:
           items: $var(params.splits)
           do: $argiter(item.p)
     inputs:
-      input_folder: $var(params.summed_folder)
+      input_folder: $var(params.output_folder)/summed
     outputs:
       output_folders:
         foreach:
           items: $var(params.splits)
-          do: $var(params.output_folder)/$argiter(item.name)
+          do: $var(params.output_folder)/split_$argiter(item.name)
   # ------------------------------------------------------------------------------------
   # SHUFFLE NODE, useless shuffle after split
   # ------------------------------------------------------------------------------------
@@ -139,10 +148,22 @@ nodes:
       do:
         command: pipelime underfolder shuffle
         inputs:
-          input_folder: $var(params.output_folder)/$iter(item.name)
+          input_folder: $var(params.output_folder)/split_$iter(item.name)
         outputs:
-          output_folder: $var(params.output_folder)/$iter(item.name)_shuffled
+          output_folder: $var(params.output_folder)/split_$iter(item.name)_shuffled
         args:
           seed: 10
+  # ------------------------------------------------------------------------------------
+  # SUMUP NODE, final merge
+  # ------------------------------------------------------------------------------------
+  sumup:
+    command: pipelime underfolder sum
+    inputs:
+      input_folders:
+        foreach:
+          items: $var(params.splits)
+          do: $var(params.output_folder)/split_$argiter(item.name)_shuffled
+    outputs:
+      output_folder: $var(params.final_folder)
 
 

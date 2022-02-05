@@ -5,16 +5,18 @@ nodes:
     command: python fake_detector.py
     inputs:
       input_folders:
-      - /tmp/pipe/generated/A_remapped
-      - /tmp/pipe/generated/B_remapped
-      - /tmp/pipe/generated/C_remapped
-    inputs_schema: {}
+      - /tmp/pipe/output/A_remapped
+      - /tmp/pipe/output/B_remapped
+      - /tmp/pipe/output/C_remapped
+    inputs_schema:
+      input_folders: /path/to/validation_remapped.schema
     outputs:
       output_folders:
-      - /tmp/pipe/generated/A_detected
-      - /tmp/pipe/generated/B_detected
-      - /tmp/pipe/generated/C_detected
-    outputs_schema: {}
+      - /tmp/pipe/output/A_detected
+      - /tmp/pipe/output/B_detected
+      - /tmp/pipe/output/C_detected
+    outputs_schema:
+      output_folders: /path/to/validation_detected.schema
   filter_keys@A:
     args:
       keys:
@@ -23,11 +25,9 @@ nodes:
       - metadata_A
     command: pipelime underfolder filter_keys
     inputs:
-      input_folder: /tmp/pipe/generated/A
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/A_generated
     outputs:
-      output_folder: /tmp/pipe/generated/A_filtered
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/A_filtered
   filter_keys@B:
     args:
       keys:
@@ -36,11 +36,9 @@ nodes:
       - metadata_B
     command: pipelime underfolder filter_keys
     inputs:
-      input_folder: /tmp/pipe/generated/B
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/B_generated
     outputs:
-      output_folder: /tmp/pipe/generated/B_filtered
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/B_filtered
   filter_keys@C:
     args:
       keys:
@@ -49,44 +47,36 @@ nodes:
       - metadata_C
     command: pipelime underfolder filter_keys
     inputs:
-      input_folder: /tmp/pipe/generated/C
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/C_generated
     outputs:
-      output_folder: /tmp/pipe/generated/C_filtered
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/C_filtered
   generator@A:
     args:
-      size: 250
+      size: 10
       suffix: _A
     command: pipelime datasets generate_toy_dataset
-    inputs: {}
-    inputs_schema: {}
     outputs:
-      output_folder: /tmp/pipe/generated/A
+      output_folder: /tmp/pipe/output/A_generated
     outputs_schema:
-      output_folder: ciao
+      output_folder: /path/to/validation.schema
   generator@B:
     args:
-      size: 250
+      size: 10
       suffix: _B
     command: pipelime datasets generate_toy_dataset
-    inputs: {}
-    inputs_schema: {}
     outputs:
-      output_folder: /tmp/pipe/generated/B
+      output_folder: /tmp/pipe/output/B_generated
     outputs_schema:
-      output_folder: ciao
+      output_folder: /path/to/validation.schema
   generator@C:
     args:
-      size: 250
+      size: 10
       suffix: _C
     command: pipelime datasets generate_toy_dataset
-    inputs: {}
-    inputs_schema: {}
     outputs:
-      output_folder: /tmp/pipe/generated/C
+      output_folder: /tmp/pipe/output/C_generated
     outputs_schema:
-      output_folder: ciao
+      output_folder: /path/to/validation.schema
   remap_keys@A:
     args:
       keys:
@@ -99,11 +89,11 @@ nodes:
       remove: {}
     command: pipelime underfolder remap_keys
     inputs:
-      input_folder: /tmp/pipe/generated/A_subsampled
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/A_subsampled
+    inputs_schema:
+      input_folder: /path/to/validation.schema
     outputs:
-      output_folder: /tmp/pipe/generated/A_remapped
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/A_remapped
   remap_keys@B:
     args:
       keys:
@@ -116,11 +106,11 @@ nodes:
       remove: {}
     command: pipelime underfolder remap_keys
     inputs:
-      input_folder: /tmp/pipe/generated/B_subsampled
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/B_subsampled
+    inputs_schema:
+      input_folder: /path/to/validation.schema
     outputs:
-      output_folder: /tmp/pipe/generated/B_remapped
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/B_remapped
   remap_keys@C:
     args:
       keys:
@@ -133,96 +123,88 @@ nodes:
       remove: {}
     command: pipelime underfolder remap_keys
     inputs:
-      input_folder: /tmp/pipe/generated/C_subsampled
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/C_subsampled
+    inputs_schema:
+      input_folder: /path/to/validation.schema
     outputs:
-      output_folder: /tmp/pipe/generated/C_remapped
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/C_remapped
   shuffle@0:
     args:
       seed: 10
     command: pipelime underfolder shuffle
     inputs:
-      input_folder: /tmp/pipe/output/train
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/split_train
     outputs:
-      output_folder: /tmp/pipe/output/train_shuffled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/split_train_shuffled
   shuffle@1:
     args:
       seed: 10
     command: pipelime underfolder shuffle
     inputs:
-      input_folder: /tmp/pipe/output/validation
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/split_validation
     outputs:
-      output_folder: /tmp/pipe/output/validation_shuffled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/split_validation_shuffled
   shuffle@2:
     args:
       seed: 10
     command: pipelime underfolder shuffle
     inputs:
-      input_folder: /tmp/pipe/output/test
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/split_test
     outputs:
-      output_folder: /tmp/pipe/output/test_shuffled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/split_test_shuffled
   split:
     args:
       splits:
-      - 0.9
-      - 0.08
-      - 0.02
+      - 0.8
+      - 0.1
+      - 0.1
     command: pipelime underfolder split
     inputs:
-      input_folder: /tmp/pipe/summed
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/summed
     outputs:
       output_folders:
-      - /tmp/pipe/output/train
-      - /tmp/pipe/output/validation
-      - /tmp/pipe/output/test
-    outputs_schema: {}
+      - /tmp/pipe/output/split_train
+      - /tmp/pipe/output/split_validation
+      - /tmp/pipe/output/split_test
   subsample@A:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
     inputs:
-      input_folder: /tmp/pipe/generated/A_filtered
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/A_filtered
     outputs:
-      output_folder: /tmp/pipe/generated/A_subsampled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/A_subsampled
   subsample@B:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
     inputs:
-      input_folder: /tmp/pipe/generated/B_filtered
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/B_filtered
     outputs:
-      output_folder: /tmp/pipe/generated/B_subsampled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/B_subsampled
   subsample@C:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
     inputs:
-      input_folder: /tmp/pipe/generated/C_filtered
-    inputs_schema: {}
+      input_folder: /tmp/pipe/output/C_filtered
     outputs:
-      output_folder: /tmp/pipe/generated/C_subsampled
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/C_subsampled
   summation:
-    args: {}
     command: pipelime underfolder sum
     inputs:
       input_folders:
-      - /tmp/pipe/generated/A_detected
-      - /tmp/pipe/generated/B_detected
-      - /tmp/pipe/generated/C_detected
-    inputs_schema: {}
+      - /tmp/pipe/output/A_detected
+      - /tmp/pipe/output/B_detected
+      - /tmp/pipe/output/C_detected
     outputs:
-      output_folder: /tmp/pipe/summed
-    outputs_schema: {}
+      output_folder: /tmp/pipe/output/summed
+  sumup:
+    command: pipelime underfolder sum
+    inputs:
+      input_folders:
+      - /tmp/pipe/output/split_train_shuffled
+      - /tmp/pipe/output/split_validation_shuffled
+      - /tmp/pipe/output/split_test_shuffled
+    outputs:
+      output_folder: /tmp/pipe/final

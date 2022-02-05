@@ -23,7 +23,6 @@ class DAGSimpleParser(DAGConfigParser):
     PLACEHOLDER_ARG_SPLIT_CHAR = "@"
 
     def __init__(self) -> None:
-        print("REGEX" * 20, "\n", self.PLACEHOLDER_REGEX)
         self._regex = re.compile(self.PLACEHOLDER_REGEX)
         self._global_data = {}
 
@@ -40,6 +39,21 @@ class DAGSimpleParser(DAGConfigParser):
         """
         self._global_data[key] = value
 
+    def _get_value(self, data: dict, dotted_key: str) -> any:
+        """Get a value from a dict.
+
+        :param data: dict
+        :type data: dict
+        :param key: key
+        :type key: str
+        :return: value
+        :rtype: any
+        """
+        if not pydash.has(data, dotted_key):
+            raise KeyError(f"Key {dotted_key} not found in data")
+        else:
+            return pydash.get(data, dotted_key)
+
     def _convert_match_to_variable(self, m: re.Match) -> any:
         """This is a callable, used in the _parse_string function. It will be called on
         every "value" found in the configuration dict. It converts the regex match to the
@@ -52,7 +66,7 @@ class DAGSimpleParser(DAGConfigParser):
         """
         command, content = m.groups()
         if command.lower() == DAGSimpleParser.PLACEHOLDER_VARIABLE_NAME:
-            value = pydash.get(self._global_data, content)
+            value = self._get_value(self._global_data, content)
             return value
         else:
             return m.group()
@@ -74,7 +88,7 @@ class DAGSimpleParser(DAGConfigParser):
         local_data = {"item": item, "index": index}
         command, content = m.groups()
         if command.lower() == DAGSimpleParser.PLACEHOLDER_ITERATION_NAME:
-            value = pydash.get(local_data, content)
+            value = self._get_value(local_data, content)
             return value
         else:
             return m.group()
@@ -96,7 +110,7 @@ class DAGSimpleParser(DAGConfigParser):
         local_data = {"item": item, "index": index}
         command, content = m.groups()
         if command.lower() == DAGSimpleParser.PLACEHOLDER_ARG_ITERATION_NAME:
-            value = pydash.get(local_data, content)
+            value = self._get_value(local_data, content)
             return value
         else:
             return m.group()
@@ -216,7 +230,8 @@ class DAGSimpleParser(DAGConfigParser):
                 DAGSimpleParser.PLACEHOLDER_FOREACH_ITEMS_NAME, None
             )
             if pseudo_node is None or foreach_data is None:
-                raise Exception("Invalid foreach node. Missing 'do' or 'items' keys.")
+                raise KeyError("Invalid foreach node. Missing 'do' or 'items' keys.")
+
             return pseudo_node, foreach_data
         else:
             return None, None
@@ -260,13 +275,13 @@ class DAGSimpleParser(DAGConfigParser):
                 if DAGSimpleParser.PLACEHOLDER_FOREACH_NAME in value:
                     pseudo_node, foreach_data = self._extract_foreach_data(value)
                     if pseudo_node is not None:
-                        if not isinstance(pseudo_node, str):
-                            raise Exception(
-                                "Invalid foreach node. 'do' key must be a sequence."
-                            )
+                        # if not isinstance(pseudo_node, str):
+                        #     raise Exception(
+                        #         "Invalid foreach node. 'do' key must be a sequence."
+                        #     )
                         if not isinstance(foreach_data, Sequence):
-                            raise Exception(
-                                "Invalid foreach node. 'items' key must be a string."
+                            raise TypeError(
+                                "Invalid foreach node. 'items' key must be a Sequence."
                             )
                         parsed_list = []
                         for value_index, value in enumerate(foreach_data):
@@ -330,6 +345,9 @@ class DAGSimpleParser(DAGConfigParser):
 
             # if pseudo_node is not None, then the node is a foreach node!
             if pseudo_node is not None:
+
+                if not isinstance(pseudo_node, dict):
+                    raise TypeError("Invalid foreach node. 'do' key must be a dict.")
 
                 # Iterate the foreach data and create a new node for each item
                 for index, data in enumerate(foreach_data):
@@ -437,7 +455,7 @@ class DAGSimpleParser(DAGConfigParser):
                                 remapped = []
                                 for r in range(row_size):
                                     row = [raw_values[i][r] for i in range(raw_size)]
-                                    remapped.append(tuple(row))
+                                    remapped.append(row)
                                 rephrased_args[arg_name] = remapped
                     to_replace[key] = rephrased_args
 
@@ -476,165 +494,3 @@ class DAGSimpleParser(DAGConfigParser):
         parsed["nodes"] = self._merge_multiple_arguments(parsed["nodes"])
 
         return DAGModel(**parsed)
-
-
-class PipeGraph(nx.DiGraph):
-    class PipeGraphNode:
-        def __init__(
-            self,
-            name: str,
-            type: str = "operation",
-            user_model: Optional[NodeModel] = None,
-        ):
-            self.name = name
-            self.type = type
-            self._user_model = user_model
-
-        @property
-        def user_model(self) -> Optional[NodeModel]:
-            return self._user_model
-
-        @property
-        def id(self):
-            return f"{self.type}({self.name})"
-
-        def __hash__(self) -> int:
-            return hash(f"{self.type}({self.name})")
-
-        def __repr__(self) -> str:
-            return f"{self.type}({self.name})"
-
-        def __eq__(self, o: object) -> bool:
-            return self.id == o.id
-
-    def __init__(self, nodes_model: DAGModel):
-        super().__init__()
-        self._nodes_model = nodes_model
-        PipeGraph.build_nodes_graph(self._nodes_model, self)
-
-    @property
-    def operations_graph(self):
-        return PipeGraph.filter_graph(self, "data")
-
-    @property
-    def data_graph(self):
-        return PipeGraph.filter_graph(self, "operation")
-
-    @property
-    def root_nodes(self) -> Sequence[PipeGraphNode]:
-        return [node for node in self.nodes if len(list(self.predecessors(node))) == 0]
-
-    def consumable_operations(self, produced_data: Set[PipeGraphNode]):
-        consumables = set()
-        for node in self.operations_graph.nodes:
-            in_data = [x for x in self.predecessors(node) if x.type == "data"]
-            if all(x in produced_data for x in in_data):
-                consumables.add(node)
-        return consumables
-
-    def consume(self, operation_nodes: Sequence[PipeGraphNode]) -> Set[PipeGraphNode]:
-        consumed_data = set()
-        for node in operation_nodes:
-            out_data = [x for x in self.successors(node) if x.type == "data"]
-            consumed_data.update(out_data)
-        return consumed_data
-
-    def build_execution_stack(self) -> Sequence[Sequence[PipeGraphNode]]:
-
-        # the execution stack is a list of lists of nodes. Each list represents a
-        execution_stack: Sequence[Sequence[PipeGraph.PipeGraphNode]] = []
-
-        # initalize global produced data with the root nodes
-        global_produced_data = set()
-        global_produced_data.update(self.root_nodes)
-
-        # set of operations that have been consumed
-        consumed_operations = set()
-
-        while True:
-            # which operations can be consumed given the produced data?
-            consumable: set = self.consumable_operations(global_produced_data)
-
-            # Remove from consumable operations the ones that have already been consumed
-            consumable = consumable.difference(consumed_operations)
-
-            # No consumable operations? We are done!
-            if len(consumable) == 0:
-                break
-
-            # If not empty, append consumable operations to the execution stack
-            execution_stack.append(consumable)
-
-            # The set of produced data is the union of all the consumed operations
-            produced_data: set = self.consume(consumable)
-
-            # Add the consumed operations to the consumed operations set
-            consumed_operations.update(consumable)
-
-            # Add the produced data to the global produced data
-            global_produced_data.update(produced_data)
-
-        return execution_stack
-
-    @classmethod
-    def build_nodes_graph(
-        cls,
-        nodes_model: DAGModel,
-        target_graph: Optional[nx.DiGraph] = None,
-    ) -> dict:
-
-        g = nx.DiGraph() if target_graph is None else target_graph
-
-        for node_name, node in nodes_model.nodes.items():
-            node: NodeModel
-
-            inputs = node.inputs
-            outputs = node.outputs
-
-            for input_key, input_value in inputs.items():
-                if isinstance(input_value, str):
-                    input_value = [input_value]
-                [
-                    g.add_edge(
-                        PipeGraph.PipeGraphNode(str(x), "data"),
-                        PipeGraph.PipeGraphNode(
-                            node_name,
-                            "operation",
-                            user_model=node,
-                        ),
-                    )
-                    for x in input_value
-                ]
-
-            for output_key, output_value in outputs.items():
-                if isinstance(output_value, str):
-                    output_value = [output_value]
-                [
-                    g.add_edge(
-                        PipeGraph.PipeGraphNode(
-                            node_name,
-                            "operation",
-                            user_model=node,
-                        ),
-                        PipeGraph.PipeGraphNode(x, "data"),
-                    )
-                    for x in output_value
-                ]
-
-        return g
-
-    @classmethod
-    def filter_graph(
-        cls, full_graph: nx.DiGraph, remove_type: str = "data"
-    ) -> nx.DiGraph:
-        operation_graph: nx.DiGraph = nx.DiGraph()
-
-        for node in full_graph.nodes:
-            if node.type == remove_type:
-                predecessors = list(full_graph.predecessors(node))
-                successors = list(full_graph.successors(node))
-                pairs = list(itertools.product(predecessors, successors))
-                for pair in pairs:
-                    operation_graph.add_edge(pair[0], pair[1])
-
-        return operation_graph

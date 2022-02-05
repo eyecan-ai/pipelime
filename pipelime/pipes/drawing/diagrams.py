@@ -4,7 +4,7 @@ from pipelime.pipes.graph import (
     GraphNode,
     GraphNodeData,
     GraphNodeOperation,
-    NodesGraph,
+    DAGNodesGraph,
 )
 from tempfile import NamedTemporaryFile
 import imageio
@@ -26,7 +26,7 @@ class DataNode(Custom):
 
 
 class DiagramsNodesGraphDrawer(NodesGraphDrawer):
-    def draw(self, graph: NodesGraph) -> np.ndarray:
+    def draw(self, graph: DAGNodesGraph) -> np.ndarray:
         """Draw graph using Diagrams library
 
         Args:

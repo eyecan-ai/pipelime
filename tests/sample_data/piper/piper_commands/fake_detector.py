@@ -20,14 +20,12 @@ from pipelime.tools.progress import pipelime_track
     multiple=True,
     help="The input folder",
 )
+@click.option("-t", "--fake_time", type=float, default=0.0)
 @Piper.command(
     inputs=["input_folders"],
     outputs=["output_folders"],
 )
-def fake_detector(
-    input_folders: str,
-    output_folders: str,
-):
+def fake_detector(input_folders: str, output_folders: str, fake_time: float):
 
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
@@ -57,6 +55,12 @@ def fake_detector(
                 "keypoints": [np.random.randint(0, 100, (10, 4)).tolist()]
             }
             out_samples.append(sample)
+
+            if fake_time > 0:
+                # wait for fake_time
+                import time
+
+                time.sleep(fake_time)
 
         # build out sequence
         out_sequence = SamplesSequence(out_samples)

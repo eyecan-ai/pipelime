@@ -1,0 +1,4 @@
+from schema import Optional, Regex
+
+deep = False
+schema = {"image_not_present": object}

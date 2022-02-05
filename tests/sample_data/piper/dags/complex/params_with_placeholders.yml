@@ -1,0 +1,24 @@
+params:
+  filter_keys:
+  - image
+  - inst
+  - metadata
+  flags:
+  - A
+  - B
+  - C
+  custom_command: '@str(CUSTOM_COMMAND)'
+  output_folder: '@str(OUTPUT_FOLDER)'
+  final_folder: '@str(FINAL_FOLDER)'
+  generated_dataset_size: '@int(SIZE)'
+  splits:
+  - name: train
+    p: 0.8
+  - name: validation
+    p: 0.1
+  - name: test
+    p: 0.1
+  schemas:
+    generated: '@str(SCHEMA_GENERATED)'
+    remapped: '@str(SCHEMA_REMAPPED)'
+    detected: '@str(SCHEMA_DETECTED)'
