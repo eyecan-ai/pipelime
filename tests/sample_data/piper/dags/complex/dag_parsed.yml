@@ -1,0 +1,189 @@
+nodes:
+  detection:
+    args:
+      fake_time: 0.01
+    command: python fake_detector.py
+    inputs:
+      input_folders:
+      - /tmp/pipe/generated/A_remapped
+      - /tmp/pipe/generated/B_remapped
+      - /tmp/pipe/generated/C_remapped
+    outputs:
+      output_folders:
+      - /tmp/pipe/generated/A_detected
+      - /tmp/pipe/generated/B_detected
+      - /tmp/pipe/generated/C_detected
+  filter_keys@A:
+    args:
+      keys:
+      - image_A
+      - inst_A
+      - metadata_A
+    command: pipelime underfolder filter_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/A
+    outputs:
+      output_folder: /tmp/pipe/generated/A_filtered
+  filter_keys@B:
+    args:
+      keys:
+      - image_B
+      - inst_B
+      - metadata_B
+    command: pipelime underfolder filter_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/B
+    outputs:
+      output_folder: /tmp/pipe/generated/B_filtered
+  filter_keys@C:
+    args:
+      keys:
+      - image_C
+      - inst_C
+      - metadata_C
+    command: pipelime underfolder filter_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/C
+    outputs:
+      output_folder: /tmp/pipe/generated/C_filtered
+  generator@A:
+    args:
+      size: 250
+      suffix: _A
+    command: pipelime datasets generate_toy_dataset
+    inputs: {}
+    outputs:
+      output_folder: /tmp/pipe/generated/A
+  generator@B:
+    args:
+      size: 250
+      suffix: _B
+    command: pipelime datasets generate_toy_dataset
+    inputs: {}
+    outputs:
+      output_folder: /tmp/pipe/generated/B
+  generator@C:
+    args:
+      size: 250
+      suffix: _C
+    command: pipelime datasets generate_toy_dataset
+    inputs: {}
+    outputs:
+      output_folder: /tmp/pipe/generated/C
+  remap_keys@A:
+    args:
+      keys:
+      - - image_A
+        - image
+      - - inst_A
+        - inst
+      - - metadata_A
+        - metadata
+      remove: {}
+    command: pipelime underfolder remap_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/A_subsampled
+    outputs:
+      output_folder: /tmp/pipe/generated/A_remapped
+  remap_keys@B:
+    args:
+      keys:
+      - - image_B
+        - image
+      - - inst_B
+        - inst
+      - - metadata_B
+        - metadata
+      remove: {}
+    command: pipelime underfolder remap_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/B_subsampled
+    outputs:
+      output_folder: /tmp/pipe/generated/B_remapped
+  remap_keys@C:
+    args:
+      keys:
+      - - image_C
+        - image
+      - - inst_C
+        - inst
+      - - metadata_C
+        - metadata
+      remove: {}
+    command: pipelime underfolder remap_keys
+    inputs:
+      input_folder: /tmp/pipe/generated/C_subsampled
+    outputs:
+      output_folder: /tmp/pipe/generated/C_remapped
+  shuffle@0:
+    args:
+      seed: 10
+    command: pipelime underfolder shuffle
+    inputs:
+      input_folder: /tmp/pipe/output/train
+    outputs:
+      output_folder: /tmp/pipe/output/train_shuffled
+  shuffle@1:
+    args:
+      seed: 10
+    command: pipelime underfolder shuffle
+    inputs:
+      input_folder: /tmp/pipe/output/validation
+    outputs:
+      output_folder: /tmp/pipe/output/validation_shuffled
+  shuffle@2:
+    args:
+      seed: 10
+    command: pipelime underfolder shuffle
+    inputs:
+      input_folder: /tmp/pipe/output/test
+    outputs:
+      output_folder: /tmp/pipe/output/test_shuffled
+  split:
+    args:
+      splits:
+      - 0.9
+      - 0.08
+      - 0.02
+    command: pipelime underfolder split
+    inputs:
+      input_folder: /tmp/pipe/summed
+    outputs:
+      output_folders:
+      - /tmp/pipe/output/train
+      - /tmp/pipe/output/validation
+      - /tmp/pipe/output/test
+  subsample@A:
+    args:
+      factor: 0.5
+    command: pipelime underfolder subsample
+    inputs:
+      input_folder: /tmp/pipe/generated/A_filtered
+    outputs:
+      output_folder: /tmp/pipe/generated/A_subsampled
+  subsample@B:
+    args:
+      factor: 0.5
+    command: pipelime underfolder subsample
+    inputs:
+      input_folder: /tmp/pipe/generated/B_filtered
+    outputs:
+      output_folder: /tmp/pipe/generated/B_subsampled
+  subsample@C:
+    args:
+      factor: 0.5
+    command: pipelime underfolder subsample
+    inputs:
+      input_folder: /tmp/pipe/generated/C_filtered
+    outputs:
+      output_folder: /tmp/pipe/generated/C_subsampled
+  summation:
+    args: {}
+    command: pipelime underfolder sum
+    inputs:
+      input_folders:
+      - /tmp/pipe/generated/A_detected
+      - /tmp/pipe/generated/B_detected
+      - /tmp/pipe/generated/C_detected
+    outputs:
+      output_folder: /tmp/pipe/summed

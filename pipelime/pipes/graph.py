@@ -1,5 +1,5 @@
 from typing import Sequence, Set
-from pipelime.pipes.model import NodeModel, NodesModel
+from pipelime.pipes.model import NodeModel, DAGModel
 import networkx as nx
 import itertools
 
@@ -142,12 +142,12 @@ class NodesGraph:
     @classmethod
     def build_nodes_graph(
         cls,
-        nodes_model: NodesModel,
+        dag_model: DAGModel,
     ) -> "NodesGraph":
 
         g = nx.DiGraph()
 
-        for node_name, node in nodes_model.nodes.items():
+        for node_name, node in dag_model.nodes.items():
             node: NodeModel
 
             inputs = node.inputs

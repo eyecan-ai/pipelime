@@ -1,5 +1,16 @@
-from pipelime.pipes.piper import Piper
+from typing import Any, Optional
+from pydantic import BaseModel, validator
 
-command = "python /Users/danieledegregorio/work/workspace_eyecan/pipelime/tests/sample_data/piper_commands/fake_detector.py"
 
-print(Piper.piper_command_description(command))
+class M(BaseModel):
+    a: Any
+
+    @validator("a")
+    def _validate(cls, v: Any, values: Optional[Any]):
+        print("VALIDATE", v, values)
+        return v
+
+
+data = {"c": 3}
+
+print(M(**data).dict())

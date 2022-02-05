@@ -2,12 +2,17 @@ import importlib.machinery
 import types
 import uuid
 
-from schema import Schema
+from schema import Schema, SchemaError
 
 from pipelime.sequences.samples import Sample
+from pipelime.sequences.stages import SampleStage
+from pipelime.sequences.operations import OperationStage
 
 
 class SampleSchema:
+    class ValidationError(Exception):
+        pass
+
     def __init__(self, schema: Schema, deep: bool = True):
         self._schema = schema
         self._deep = deep
@@ -21,10 +26,13 @@ class SampleSchema:
         return self._schema
 
     def validate(self, sample: Sample):
-        if not self.deep:
-            self.schema.validate(sample.skeleton)
-        else:
-            self.schema.validate(dict(sample))
+        try:
+            if not self.deep:
+                self.schema.validate(sample.skeleton)
+            else:
+                self.schema.validate(dict(sample))
+        except SchemaError as e:
+            raise SampleSchema.ValidationError(e)
 
 
 class SchemaLoader:
@@ -50,3 +58,20 @@ class SchemaLoader:
         mod = types.ModuleType(loader.name)
         loader.exec_module(mod)
         return mod
+
+
+class StageValidate(SampleStage):
+    def __init__(self, sample_schema: SampleSchema):
+        self._sample_schema = sample_schema
+
+    def __call__(self, x: Sample) -> Sample:
+        try:
+            self._sample_schema.validate(x)
+        except Exception as e:
+            raise SampleSchema.ValidationError(f"Sample ID: {x.id} -> {str(e)}")
+        return x
+
+
+class OperationValidate(OperationStage):
+    def __init__(self, sample_schema: SampleSchema, **kwargs):
+        super().__init__(stage=StageValidate(sample_schema), **kwargs)

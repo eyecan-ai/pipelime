@@ -9,5 +9,5 @@ class NodeModel(BaseModel):
     outputs: dict = {}
 
 
-class NodesModel(BaseModel):
+class DAGModel(BaseModel):
     nodes: Dict[str, NodeModel]

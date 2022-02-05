@@ -2,13 +2,14 @@ import copy
 from typing import Callable, Optional, Sequence, Set, Tuple
 import re
 import pydash
+from pipelime.pipes.parsers.base import DAGConfigParser
 from pipelime.tools.dictionaries import DictionaryUtils
 import networkx as nx
 import itertools
-from pipelime.pipes.model import NodeModel, NodesModel
+from pipelime.pipes.model import NodeModel, DAGModel
 
 
-class PipesConfigParser:
+class DAGSimpleParser(DAGConfigParser):
 
     PLACEHOLDER_CHAR = "@"
     PLACEHOLDER_REGEX = r = f"{PLACEHOLDER_CHAR}(\\w*)\\(([^)]+)\\)"  # @methodName(arg)
@@ -49,7 +50,7 @@ class PipesConfigParser:
         :rtype: any
         """
         command, content = m.groups()
-        if command.lower() == PipesConfigParser.PLACEHOLDER_VARIABLE_NAME:
+        if command.lower() == DAGSimpleParser.PLACEHOLDER_VARIABLE_NAME:
             value = pydash.get(self._global_data, content)
             return value
         else:
@@ -71,7 +72,7 @@ class PipesConfigParser:
         """
         local_data = {"item": item, "index": index}
         command, content = m.groups()
-        if command.lower() == PipesConfigParser.PLACEHOLDER_ITERATION_NAME:
+        if command.lower() == DAGSimpleParser.PLACEHOLDER_ITERATION_NAME:
             value = pydash.get(local_data, content)
             return value
         else:
@@ -93,7 +94,7 @@ class PipesConfigParser:
         """
         local_data = {"item": item, "index": index}
         command, content = m.groups()
-        if command.lower() == PipesConfigParser.PLACEHOLDER_ARG_ITERATION_NAME:
+        if command.lower() == DAGSimpleParser.PLACEHOLDER_ARG_ITERATION_NAME:
             value = pydash.get(local_data, content)
             return value
         else:
@@ -205,13 +206,13 @@ class PipesConfigParser:
         the pseudo node and the foreach data are None.
         :rtype: Tuple[Optional[dict], Optional[dict]]
         """
-        if PipesConfigParser.PLACEHOLDER_FOREACH_NAME in node:
-            foreach_node = node[PipesConfigParser.PLACEHOLDER_FOREACH_NAME]
+        if DAGSimpleParser.PLACEHOLDER_FOREACH_NAME in node:
+            foreach_node = node[DAGSimpleParser.PLACEHOLDER_FOREACH_NAME]
             pseudo_node = foreach_node.get(
-                PipesConfigParser.PLACEHOLDER_FOREACH_DO_NAME, None
+                DAGSimpleParser.PLACEHOLDER_FOREACH_DO_NAME, None
             )
             foreach_data = foreach_node.get(
-                PipesConfigParser.PLACEHOLDER_FOREACH_ITEMS_NAME, None
+                DAGSimpleParser.PLACEHOLDER_FOREACH_ITEMS_NAME, None
             )
             if pseudo_node is None or foreach_data is None:
                 raise Exception("Invalid foreach node. Missing 'do' or 'items' keys.")
@@ -255,7 +256,7 @@ class PipesConfigParser:
         to_replace_data = {}
         for key, value in branch_cfg.items():
             if isinstance(value, dict):
-                if PipesConfigParser.PLACEHOLDER_FOREACH_NAME in value:
+                if DAGSimpleParser.PLACEHOLDER_FOREACH_NAME in value:
                     pseudo_node, foreach_data = self._extract_foreach_data(value)
                     if pseudo_node is not None:
                         if not isinstance(pseudo_node, str):
@@ -412,9 +413,9 @@ class PipesConfigParser:
                 if isinstance(subnode, dict):
                     rephrased_args = {}
                     for arg_name, value in subnode.items():
-                        if PipesConfigParser.PLACEHOLDER_ARG_SPLIT_CHAR in arg_name:
+                        if DAGSimpleParser.PLACEHOLDER_ARG_SPLIT_CHAR in arg_name:
                             arg_name, arg_index = arg_name.split(
-                                PipesConfigParser.PLACEHOLDER_ARG_SPLIT_CHAR
+                                DAGSimpleParser.PLACEHOLDER_ARG_SPLIT_CHAR
                             )
                             if arg_name not in rephrased_args:
                                 rephrased_args[arg_name] = {}
@@ -444,7 +445,7 @@ class PipesConfigParser:
 
         return nodes_cfg
 
-    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> NodesModel:
+    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> DAGModel:
         """Parse the configuration
 
         :param cfg: configuration to parse
@@ -473,7 +474,7 @@ class PipesConfigParser:
         # Merge multiple arguments as tuples
         parsed["nodes"] = self._merge_multiple_arguments(parsed["nodes"])
 
-        return NodesModel(**parsed)
+        return DAGModel(**parsed)
 
 
 class PipeGraph(nx.DiGraph):
@@ -505,7 +506,7 @@ class PipeGraph(nx.DiGraph):
         def __eq__(self, o: object) -> bool:
             return self.id == o.id
 
-    def __init__(self, nodes_model: NodesModel):
+    def __init__(self, nodes_model: DAGModel):
         super().__init__()
         self._nodes_model = nodes_model
         PipeGraph.build_nodes_graph(self._nodes_model, self)
@@ -577,7 +578,7 @@ class PipeGraph(nx.DiGraph):
     @classmethod
     def build_nodes_graph(
         cls,
-        nodes_model: NodesModel,
+        nodes_model: DAGModel,
         target_graph: Optional[nx.DiGraph] = None,
     ) -> dict:
 

@@ -5,7 +5,7 @@ import rich
 from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
 from pipelime.pipes.executors import NaiveGraphExecutor
 from pipelime.pipes.graph import NodesGraph
-from pipelime.pipes.parser import PipesConfigParser
+from pipelime.pipes.parsers.factory import DAGConfigParserFactory
 
 
 @click.command("piper_example")
@@ -26,18 +26,16 @@ def piper_example(
     # Load global data
     global_data = XConfig(piper_params_file).to_dict()
 
-    # Create Parser
-    parser = PipesConfigParser()
-
-    # Nodes Model (abstraction layer to allow several parsing methods)
-    nodes_model = parser.parse_cfg(
-        cfg.to_dict(),
-        global_data=global_data,
+    # DAG Model (abstraction layer to allow several parsing methods)
+    dag = DAGConfigParserFactory.parse_file(
+        cfg_file=piper_file,
+        params_file=piper_params_file,
     )
-    rich.print(nodes_model.dict())
+    rich.print(dag.dict())
+    XConfig.from_dict(dag.dict()).save_to("dag_enrolled.yml")
 
     # Create graph from NodesModel
-    graph = NodesGraph.build_nodes_graph(nodes_model)
+    graph = NodesGraph.build_nodes_graph(dag)
 
     if draw:
         # Drawer
