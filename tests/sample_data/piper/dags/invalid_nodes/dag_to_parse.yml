@@ -1,0 +1,3 @@
+nodes:
+  main:
+    commands: pipelime datasets generate_toy_dataset

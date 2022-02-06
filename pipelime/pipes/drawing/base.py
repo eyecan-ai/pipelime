@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from pipelime.pipes.graph import NodesGraph
+from pipelime.pipes.graph import DAGNodesGraph
 
 
 class NodesGraphDrawer(ABC):
@@ -10,5 +10,5 @@ class NodesGraphDrawer(ABC):
         pass
 
     @abstractmethod
-    def draw(self, graph: NodesGraph) -> np.ndarray:
+    def draw(self, graph: DAGNodesGraph) -> np.ndarray:
         raise NotImplementedError()

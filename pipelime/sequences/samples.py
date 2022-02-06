@@ -281,10 +281,23 @@ class FileSystemSample(Sample):
 
 
 class SamplesSequence(Sequence):
-    # This import here is due to circular dependency 💀💀💀 !!
-    from pipelime.sequences.stages import SampleStage
+    # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+    # Removed type hinting for stage argument, which resulted in circular import
+    # between pipelime.sequences.stages and pipelime.sequences.samples modules
 
-    def __init__(self, samples: Sequence[Sample], stage: Optional[SampleStage] = None):
+    # Refactoring is needed to decouple these classes or to reorganize these modules
+    # to avoid this circular dependency!
+    # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+
+    def __init__(self, samples: Sequence[Sample], stage=None):
+        """Constructor for `SamplesSequence`
+
+        :param samples: A sequence of samples that this SampleSequence will contain
+        :type samples: Sequence[Sample]
+        :param stage: A stage to apply to each sample of the sequence when the
+        __getitem__ is called, if set to `None` no stage is applied, defaults to None
+        :type stage: Optional[SampleStage], optional
+        """
         self._samples = samples
 
         # This import here is due to circular dependency 💀💀💀 !!

@@ -1,0 +1,9 @@
+params:
+  flags:
+  - A
+  - B
+  - C
+  output_folder: '@str(OUTPUT_FOLDER)'
+  generated_dataset_size: '@int(SIZE)'
+  schemas:
+    generated: '@str(SCHEMA_GENERATED)'

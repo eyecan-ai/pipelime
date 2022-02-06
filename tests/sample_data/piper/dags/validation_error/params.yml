@@ -1,0 +1,9 @@
+params:
+  flags:
+  - A
+  - B
+  - C
+  output_folder: /tmp/pipe/output
+  generated_dataset_size: 10
+  schemas:
+    generated: /path/to/validation.schema
