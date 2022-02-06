@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Union, Collection, Sequence, Mapping, Tuple, Optional
+from typing import Union, Collection, Sequence, Mapping, Tuple, Optional, Any
 import io
 from pathlib import Path
 import albumentations as A
@@ -187,7 +187,7 @@ class StageUploadToRemote(SampleStage):
         scheme: str
         netloc: str
         base_path: str
-        init_args: Mapping[str, str] = field(default_factory=dict)
+        init_args: Mapping[str, Any] = field(default_factory=dict)
 
     def __init__(
         self,

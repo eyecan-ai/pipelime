@@ -52,3 +52,15 @@ class TestRemotes:
         remote_root = remote_root.as_posix()
 
         self._upload_download(tmp_path, srcdata_folder, file_remote, remote_root)
+
+    def test_s3_remote(self, toy_dataset_small, tmp_path):
+        file_remote = plr.create_remote("file", "localhost")
+        assert file_remote is not None
+
+        srcdata_folder = toy_dataset_small["folder"]
+
+        remote_root = tmp_path / "remote"
+        remote_root.mkdir(parents=True)
+        remote_root = remote_root.as_posix()
+
+        self._upload_download(tmp_path, srcdata_folder, file_remote, remote_root)

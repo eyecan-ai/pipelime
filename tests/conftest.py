@@ -171,3 +171,28 @@ def h5_datasets(data_folder):
             # }
         }
     }
+
+
+@pytest.fixture(scope="session")
+def minio(tmp_path_factory):
+    minio_path = os.environ.get("MINIO_APP")
+    if not minio_path or not Path(minio_path).is_file():
+        yield ""
+        return
+
+    try:
+        import minio  # noqa
+    except ModuleNotFoundError:
+        yield ""
+        return
+
+    from subprocess import Popen
+    from time import sleep
+
+    minio_root = tmp_path_factory.mktemp(".minio")
+    minio_proc = Popen([minio_path, "server", str(minio_root)])
+    sleep(5)
+    yield "minioadmin"
+
+    # teardown
+    minio_proc.terminate()

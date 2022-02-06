@@ -903,6 +903,23 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
     from pipelime.sequences.stages import StageUploadToRemote
     from urllib.parse import urlparse, unquote_plus
 
+    def _convert_val(val: str):
+        if val == "True":
+            return True
+        if val == "False":
+            return False
+        try:
+            num = int(val)
+            return num
+        except ValueError:
+            pass
+        try:
+            num = float(val)
+            return num
+        except ValueError:
+            pass
+        return val
+
     remote_params = [urlparse(rm) for rm in remote]
     remote_params = [
         StageUploadToRemote.RemoteParams(
@@ -910,7 +927,7 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
             netloc=rm.netloc,
             base_path=unquote_plus(rm.path)[1:],
             init_args={
-                kw.split("=", 1)[0]: kw.split("=", 1)[1]
+                kw.split("=", 1)[0]: _convert_val(kw.split("=", 1)[1])
                 for kw in rm.query.split(":")
                 if len(kw) >= 3 and "=" in kw
             },

@@ -18,6 +18,10 @@ test_requirements = [
     "pytest>=3",
 ]
 
+extras_requirements = {
+    'minio': ['minio']
+}
+
 setup(
     author="daniele de gregorio",
     author_email="daniele.degregorio@eyecan.ai",

@@ -203,22 +203,12 @@ class TestSampleSequenceStaged:
 
 
 class TestStageUploadToRemote:
-    def test_file_upload(self, toy_dataset_small, tmp_path):
-        # data lake
-        remote_root = tmp_path / "remote"
-        remote_root.mkdir(parents=True)
-        remote_root = remote_root.as_posix()
-
+    def _upload_to_remote(self, dataset, out_folder, remote_prms):
         # read and upload
-        reader = UnderfolderReader(toy_dataset_small["folder"])
+        reader = UnderfolderReader(dataset)
         sseq = SamplesSequence(
             reader,
-            StageUploadToRemote(
-                StageUploadToRemote.RemoteParams(
-                    scheme="file", netloc="localhost", base_path=remote_root
-                ),
-                {"image": "png", "mask": "png"},
-            ),
+            StageUploadToRemote(remote_prms, {"image": "png", "mask": "png"}),
         )
 
         # save after uploading
@@ -227,7 +217,6 @@ class TestStageUploadToRemote:
         reader_template.extensions_map["image"] = "remote"
         reader_template.extensions_map["mask"] = "remote"
 
-        out_folder = tmp_path / "output"
         out_folder.mkdir(parents=True)
         writer = UnderfolderWriterV2(
             out_folder,
@@ -251,3 +240,39 @@ class TestStageUploadToRemote:
                     assert np.array_equal(v, y[k])
                 else:
                     assert v == y[k]
+
+    def test_file_upload(self, toy_dataset_small, tmp_path):
+        # data lake
+        remote_root = tmp_path / "remote"
+        remote_root.mkdir(parents=True)
+        remote_root = remote_root.as_posix()
+
+        self._upload_to_remote(
+            toy_dataset_small["folder"],
+            tmp_path / "output",
+            StageUploadToRemote.RemoteParams(
+                scheme="file", netloc="localhost", base_path=remote_root
+            ),
+        )
+
+    def test_s3_upload(self, toy_dataset_small, tmp_path, minio):
+        # data lake
+        if not minio:
+            from pytest import skip
+
+            skip("MinIO unavailable")
+
+        self._upload_to_remote(
+            toy_dataset_small["folder"],
+            tmp_path / "output",
+            StageUploadToRemote.RemoteParams(
+                scheme="s3",
+                netloc="localhost:9000",
+                base_path="test-s3-upload",
+                init_args={
+                    "access_key": minio,
+                    "secret_key": minio,
+                    "secure_connection": False,
+                },
+            ),
+        )
