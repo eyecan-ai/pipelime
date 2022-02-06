@@ -882,6 +882,7 @@ def operation_remap_keys(
 @click.option(
     "-o", "--output_folder", required=True, type=str, help="Output Underfolder"
 )
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
@@ -946,5 +947,6 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
             else UnderfolderWriterV2.CopyMode.DEEP_COPY
         ),
         reader_template=template,
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(sseq)
