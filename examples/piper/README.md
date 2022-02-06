@@ -1,14 +1,7 @@
-# Piper Example
+# Piper 
 
-To display the execution graph:
+## [Compile](compile/)
+## [Draw](draw/)
+## [Execute](execute/)
 
-```
-python piper_example.py --draw
-```
-
-To execute the graph:
-
-```
-python piper_example.py --execute
-```
 

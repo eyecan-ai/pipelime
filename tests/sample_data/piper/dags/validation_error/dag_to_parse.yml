@@ -1,0 +1,14 @@
+nodes:
+  generator:
+    foreach:
+      items: $var(params.flags)
+      do:
+        command: pipelime datasets generate_toy_dataset
+        outputs:
+          output_folder: $var(params.output_folder)/$iter(item)_generated
+        args:
+          suffix: _$iter(item)
+          size: $var(params.generated_dataset_size)
+        # ↓ these are the schemas of the outputs of the node
+        outputs_schema:
+          output_folder: $var(params.schemas.generated)

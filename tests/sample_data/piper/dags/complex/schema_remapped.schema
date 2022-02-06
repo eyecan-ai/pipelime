@@ -1,0 +1,4 @@
+from schema import Optional
+
+deep = False
+schema = {"image": object, Optional(str): object}

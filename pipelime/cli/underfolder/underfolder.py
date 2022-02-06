@@ -15,6 +15,7 @@ from pipelime.cli.underfolder.operations import (
     operation_subsample,
     operation_sum,
     summary,
+    upload_to_remote,
     dump,
 )
 
@@ -38,4 +39,5 @@ underfolder.add_command(operation_groupby)
 underfolder.add_command(operation_mix)
 underfolder.add_command(operation_remap_keys)
 underfolder.add_command(summary)
+underfolder.add_command(upload_to_remote)
 underfolder.add_command(dump)

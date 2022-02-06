@@ -4,20 +4,27 @@ import pickle
 import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, Iterable, BinaryIO, TextIO, Tuple
 
 import imageio
 import numpy as np
 import yaml
 import toml
+from io import BytesIO, TextIOWrapper
+
+from loguru import logger
 
 from pipelime.tools.bytes import DataCoding
+import pipelime.filesystem.remotes as plr
 
 
 class FSToolkit(object):
 
     # Default imageio options for each image format
-    OPTIONS = {"png": {"compress_level": 4}}
+    IMG_SAVE_OPTIONS = {"png": {"compress_level": 4}}
+
+    # Default remote init options for each remote scheme
+    REMOTE_INIT_OPTIONS = {"s3": {"secure_connection": False}}
 
     YAML_EXT = ("yaml", "yml")
     JSON_EXT = ("json",)
@@ -29,6 +36,8 @@ class FSToolkit(object):
     NUMPY_EXT = NUMPY_TXT_EXT + NUMPY_NATIVE_EXT
 
     PICKLE_EXT = ("pkl", "pickle")
+
+    REMOTE_EXT = ("plr", "rmt", "remote")
 
     # Declare TREE structure
     @classmethod
@@ -79,9 +88,7 @@ class FSToolkit(object):
     @classmethod
     def get_file_extension(cls, filename, with_dot=False):
         ext = Path(filename).suffix.lower()
-        if not with_dot and len(ext) > 0:
-            ext = ext[1:]
-        return ext
+        return ext if with_dot else ext.lstrip(".")
 
     @classmethod
     def is_metadata_file(cls, filename: str) -> bool:
@@ -89,11 +96,16 @@ class FSToolkit(object):
         return ext in cls.METADATA_EXT
 
     @classmethod
-    def is_image_file(cls, filename: str) -> bool:
-        return imghdr.what(filename) is not None
+    def is_remote_file(cls, filename: str) -> bool:
+        ext = cls.get_file_extension(filename)
+        return ext in cls.REMOTE_EXT
 
     @classmethod
-    def _numpy_load_txt(cls, filename: str) -> np.ndarray:
+    def is_image_file(cls, filename: Union[str, BinaryIO]) -> bool:
+        return imghdr.what(filename) is not None  # type: ignore
+
+    @classmethod
+    def _numpy_load_txt(cls, filename: Union[str, TextIO, BinaryIO]) -> np.ndarray:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", "loadtxt")
             data = np.loadtxt(filename)
@@ -122,6 +134,29 @@ class FSToolkit(object):
         return ext in cls.PICKLE_EXT
 
     @classmethod
+    def _download_from_remote(cls, filename: str) -> Tuple[str, BytesIO]:
+        extension = ""
+        data_stream = None
+        with open(filename, "r") as fd:
+            for line in fd:  # download from first available remote
+                remote, rm_base, rm_name = plr.get_remote_and_paths(
+                    line.rstrip("\n"), cls.REMOTE_INIT_OPTIONS
+                )
+                if remote and rm_base and rm_name:
+                    extension = cls.get_file_extension(rm_name)
+                    data_stream = BytesIO()
+                    if not remote.download_stream(data_stream, rm_base, rm_name):
+                        data_stream = None
+                if data_stream is None:
+                    logger.debug(f"unknown or unreachable remote: {line}")
+                else:
+                    data_stream.seek(0)
+                    break
+            else:  # no remote loaded
+                raise Exception(f"Remote loading error: {filename}")
+        return extension, data_stream
+
+    @classmethod
     def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
         """Load data from file based on its extension
 
@@ -130,56 +165,127 @@ class FSToolkit(object):
         :return: Loaded data as array or dict. May return NONE
         :rtype: Union[None, np.ndarray, dict]
         """
+        data_stream = None
         try:
-            if cls.is_image_file(filename):
-                return np.array(imageio.imread(filename))
+            extension = cls.get_file_extension(filename)
+            if extension in cls.REMOTE_EXT:
+                extension, data_stream = cls._download_from_remote(filename)
+
+            if data_stream is None:
+                data_stream = open(filename, "rb")
+
+            if cls.is_image_file(data_stream):
+                return np.array(imageio.imread(data_stream))
             else:
-                extension = cls.get_file_extension(filename)
-                if extension in cls.YAML_EXT:
-                    return yaml.safe_load(open(filename, "r"))
-                elif extension in cls.JSON_EXT:
-                    return json.load(open(filename))
-                elif extension in cls.TOML_EXT:
-                    return dict(toml.load(filename))
-                elif extension in cls.PICKLE_EXT:
-                    return pickle.load(open(filename, "rb"))
-                elif extension in cls.NUMPY_EXT:
-                    npdata = (
-                        cls._numpy_load_txt(filename)
-                        if extension in cls.NUMPY_TXT_EXT
-                        else (
-                            np.load(filename)
-                            if extension in cls.NUMPY_NATIVE_EXT
-                            else None
-                        )
-                    )
-                    if npdata is not None:
-                        return np.atleast_2d(npdata)
+                switches = (
+                    (
+                        lambda: extension in cls.YAML_EXT,
+                        lambda: yaml.safe_load(TextIOWrapper(data_stream)),
+                    ),
+                    (
+                        lambda: extension in cls.JSON_EXT,
+                        lambda: json.load(TextIOWrapper(data_stream)),
+                    ),
+                    (
+                        lambda: extension in cls.TOML_EXT,
+                        lambda: dict(toml.load(TextIOWrapper(data_stream))),
+                    ),
+                    (
+                        lambda: extension in cls.PICKLE_EXT,
+                        lambda: pickle.load(data_stream),
+                    ),
+                    (
+                        lambda: extension in cls.NUMPY_TXT_EXT,
+                        lambda: np.atleast_2d(cls._numpy_load_txt(data_stream)),
+                    ),
+                    (
+                        lambda: extension in cls.NUMPY_NATIVE_EXT,
+                        lambda: np.atleast_2d(np.load(data_stream)),
+                    ),
+                )
+
+                for cond, fn in switches:
+                    if cond():
+                        return fn()
         except Exception as e:
             raise Exception(f"Loading data error: {e}")
+        finally:
+            if data_stream is not None:
+                data_stream.close()
 
         raise NotImplementedError(f"Unknown file extension: {filename}")
 
     @classmethod
-    def store_data(cls, filename: str, data: Any):
+    def store_data_to_stream(cls, data_stream: BinaryIO, extension: str, data: Any):
         try:
-            extension = cls.get_file_extension(filename)
-            if DataCoding.is_image_extension(extension):
-                options = cls.OPTIONS.get(extension, {})
-                imageio.imwrite(filename, data, **options)
-            elif DataCoding.is_text_extension(extension):
-                np.savetxt(filename, data)
-            elif DataCoding.is_numpy_extension(extension):
-                np.save(filename, data)
-            elif extension in cls.YAML_EXT:
-                yaml.safe_dump(data, open(filename, "w"))
-            elif extension in cls.JSON_EXT:
-                json.dump(data, open(filename, "w"))
-            elif extension in cls.TOML_EXT:
-                toml.dump(data, open(filename, "w"))
-            elif DataCoding.is_pickle_extension(extension):
-                pickle.dump(data, open(filename, "wb"))
-            else:
-                raise NotImplementedError(f"Unknown file extension: {filename}")
+
+            def _write_remote_file(filestream, data):
+                if isinstance(data, Iterable):
+                    data = "\n".join(data)
+                filestream.write(data)
+
+            extension = extension.lstrip(".")
+
+            switches = (
+                (
+                    lambda: DataCoding.is_image_extension(extension),
+                    lambda: imageio.imwrite(
+                        data_stream,
+                        data,
+                        format=f".{extension}",
+                        **(cls.IMG_SAVE_OPTIONS.get(extension, {})),
+                    ),
+                ),
+                (
+                    lambda: DataCoding.is_text_extension(extension),
+                    lambda: np.savetxt(data_stream, data),
+                ),
+                (
+                    lambda: DataCoding.is_numpy_extension(extension),
+                    lambda: np.save(data_stream, data),
+                ),
+                (
+                    lambda: extension in cls.YAML_EXT,
+                    lambda: yaml.safe_dump(data, TextIOWrapper(data_stream)),
+                ),
+                (
+                    lambda: extension in cls.JSON_EXT,
+                    lambda: json.dump(data, TextIOWrapper(data_stream)),
+                ),
+                (
+                    lambda: extension in cls.TOML_EXT,
+                    lambda: toml.dump(data, TextIOWrapper(data_stream)),
+                ),
+                (
+                    lambda: DataCoding.is_pickle_extension(extension),
+                    lambda: pickle.dump(data, data_stream),
+                ),
+                (
+                    lambda: extension in cls.REMOTE_EXT,
+                    lambda: _write_remote_file(TextIOWrapper(data_stream), data),
+                ),
+            )
+
+            for cond, fn in switches:
+                if cond():
+                    fn()
+                    return
         except Exception as e:
             raise Exception(f"Loading data error: {e}")
+
+        # extension not found in switches
+        raise NotImplementedError(f"Unknown file extension: {extension}")
+
+    @classmethod
+    def store_data(cls, filename: str, data: Any):
+        data_stream = None
+        try:
+            extension = cls.get_file_extension(filename)
+            data_stream = open(filename, "wb")
+        except Exception as e:
+            raise Exception(f"Loading data error: {e}")
+        else:
+            return cls.store_data_to_stream(data_stream, extension, data)
+        finally:
+            if data_stream is not None:
+                data_stream.close()

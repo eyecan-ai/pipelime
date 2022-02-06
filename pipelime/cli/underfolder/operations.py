@@ -27,19 +27,18 @@ from pipelime.pipes.piper import Piper, PiperCommand
     type=str,
     help="Convert a root file into an item to avoid conflicts [multiple]",
 )
-@Piper.piper_command_options(inputs=["input_folders"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folders"], outputs=["output_folder"])
 def operation_sum(
     input_folders: Sequence[str],
     output_folder: str,
     convert_root_file: Sequence[str],
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import OperationResetIndices, OperationSum
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    pipercmd = PiperCommand.instance
 
     if len(input_folders) > 0:
         datasets = [
@@ -62,7 +61,7 @@ def operation_sum(
             ),
             extensions_map=template.extensions_map,
             zfill=template.idx_length,
-            progress_callback=PiperCommand().generate_progress_callback(),
+            progress_callback=pipercmd.generate_progress_callback(),
         )
         writer(output_dataset)
 
@@ -83,19 +82,16 @@ def operation_sum(
     type=click.Path(),
     help="Output Underfolder",
 )
-@Piper.piper_command_options(inputs=["input_folders"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folders"], outputs=["output_folder"])
 def operation_mix(
     input_folders: Sequence[str],
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from click import ClickException
     from pipelime.sequences.operations import OperationMix
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
-
-    PiperCommand()
 
     if len(input_folders) > 0:
         datasets = [
@@ -124,7 +120,7 @@ def operation_mix(
             copy_files=True,
             root_files_keys=root_files,
             extensions_map=ext_map,
-            progress_callback=PiperCommand().generate_progress_callback(),
+            progress_callback=PiperCommand.instance.generate_progress_callback(),
         )
         writer(output_dataset)
 
@@ -158,20 +154,19 @@ def operation_mix(
     type=click.Path(),
     help="Output Underfolder",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_subsample(
     input_folder: str,
     factor: float,
     start: float,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import OperationResetIndices, OperationSubsample
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -189,7 +184,7 @@ def operation_subsample(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -216,15 +211,14 @@ def operation_subsample(
     type=int,
     help="Random seed",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_shuffle(
     input_folder: str,
     output_folder: str,
     seed: int,
-    **piper_kwargs,
 ):
 
-    PiperCommand()
+    PiperCommand.instance
 
     from pipelime.sequences.operations import OperationResetIndices, OperationShuffle
     from pipelime.sequences.readers.filesystem import UnderfolderReader
@@ -243,7 +237,7 @@ def operation_shuffle(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -272,12 +266,11 @@ def operation_shuffle(
     type=float,
     help="Splits percentages [multple]",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folders"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folders"])
 def operation_split(
     input_folder: str,
     output_folders: Sequence[str],
     splits: Sequence[float],
-    **piper_kwargs,
 ):
 
     from functools import reduce
@@ -285,7 +278,7 @@ def operation_split(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -312,7 +305,7 @@ def operation_split(
             copy_files=True,
             root_files_keys=template.root_files_keys,
             extensions_map=template.extensions_map,
-            progress_callback=PiperCommand().generate_progress_callback(
+            progress_callback=PiperCommand.instance.generate_progress_callback(
                 chunk_index=index,
                 total_chunks=len(output_datasets_map),
             ),
@@ -342,12 +335,11 @@ def operation_split(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterbyquery(
     input_folder: str,
     query: str,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import (
@@ -357,7 +349,7 @@ def operation_filterbyquery(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -372,7 +364,7 @@ def operation_filterbyquery(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -406,7 +398,7 @@ def operation_filterbyquery(
     type=click.Path(),
     help="Output Underfolder for negative matches",
 )
-@Piper.piper_command_options(
+@Piper.command(
     inputs=["input_folder"],
     outputs=["output_folder_1", "output_folder_2"],
 )
@@ -415,7 +407,6 @@ def operation_splitbyquery(
     query: str,
     output_folder_1: str,
     output_folder_2: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import (
@@ -425,7 +416,7 @@ def operation_splitbyquery(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -445,7 +436,7 @@ def operation_splitbyquery(
             copy_files=True,
             root_files_keys=template.root_files_keys,
             extensions_map=template.extensions_map,
-            progress_callback=PiperCommand().generate_progress_callback(
+            progress_callback=PiperCommand.instance.generate_progress_callback(
                 chunk_index=index, total_chunks=len(output_folders)
             ),
         )
@@ -474,12 +465,11 @@ def operation_splitbyquery(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterbyscript(
     input_folder: str,
     script: str,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import (
@@ -489,7 +479,7 @@ def operation_filterbyscript(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -504,7 +494,7 @@ def operation_filterbyscript(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -538,20 +528,19 @@ def operation_filterbyscript(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterkeys(
     input_folder: str,
     keys: Sequence[str],
     negate: bool,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import OperationFilterKeys, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -566,7 +555,7 @@ def operation_filterkeys(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -594,19 +583,18 @@ def operation_filterkeys(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_orderby(
     input_folder: str,
     keys: Sequence[str],
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import OperationOrderBy, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -621,7 +609,7 @@ def operation_orderby(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -712,19 +700,18 @@ def operation_split_by_value(
     type=click.Path(),
     help="Output Underfolder for grouped dataset",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_groupby(
     input_folder: str,
     key: str,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import OperationGroupBy, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
 
@@ -736,7 +723,7 @@ def operation_groupby(
     writer = UnderfolderWriter(
         folder=output_folder,
         copy_files=True,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
 
@@ -818,13 +805,12 @@ def summary(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
-@Piper.piper_command_options(inputs=["input_folder"], outputs=["output_folder"])
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_remap_keys(
     input_folder: str,
     keys: Sequence[str],
     remove_: bool,
     output_folder: str,
-    **piper_kwargs,
 ):
 
     from pipelime.sequences.operations import (
@@ -833,7 +819,7 @@ def operation_remap_keys(
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriter
 
-    PiperCommand()
+    PiperCommand.instance
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -856,9 +842,95 @@ def operation_remap_keys(
         copy_files=True,
         root_files_keys=template.root_files_keys,
         extensions_map=template.extensions_map,
-        progress_callback=PiperCommand().generate_progress_callback(),
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
+
+
+@click.command("upload", help="Upload underfolder data to remote")
+@click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
+@click.option(
+    "-r",
+    "--remote",
+    required=True,
+    multiple=True,
+    help="For each remote you must provide "
+    "'<scheme>://<netloc>/<base_path>"
+    "[?<init-kw>=<init-value>:<init-kw>=<init-value>...]'"
+    " (repeat for each remote)",
+)
+@click.option(
+    "-k",
+    "--key",
+    required=True,
+    multiple=True,
+    help="Keys to upload (repeat for each key)",
+)
+@click.option(
+    "--copy",
+    "copy_mode",
+    flag_value="copy",
+    help="Always deep copy source data (default)",
+    default=True,
+)
+@click.option(
+    "--symlink", "copy_mode", flag_value="symlink", help="Sym-link source data"
+)
+@click.option(
+    "--hardlink", "copy_mode", flag_value="hardlink", help="Hard-link source data"
+)
+@click.option(
+    "-o", "--output_folder", required=True, type=str, help="Output Underfolder"
+)
+def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+    from pipelime.sequences.samples import SamplesSequence
+    from pipelime.sequences.stages import StageUploadToRemote
+    from urllib.parse import urlparse, unquote_plus
+
+    remote_params = [urlparse(rm) for rm in remote]
+    remote_params = [
+        StageUploadToRemote.RemoteParams(
+            scheme=rm.scheme,
+            netloc=rm.netloc,
+            base_path=unquote_plus(rm.path)[1:],
+            init_args={
+                kw.split("=", 1)[0]: kw.split("=", 1)[1]
+                for kw in rm.query.split(":")
+                if len(kw) >= 3 and "=" in kw
+            },
+        )
+        for rm in remote_params
+    ]
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+
+    sseq = SamplesSequence(
+        dataset,
+        stage=StageUploadToRemote(
+            remotes=remote_params,
+            key_ext_map={k: template.extensions_map.get(k) for k in key},
+        ),
+    )
+
+    # save uploaded keys with .remote extension
+    for k in key:
+        template.extensions_map[k] = "remote"
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+        if copy_mode == "hardlink"
+        else (
+            UnderfolderWriterV2.CopyMode.SYM_LINK
+            if copy_mode == "symlink"
+            else UnderfolderWriterV2.CopyMode.DEEP_COPY
+        ),
+        reader_template=template,
+    )
+    writer(sseq)
 
 
 @click.command("dump", help="Dumps an underfolder dataset to CSV or Orange Tab file.")

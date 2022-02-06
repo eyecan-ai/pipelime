@@ -1,0 +1,5 @@
+nodes:
+  generator:
+    foreach:
+      items: 'A'
+      do: 'what?'
