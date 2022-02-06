@@ -934,8 +934,12 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
 
 
 @click.command("dump", help="Dumps an underfolder dataset to CSV or Orange Tab file.")
-@click.option("-i", "--input", type=Path, required=True, help="Input dataset")
-@click.option("-o", "--output", type=Path, required=True, help="Output folder")
+@click.option(
+    "-i", "--input_folder", type=Path, required=True, help="Input Underfolder"
+)
+@click.option(
+    "-o", "--output_folder", type=Path, required=True, help="Output Underfolder"
+)
 @click.option("-k", "--keys", type=str, multiple=True, help="Filtering keys [multiple]")
 @click.option(
     "--negated",
@@ -972,11 +976,14 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
     help="if soft/hard links should be used whenever possible when writing assets",
     show_default=True,
 )
-def dump(input, output, keys, negated, start, stop, step, format, link_type):
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def dump(
+    input_folder, output_folder, keys, negated, start, stop, step, format, link_type
+):
     from pipelime.cli.dump import dump_data, LinkType
     from pipelime.sequences.readers.filesystem import UnderfolderReader
 
-    reader = UnderfolderReader(input)
+    reader = UnderfolderReader(input_folder)
     if keys:
         from pipelime.sequences.samples import SamplesSequence
         from pipelime.sequences.stages import StageKeysFilter
@@ -985,12 +992,14 @@ def dump(input, output, keys, negated, start, stop, step, format, link_type):
 
     file_ext = {"csv": ".csv", "orange": ".tab"}
 
-    output = Path(output)
-    output.mkdir(parents=True, exist_ok=True)
-    with open(output / (Path(input).name + file_ext[format]), "w") as outfile:
+    output_folder = Path(output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    with open(
+        output_folder / (Path(input_folder).name + file_ext[format]), "w"
+    ) as outfile:
         dump_data(
             samples=reader,
-            output_assets_path=output / "assets",
+            output_assets_path=output_folder / "assets",
             start=start,
             stop=stop,
             step=step,
