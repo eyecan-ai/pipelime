@@ -931,3 +931,79 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
         reader_template=template,
     )
     writer(sseq)
+
+
+@click.command("dump", help="Dumps an underfolder dataset to CSV or Orange Tab file.")
+@click.option(
+    "-i", "--input_folder", type=Path, required=True, help="Input Underfolder"
+)
+@click.option(
+    "-o", "--output_folder", type=Path, required=True, help="Output Underfolder"
+)
+@click.option("-k", "--keys", type=str, multiple=True, help="Filtering keys [multiple]")
+@click.option(
+    "--negated",
+    is_flag=True,
+    help="If present, filtering keys are removed from samples, instead of extracted",
+)
+@click.option(
+    "--start",
+    default=None,
+    type=int,
+    help="First sample index (negative values are allowed)",
+)
+@click.option(
+    "--stop",
+    default=None,
+    type=int,
+    help="Last sample index, excluded (negative values are allowed)",
+)
+@click.option(
+    "--step", default=None, type=int, help="Range step (negative values are allowed)"
+)
+@click.option(
+    "-f",
+    "--format",
+    type=click.Choice(["csv", "orange"]),
+    default="orange",
+    help="Output format [csv|orange]",
+    show_default=True,
+)
+@click.option(
+    "--link_type",
+    type=click.Choice(["copy", "soft", "hard"]),
+    default="hard",
+    help="if soft/hard links should be used whenever possible when writing assets",
+    show_default=True,
+)
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def dump(
+    input_folder, output_folder, keys, negated, start, stop, step, format, link_type
+):
+    from pipelime.cli.dump import dump_data, LinkType
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+
+    reader = UnderfolderReader(input_folder)
+    if keys:
+        from pipelime.sequences.samples import SamplesSequence
+        from pipelime.sequences.stages import StageKeysFilter
+
+        reader = SamplesSequence(reader, StageKeysFilter(keys, negated))
+
+    file_ext = {"csv": ".csv", "orange": ".tab"}
+
+    output_folder = Path(output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    with open(
+        output_folder / (Path(input_folder).name + file_ext[format]), "w"
+    ) as outfile:
+        dump_data(
+            samples=reader,
+            output_assets_path=output_folder / "assets",
+            start=start,
+            stop=stop,
+            step=step,
+            format=format,
+            link_type=LinkType[link_type],
+            file=outfile,
+        )
