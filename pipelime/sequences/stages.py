@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Union, Collection, Sequence, Mapping, Tuple, Optional, Any
+from typing import Union, Collection, Sequence, Mapping, Tuple, Optional, Any, List
 import io
 from pathlib import Path
 import albumentations as A
@@ -204,6 +204,7 @@ class StageUploadToRemote(SampleStage):
                 pickled. Defaults to {}.
         """
         from pipelime.filesystem.remotes import BaseRemote, create_remote
+        from urllib.parse import ParseResult
 
         def _check_ext(e: Optional[str]) -> str:
             if isinstance(e, str) and len(e) > 0:
@@ -211,40 +212,113 @@ class StageUploadToRemote(SampleStage):
             return ".pickle"
 
         self._key_ext_map = {k: _check_ext(e) for k, e in key_ext_map.items()}
-        self._remotes: Sequence[Tuple[BaseRemote, str]] = []
+        self._remotes: Sequence[Tuple[BaseRemote, str, str]] = []
         for rm in remotes if isinstance(remotes, Sequence) else [remotes]:
             rm_instance = create_remote(rm.scheme, rm.netloc, **rm.init_args)
             if rm_instance is not None:
-                self._remotes.append((rm_instance, rm.base_path))
+                self._remotes.append(
+                    (
+                        rm_instance,
+                        rm.base_path,
+                        ParseResult(
+                            scheme=rm.scheme,
+                            netloc=self._netloc(rm.netloc),
+                            path=rm.base_path,
+                            params="",
+                            query="",
+                            fragment="",
+                        ).geturl(),
+                    )
+                )
 
-    def __call__(self, x: Sample) -> Sample:
-        x = x.copy()
-        for k, ext in self._key_ext_map.items():
-            if k in x:
-                url_list = []
-                if (
-                    isinstance(x, FileSystemSample)
-                    and not x.is_cached(k)
-                    and ext == "".join(Path(x.filesmap[k]).suffixes)
-                ):
-                    for rm, base_path in self._remotes:
-                        target = rm.upload_file(x.filesmap[k], base_path)
-                        if target is not None:
-                            url_list.append(target)
-                else:
+    def _netloc(self, netloc: str) -> str:
+        ip_port = netloc.split(":", 1)
+        ip_addr = ip_port[0]
+        port = ip_port[1] if len(ip_port) > 1 else ""
+        if not ip_addr or ip_addr == "localhost":
+            ip_addr = "127.0.0.1"
+        return f"{ip_addr}:{port}" if port else ip_addr
+
+    def _fssample_shortcut(self, x: Sample, k: str, ext: str) -> Tuple[List[str], bool]:
+        url_list = []
+        uploaded = False
+        if isinstance(x, FileSystemSample) and not x.is_cached(k):
+            if FSToolkit.is_remote_file(x.filesmap[k]):
+                # read current remote list
+                url_list = FSToolkit.load_remote_list(x.filesmap[k])
+            elif ext == "".join(Path(x.filesmap[k]).suffixes):
+                # just upload the file
+                for rm, base_path, _ in self._remotes:
+                    target = rm.upload_file(x.filesmap[k], base_path)
+                    if target is not None:
+                        url_list.append(target)
+                uploaded = True
+        return url_list, uploaded
+
+    def _upload_to_remotes(self, url_list, sample, key, ext):
+        from urllib.parse import urlparse, ParseResult
+
+        # parsed url to easily find duplicates (see below)
+        parsed_url_list = [urlparse(u) for u in url_list]
+        parsed_url_list = [
+            ParseResult(
+                scheme=u.scheme,
+                netloc=self._netloc(u.netloc),
+                path=Path(u.path[1:]).parent.as_posix(),
+                params="",
+                query="",
+                fragment="",
+            ).geturl()
+            for u in parsed_url_list
+        ]
+
+        data_stream = None
+        data_size = 0
+        for rm, base_path, rm_url in self._remotes:
+            # first check if the remote is already listed
+            if rm_url not in parsed_url_list:
+                if data_stream is None:
+                    item_data = None
+                    if not url_list:
+                        # the item is not a 'remote' file
+                        # however, it can still be a remote list if not bound to a file
+                        item_data = sample[key]
+                        if FSToolkit.is_remote_list(item_data):
+                            url_list = item_data
+                            item_data = None
+
+                    # this list come from a remote file or from a 'memory' item
+                    if url_list:
+                        # manually get the item from the remote
+                        item_data = FSToolkit.load_remote_data(url_list)
+                        if FSToolkit.is_remote_list(item_data):
+                            raise RuntimeError(
+                                f"Stage[{self.__class__.__name__}] "
+                                "recursive remotes not allowed!"
+                            )
+
+                    # store the item as binary blob
                     data_stream = io.BytesIO()
-                    FSToolkit.store_data_to_stream(data_stream, ext, x[k])
+                    FSToolkit.store_data_to_stream(data_stream, ext, item_data)
 
                     data_stream.seek(0, io.SEEK_END)
                     data_size = data_stream.tell()
                     data_stream.seek(0, io.SEEK_SET)
 
-                    for rm, base_path in self._remotes:
-                        target = rm.upload_stream(
-                            data_stream, data_size, base_path, ext
-                        )
-                        if target is not None:
-                            url_list.append(target)
+                target = rm.upload_stream(data_stream, data_size, base_path, ext)
+                if target is not None:
+                    url_list.append(target)
+                    parsed_url_list.append(rm_url)
+
+        return url_list
+
+    def __call__(self, x: Sample) -> Sample:
+        x = x.copy()
+        for k, ext in self._key_ext_map.items():
+            if k in x:
+                url_list, uploaded = self._fssample_shortcut(x, k, ext)
+                if not uploaded:
+                    url_list = self._upload_to_remotes(url_list, x, k, ext)
 
                 # replace item value with the list of remote urls
                 x[k] = url_list

@@ -483,7 +483,7 @@ class S3Remote(BaseRemote):
                 hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
                 return hash_fn()
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return None
 
     def target_exists(self, target_base_path: str, target_name: str) -> bool:
@@ -497,7 +497,7 @@ class S3Remote(BaseRemote):
             except StopIteration:
                 return False
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return False
 
     def _upload(
@@ -518,7 +518,7 @@ class S3Remote(BaseRemote):
                 )
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False
@@ -532,7 +532,7 @@ class S3Remote(BaseRemote):
     ) -> bool:
         if self.is_valid:
             if not self._client.bucket_exists(source_base_path):  # type: ignore
-                logger.warning(
+                logger.debug(
                     f"Bucket '{source_base_path}' does not exist "
                     f"on S3 remote '{self.netloc}'."
                 )
@@ -550,7 +550,7 @@ class S3Remote(BaseRemote):
                     local_stream.write(data)
                 ok = True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
             finally:
                 if response:
@@ -629,7 +629,7 @@ class FileRemote(BaseRemote):
                 hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
                 return hash_fn()
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return None
 
     def target_exists(self, target_base_path: str, target_name: str) -> bool:
@@ -654,7 +654,7 @@ class FileRemote(BaseRemote):
 
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False
@@ -669,8 +669,8 @@ class FileRemote(BaseRemote):
         if self.is_valid:
             try:
                 source_full_path = self._make_file_path(source_base_path, source_name)
-                if not source_full_path.exists():
-                    logger.warning(f"File '{source_full_path}' does not exist.")
+                if not source_full_path.is_file():
+                    logger.debug(f"File '{source_full_path}' does not exist.")
                     return False
 
                 with source_full_path.open("rb") as source:
@@ -679,7 +679,7 @@ class FileRemote(BaseRemote):
 
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False

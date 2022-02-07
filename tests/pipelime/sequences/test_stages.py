@@ -203,11 +203,44 @@ class TestSampleSequenceStaged:
 
 
 class TestStageUploadToRemote:
-    def _upload_to_remote(self, dataset, out_folder, remote_prms):
+    def _check_remote_list(self, data_folder, expected_remote_list):
+        from pipelime.filesystem.toolkit import FSToolkit
+        from urllib.parse import urlparse, ParseResult
+        from pathlib import Path
+
+        for x in UnderfolderReader(data_folder):
+            for k in x.keys():
+                if FSToolkit.is_remote_file(x.metaitem(k).source()):
+                    rmlist = FSToolkit.load_remote_list(x.metaitem(k).source())
+                    rmlist = [urlparse(rm) for rm in rmlist]
+                    rmlist = [
+                        ParseResult(
+                            scheme=rm.scheme,
+                            netloc="localhost",
+                            path=Path(rm.path[1:]).parent.as_posix(),
+                            params="",
+                            query="",
+                            fragment="",
+                        ).geturl()
+                        for rm in rmlist
+                    ]
+
+                    assert expected_remote_list == rmlist
+
+    def _upload_to_remote(
+        self, dataset, out_folder, remote_prms, filter_fn=None, check_data=True
+    ):
+        from pipelime.sequences.proxies import FilteredSamplesSequence
+        from pipelime.filesystem.toolkit import FSToolkit
+        import numpy as np
+
         # read and upload
         reader = UnderfolderReader(dataset)
+        filtered_seq = (
+            reader if filter_fn is None else FilteredSamplesSequence(reader, filter_fn)
+        )
         sseq = SamplesSequence(
-            reader,
+            filtered_seq,
             StageUploadToRemote(remote_prms, {"image": "png", "mask": "png"}),
         )
 
@@ -226,20 +259,21 @@ class TestStageUploadToRemote:
 
         writer(sseq)
 
-        # high-level check
-        import numpy as np
+        if check_data:
+            # high-level check
+            reader_out = UnderfolderReader(out_folder)
+            for x, y in zip(filtered_seq, reader_out):
+                assert FSToolkit.is_remote_file(y.metaitem("image").source())
+                assert FSToolkit.is_remote_file(y.metaitem("mask").source())
 
-        reader_out = UnderfolderReader(out_folder)
-        for x, y in zip(reader, reader_out):
-            assert y.metaitem("image").source().suffix == ".remote"
-            assert y.metaitem("mask").source().suffix == ".remote"
+                assert x.keys() == y.keys()
+                for k, v in x.items():
+                    if isinstance(v, np.ndarray):
+                        assert np.array_equal(v, y[k])
+                    else:
+                        assert v == y[k]
 
-            assert x.keys() == y.keys()
-            for k, v in x.items():
-                if isinstance(v, np.ndarray):
-                    assert np.array_equal(v, y[k])
-                else:
-                    assert v == y[k]
+        return len(sseq)
 
     def test_file_upload(self, toy_dataset_small, tmp_path):
         # data lake
@@ -276,3 +310,172 @@ class TestStageUploadToRemote:
                 },
             ),
         )
+
+    def test_incremental_file_upload(self, toy_dataset_small, tmp_path):
+        from pipelime.sequences.proxies import FilteredSamplesSequence
+        from pipelime.filesystem.toolkit import FSToolkit
+        from shutil import rmtree
+        import pytest
+        import numpy as np
+        from filecmp import cmp
+
+        # data lake
+        remote_root = tmp_path / "remote"
+        remote_root.mkdir(parents=True)
+        remote_root = remote_root.as_posix()
+
+        input_dataset = toy_dataset_small["folder"]
+        output_dataset_a = tmp_path / "output_a"
+
+        stage_upload = StageUploadToRemote.RemoteParams(
+            scheme="file", netloc="localhost", base_path=remote_root
+        )
+
+        # upload even samples
+        counter_even = self._upload_to_remote(
+            input_dataset,
+            output_dataset_a,
+            stage_upload,
+            lambda x: int(x["metadata"]["index"]) % 2 == 0,
+        )
+
+        # manually copy the odd samples
+        reader = UnderfolderReader(input_dataset, copy_root_files=False)
+        sseq = FilteredSamplesSequence(
+            reader, lambda x: int(x["metadata"]["index"]) % 2 == 1
+        )
+        writer = UnderfolderWriterV2(
+            output_dataset_a,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
+            reader_template=reader.get_reader_template(),
+        )
+        writer(sseq)
+
+        # clear all remote data
+        rmtree(remote_root, ignore_errors=True)
+        remote_root = tmp_path / "remote"
+        remote_root.mkdir(parents=True, exist_ok=True)
+        remote_root = remote_root.as_posix()
+
+        # upload all indices, but only the odd ones are actually copied to the remote
+        output_dataset_b = tmp_path / "output_b"
+        counter_all = self._upload_to_remote(
+            output_dataset_a, output_dataset_b, stage_upload, check_data=False
+        )
+
+        reader = UnderfolderReader(output_dataset_b)
+        assert counter_even == len(reader) // 2
+        assert counter_all == len(reader)
+
+        # only the odd samples are on the remote
+        for x, y in zip(UnderfolderReader(output_dataset_a), reader):
+            assert x.keys() == y.keys()
+            for k in x.keys():
+                if k in ("image", "mask") and int(x["metadata"]["index"]) % 2 == 0:
+                    # even sample
+                    assert FSToolkit.is_remote_file(x.metaitem(k).source())
+                    assert FSToolkit.is_remote_file(y.metaitem(k).source())
+                    assert cmp(
+                        x.metaitem(k).source(), y.metaitem(k).source(), shallow=False
+                    )
+                    with pytest.raises(Exception):
+                        _ = x[k]
+                    with pytest.raises(Exception):
+                        _ = y[k]
+                else:
+                    v = x[k]
+                    if isinstance(v, np.ndarray):
+                        assert np.array_equal(v, y[k])
+                    else:
+                        assert v == y[k]
+
+    def test_multiple_remote_upload(self, toy_dataset_small, tmp_path):
+        from urllib.parse import urlparse, ParseResult
+        from shutil import rmtree
+        import numpy as np
+
+        # create two remotes
+        remote_a = tmp_path / "remote_a"
+        remote_a.mkdir(parents=True, exist_ok=True)
+        remote_a = remote_a.as_posix()
+
+        remote_b = tmp_path / "remote_b"
+        remote_b.mkdir(parents=True, exist_ok=True)
+        remote_b = remote_b.as_posix()
+
+        input_dataset = toy_dataset_small["folder"]
+        output_dataset_a = tmp_path / "output_a"
+
+        # upload to both remotes
+        self._upload_to_remote(
+            input_dataset,
+            output_dataset_a,
+            [
+                StageUploadToRemote.RemoteParams(
+                    scheme="file", netloc="localhost", base_path=remote_a
+                ),
+                StageUploadToRemote.RemoteParams(
+                    scheme="file", netloc="localhost", base_path=remote_b
+                ),
+            ],
+        )
+
+        # the .remote files must contains both remotes, remote_root first
+        expected_remote_list = [
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_a,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_b,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+        ]
+        self._check_remote_list(output_dataset_a, expected_remote_list)
+
+        # now remove remote_a and check again the data
+        rmtree(remote_a, ignore_errors=True)
+
+        for x, y in zip(
+            UnderfolderReader(input_dataset), UnderfolderReader(output_dataset_a)
+        ):
+            for k, v in x.items():
+                if isinstance(v, np.ndarray):
+                    assert np.array_equal(v, y[k])
+                else:
+                    assert v == y[k]
+
+        # now upload to remote_c taking data from remote_b
+        remote_c = tmp_path / "remote_c"
+        remote_c.mkdir(parents=True, exist_ok=True)
+        remote_c = remote_c.as_posix()
+
+        output_dataset_b = tmp_path / "output_b"
+        self._upload_to_remote(
+            output_dataset_a,
+            output_dataset_b,
+            StageUploadToRemote.RemoteParams(
+                scheme="file", netloc="localhost", base_path=remote_c
+            ),
+        )
+
+        expected_remote_list.append(
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_c,
+                params="",
+                query="",
+                fragment="",
+            ).geturl()
+        )
+
+        self._check_remote_list(output_dataset_b, expected_remote_list)
