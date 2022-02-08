@@ -887,7 +887,7 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
     from pipelime.sequences.readers.filesystem import UnderfolderReader
     from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
     from pipelime.sequences.samples import SamplesSequence
-    from pipelime.sequences.stages import StageUploadToRemote
+    from pipelime.sequences.stages import StageUploadToRemote, RemoteParams
     from urllib.parse import urlparse, unquote_plus
 
     def _convert_val(val: str):
@@ -909,7 +909,7 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
 
     remote_params = [urlparse(rm) for rm in remote]
     remote_params = [
-        StageUploadToRemote.RemoteParams(
+        RemoteParams(
             scheme=rm.scheme,
             netloc=rm.netloc,
             base_path=unquote_plus(rm.path)[1:],

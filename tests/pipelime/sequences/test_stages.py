@@ -11,7 +11,9 @@ from pipelime.sequences.stages import (
     StageIdentity,
     StageKeysFilter,
     StageRemap,
+    RemoteParams,
     StageUploadToRemote,
+    StageRemoveRemote,
 )
 
 
@@ -202,7 +204,7 @@ class TestSampleSequenceStaged:
             assert "tail" not in sample
 
 
-class TestStageUploadToRemote:
+class TestStageRemote:
     def _check_remote_list(self, data_folder, expected_remote_list):
         from pipelime.filesystem.toolkit import FSToolkit
         from urllib.parse import urlparse, ParseResult
@@ -284,9 +286,7 @@ class TestStageUploadToRemote:
         self._upload_to_remote(
             toy_dataset_small["folder"],
             tmp_path / "output",
-            StageUploadToRemote.RemoteParams(
-                scheme="file", netloc="localhost", base_path=remote_root
-            ),
+            RemoteParams(scheme="file", netloc="localhost", base_path=remote_root),
         )
 
     def test_s3_upload(self, toy_dataset_small, tmp_path, minio):
@@ -299,7 +299,7 @@ class TestStageUploadToRemote:
         self._upload_to_remote(
             toy_dataset_small["folder"],
             tmp_path / "output",
-            StageUploadToRemote.RemoteParams(
+            RemoteParams(
                 scheme="s3",
                 netloc="localhost:9000",
                 base_path="test-s3-upload",
@@ -327,7 +327,7 @@ class TestStageUploadToRemote:
         input_dataset = toy_dataset_small["folder"]
         output_dataset_a = tmp_path / "output_a"
 
-        stage_upload = StageUploadToRemote.RemoteParams(
+        stage_upload = RemoteParams(
             scheme="file", netloc="localhost", base_path=remote_root
         )
 
@@ -390,7 +390,7 @@ class TestStageUploadToRemote:
                         assert v == y[k]
 
     def test_multiple_remote_upload(self, toy_dataset_small, tmp_path):
-        from urllib.parse import urlparse, ParseResult
+        from urllib.parse import ParseResult
         from shutil import rmtree
         import numpy as np
 
@@ -411,12 +411,8 @@ class TestStageUploadToRemote:
             input_dataset,
             output_dataset_a,
             [
-                StageUploadToRemote.RemoteParams(
-                    scheme="file", netloc="localhost", base_path=remote_a
-                ),
-                StageUploadToRemote.RemoteParams(
-                    scheme="file", netloc="localhost", base_path=remote_b
-                ),
+                RemoteParams(scheme="file", netloc="localhost", base_path=remote_a),
+                RemoteParams(scheme="file", netloc="localhost", base_path=remote_b),
             ],
         )
 
@@ -462,9 +458,7 @@ class TestStageUploadToRemote:
         self._upload_to_remote(
             output_dataset_a,
             output_dataset_b,
-            StageUploadToRemote.RemoteParams(
-                scheme="file", netloc="localhost", base_path=remote_c
-            ),
+            RemoteParams(scheme="file", netloc="localhost", base_path=remote_c),
         )
 
         expected_remote_list.append(
@@ -478,4 +472,72 @@ class TestStageUploadToRemote:
             ).geturl()
         )
 
+        self._check_remote_list(output_dataset_b, expected_remote_list)
+
+    def test_remove_remote(self, toy_dataset_small, tmp_path):
+        from urllib.parse import ParseResult
+
+        # create two remotes
+        remote_a = tmp_path / "remote_a"
+        remote_a.mkdir(parents=True, exist_ok=True)
+        remote_a = remote_a.as_posix()
+
+        remote_b = tmp_path / "remote_b"
+        remote_b.mkdir(parents=True, exist_ok=True)
+        remote_b = remote_b.as_posix()
+
+        input_dataset = toy_dataset_small["folder"]
+        output_dataset_a = tmp_path / "output_a"
+
+        # upload to both remotes
+        self._upload_to_remote(
+            input_dataset,
+            output_dataset_a,
+            [
+                RemoteParams(scheme="file", netloc="localhost", base_path=remote_a),
+                RemoteParams(scheme="file", netloc="localhost", base_path=remote_b),
+            ],
+        )
+
+        # the .remote files must contains both remotes, remote_root first
+        expected_remote_list = [
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_a,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_b,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+        ]
+        self._check_remote_list(output_dataset_a, expected_remote_list)
+
+        # remove remote_a
+        reader = UnderfolderReader(output_dataset_a)
+        sseq = SamplesSequence(
+            reader,
+            StageRemoveRemote(
+                RemoteParams(scheme="file", netloc="localhost", base_path=remote_a),
+                ["image", "mask"],
+            ),
+        )
+
+        output_dataset_b = tmp_path / "output_b"
+        output_dataset_b.mkdir(parents=True)
+        writer = UnderfolderWriterV2(
+            output_dataset_b,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
+            reader_template=reader.get_reader_template(),
+        )
+        writer(sseq)
+
+        expected_remote_list.pop(0)
         self._check_remote_list(output_dataset_b, expected_remote_list)

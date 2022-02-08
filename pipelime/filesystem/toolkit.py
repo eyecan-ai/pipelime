@@ -184,7 +184,9 @@ class FSToolkit(object):
         return True
 
     @classmethod
-    def load_data_from_stream(cls, data_stream: BinaryIO, extension: str) -> Union[None, np.ndarray, dict]:
+    def load_data_from_stream(
+        cls, data_stream: BinaryIO, extension: str
+    ) -> Union[None, np.ndarray, dict]:
         if cls.is_image_file(data_stream):
             return np.array(imageio.imread(data_stream))
 
@@ -221,7 +223,9 @@ class FSToolkit(object):
         return None
 
     @classmethod
-    def load_remote_data(cls, remote_list: Sequence[str]) -> Union[None, np.ndarray, dict]:
+    def load_remote_data(
+        cls, remote_list: Sequence[str]
+    ) -> Union[None, np.ndarray, dict]:
         try:
             extension, data_stream = cls._download_from_remote_list(remote_list)
             data = cls.load_data_from_stream(data_stream, extension)

@@ -171,40 +171,64 @@ class StageAugmentations(SampleStage):
         return {"transform_cfg": self._transform_cfg, "targets": self._targets}
 
 
+@dataclass
+class RemoteParams:
+    """Remote parameters.
+
+    :param scheme: the protocol used, eg, 'file', 's3' etc.
+    :type scheme: str
+    :param netloc: the ip address and port or 'localhost'.
+    :type netloc: str
+    :param base_path: the base path for all uploads, eg, the name of the bucket.
+    :type base_path: str
+    :param init_args: keyword arguments forwarded to the remote initializer.
+        Defaults to {}.
+    :type init_args: Mapping[str, str], optional
+    """
+
+    scheme: str
+    netloc: str
+    base_path: str
+    init_args: Mapping[str, Any] = field(default_factory=dict)
+    url: str = field(init=False)
+
+    def __post_init__(self):
+        from urllib.parse import ParseResult
+
+        ip_and_port = self.netloc.split(":", 1)
+        ip_addr = ip_and_port[0]
+        port = ip_and_port[1] if len(ip_and_port) > 1 else ""
+        if not ip_addr or ip_addr == "localhost":
+            ip_addr = "127.0.0.1"
+        ip_and_port = f"{ip_addr}:{port}" if port else ip_addr
+
+        self.url = ParseResult(
+            scheme=self.scheme,
+            netloc=ip_and_port,
+            path=self.base_path,
+            params="",
+            query="",
+            fragment="",
+        ).geturl()
+
+
 class StageUploadToRemote(SampleStage):
-    @dataclass
-    class RemoteParams:
-        """Remote parameters.
-
-        Args:
-            scheme (str): the protocol used, eg, 'file', 's3' etc.
-            netloc (str): the ip address and port or 'localhost'.
-            base_path (str): the base path for all uploads, eg, the name of the bucket.
-            init_args (Mapping[str, str], optional): keyword arguments forwarded to the
-                remote initializer. Defaults to {}.
-        """
-
-        scheme: str
-        netloc: str
-        base_path: str
-        init_args: Mapping[str, Any] = field(default_factory=dict)
-
     def __init__(
         self,
         remotes: Union[RemoteParams, Sequence[RemoteParams]],
-        key_ext_map: Mapping[str, Optional[str]] = {},
+        key_ext_map: Mapping[str, Optional[str]],
     ):
         """Upload sample data to one or more remotes. The uploaded items are then
         managed through a RemoteMetaItem.
 
-        Args:
-            remotes (Sequence[RemoteParams]): list of remotes.
-            key_ext_map (Mapping[str, str], optional): the item keys to upload and the
-                associated file extension to use. If no extension is given, the item is
-                pickled. Defaults to {}.
+        :param remotes: the list of remotes.
+        :type remotes: Union[RemoteParams, Sequence[RemoteParams]]
+        :param key_ext_map: the item keys to upload and the
+            associated file extension to use. If no extension is given, the item is
+            pickled.
+        :type key_list: Mapping[str, Optional[str]]
         """
         from pipelime.filesystem.remotes import BaseRemote, create_remote
-        from urllib.parse import ParseResult
 
         def _check_ext(e: Optional[str]) -> str:
             if isinstance(e, str) and len(e) > 0:
@@ -220,24 +244,9 @@ class StageUploadToRemote(SampleStage):
                     (
                         rm_instance,
                         rm.base_path,
-                        ParseResult(
-                            scheme=rm.scheme,
-                            netloc=self._netloc(rm.netloc),
-                            path=rm.base_path,
-                            params="",
-                            query="",
-                            fragment="",
-                        ).geturl(),
+                        rm.url,
                     )
                 )
-
-    def _netloc(self, netloc: str) -> str:
-        ip_port = netloc.split(":", 1)
-        ip_addr = ip_port[0]
-        port = ip_port[1] if len(ip_port) > 1 else ""
-        if not ip_addr or ip_addr == "localhost":
-            ip_addr = "127.0.0.1"
-        return f"{ip_addr}:{port}" if port else ip_addr
 
     def _fssample_shortcut(self, x: Sample, k: str, ext: str) -> Tuple[List[str], bool]:
         url_list = []
@@ -256,19 +265,16 @@ class StageUploadToRemote(SampleStage):
         return url_list, uploaded
 
     def _upload_to_remotes(self, url_list, sample, key, ext):
-        from urllib.parse import urlparse, ParseResult
+        from urllib.parse import urlparse
 
         # parsed url to easily find duplicates (see below)
         parsed_url_list = [urlparse(u) for u in url_list]
         parsed_url_list = [
-            ParseResult(
+            RemoteParams(
                 scheme=u.scheme,
-                netloc=self._netloc(u.netloc),
-                path=Path(u.path[1:]).parent.as_posix(),
-                params="",
-                query="",
-                fragment="",
-            ).geturl()
+                netloc=u.netloc,
+                base_path=Path(u.path[1:]).parent.as_posix(),
+            ).url
             for u in parsed_url_list
         ]
 
@@ -322,4 +328,54 @@ class StageUploadToRemote(SampleStage):
 
                 # replace item value with the list of remote urls
                 x[k] = url_list
+        return x
+
+
+class StageRemoveRemote(SampleStage):
+    def __init__(
+        self,
+        remotes: Union[RemoteParams, Sequence[RemoteParams]],
+        key_list: Sequence[str],
+    ):
+        """Remove a remote in remote lists. To avoid an unintended data loss, the actual
+        file is not deleted on the remote.
+
+        :param remotes: the remote to remove.
+        :type remotes: Union[RemoteParams, Sequence[RemoteParams]]
+        :param key_list: the target item keys.
+        :type key_list: Sequence[str]
+        """
+        if not isinstance(remotes, Sequence):
+            remotes = [remotes]
+        self._remotes = [rm.url for rm in remotes]
+        self._key_list = key_list
+
+    def _as_remote_url(self, url) -> str:
+        from urllib.parse import urlparse
+
+        url = urlparse(url)
+        return RemoteParams(
+            scheme=url.scheme,
+            netloc=url.netloc,
+            base_path=Path(url.path[1:]).parent.as_posix(),
+        ).url
+
+    def __call__(self, x: Sample) -> Sample:
+        x = x.copy()
+        for k in self._key_list:
+            url_list = []
+            if (
+                isinstance(x, FileSystemSample)
+                and not x.is_cached(k)
+                and FSToolkit.is_remote_file(x.filesmap[k])
+            ):
+                url_list = FSToolkit.load_remote_list(x.filesmap[k])
+            else:
+                data = x[k]
+                if FSToolkit.is_remote_list(data):
+                    url_list = data
+            if url_list:
+                x[k] = [
+                    u for u in url_list if self._as_remote_url(u) not in self._remotes
+                ]
         return x
