@@ -14,7 +14,7 @@ This command will print the compiled dag file to stdout. The compiled dag file c
 pipelime piper compile -i dag.yml -p params.yml -o $COMPILED_FILE
 ```
 
-If yuo try to launch the compile tool without providing a configuration file, the tool will fail due to missing replacement for the placeholders:
+If you try to launch the compile tool without providing a configuration file, the tool will fail due to missing replacement for the placeholders:
 
 ```
 pipelime piper compile -i dag.yml
