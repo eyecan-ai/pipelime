@@ -4,7 +4,7 @@ import pickle
 import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Union, Iterable, BinaryIO, TextIO, Tuple
+from typing import Any, Union, Iterable, Sequence, BinaryIO, TextIO, Tuple, List
 
 import imageio
 import numpy as np
@@ -22,9 +22,6 @@ class FSToolkit(object):
 
     # Default imageio options for each image format
     IMG_SAVE_OPTIONS = {"png": {"compress_level": 4}}
-
-    # Default remote init options for each remote scheme
-    REMOTE_INIT_OPTIONS = {"s3": {"secure_connection": False}}
 
     YAML_EXT = ("yaml", "yml")
     JSON_EXT = ("json",)
@@ -134,27 +131,109 @@ class FSToolkit(object):
         return ext in cls.PICKLE_EXT
 
     @classmethod
-    def _download_from_remote(cls, filename: str) -> Tuple[str, BytesIO]:
+    def _download_from_remote_list(
+        cls, remote_list: Union[Sequence[str], TextIO]
+    ) -> Tuple[str, BytesIO]:
         extension = ""
         data_stream = None
-        with open(filename, "r") as fd:
-            for line in fd:  # download from first available remote
-                remote, rm_base, rm_name = plr.get_remote_and_paths(
-                    line.rstrip("\n"), cls.REMOTE_INIT_OPTIONS
-                )
-                if remote and rm_base and rm_name:
-                    extension = cls.get_file_extension(rm_name)
-                    data_stream = BytesIO()
-                    if not remote.download_stream(data_stream, rm_base, rm_name):
-                        data_stream = None
-                if data_stream is None:
-                    logger.debug(f"unknown or unreachable remote: {line}")
-                else:
-                    data_stream.seek(0)
-                    break
-            else:  # no remote loaded
-                raise Exception(f"Remote loading error: {filename}")
+        for line in remote_list:  # download from first available remote
+            line = line.strip()
+            remote, rm_base, rm_name = plr.get_remote_and_paths(line)
+            if remote and rm_base and rm_name:
+                extension = cls.get_file_extension(rm_name)
+                data_stream = BytesIO()
+                if not remote.download_stream(data_stream, rm_base, rm_name):
+                    data_stream = None
+            if data_stream is None:
+                logger.debug(f"unknown or unreachable remote: {line}")
+            else:
+                data_stream.seek(0)
+                break
+        else:  # no remote loaded
+            raise Exception(f"remote loading error")
         return extension, data_stream
+
+    @classmethod
+    def _download_from_remote(cls, filename: str) -> Tuple[str, BytesIO]:
+        with open(filename, "r") as fd:
+            return cls._download_from_remote_list(fd)
+
+    @classmethod
+    def load_remote_list(cls, filename: str) -> List[str]:
+        url_list = []
+        with open(filename, "r") as fd:
+            for line in fd:
+                url_list.append(line.strip())
+        return url_list
+
+    @classmethod
+    def is_remote_list(cls, data: Any) -> bool:
+        from urllib.parse import urlparse
+
+        if not isinstance(data, Sequence):
+            return False
+        for d in data:
+            if not isinstance(d, str):
+                return False
+            try:
+                parsed_url = urlparse(d)
+                if not parsed_url.scheme:
+                    return False
+            except ValueError:
+                return False
+        return True
+
+    @classmethod
+    def load_data_from_stream(
+        cls, data_stream: BinaryIO, extension: str
+    ) -> Union[None, np.ndarray, dict]:
+        if cls.is_image_file(data_stream):
+            return np.array(imageio.imread(data_stream))
+
+        switches = (
+            (
+                lambda: extension in cls.YAML_EXT,
+                lambda: yaml.safe_load(TextIOWrapper(data_stream)),
+            ),
+            (
+                lambda: extension in cls.JSON_EXT,
+                lambda: json.load(TextIOWrapper(data_stream)),
+            ),
+            (
+                lambda: extension in cls.TOML_EXT,
+                lambda: dict(toml.load(TextIOWrapper(data_stream))),
+            ),
+            (
+                lambda: extension in cls.PICKLE_EXT,
+                lambda: pickle.load(data_stream),
+            ),
+            (
+                lambda: extension in cls.NUMPY_TXT_EXT,
+                lambda: np.atleast_2d(cls._numpy_load_txt(data_stream)),
+            ),
+            (
+                lambda: extension in cls.NUMPY_NATIVE_EXT,
+                lambda: np.atleast_2d(np.load(data_stream)),
+            ),
+        )
+
+        for cond, fn in switches:
+            if cond():
+                return fn()
+        return None
+
+    @classmethod
+    def load_remote_data(
+        cls, remote_list: Sequence[str]
+    ) -> Union[None, np.ndarray, dict]:
+        try:
+            extension, data_stream = cls._download_from_remote_list(remote_list)
+            data = cls.load_data_from_stream(data_stream, extension)
+            if data is not None:
+                return data
+        except Exception as e:
+            raise Exception(f"Loading data error: {e}")
+        raise NotImplementedError(f"Unknown data extension: {extension}")
 
     @classmethod
     def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
@@ -174,39 +253,9 @@ class FSToolkit(object):
             if data_stream is None:
                 data_stream = open(filename, "rb")
 
-            if cls.is_image_file(data_stream):
-                return np.array(imageio.imread(data_stream))
-            else:
-                switches = (
-                    (
-                        lambda: extension in cls.YAML_EXT,
-                        lambda: yaml.safe_load(TextIOWrapper(data_stream)),
-                    ),
-                    (
-                        lambda: extension in cls.JSON_EXT,
-                        lambda: json.load(TextIOWrapper(data_stream)),
-                    ),
-                    (
-                        lambda: extension in cls.TOML_EXT,
-                        lambda: dict(toml.load(TextIOWrapper(data_stream))),
-                    ),
-                    (
-                        lambda: extension in cls.PICKLE_EXT,
-                        lambda: pickle.load(data_stream),
-                    ),
-                    (
-                        lambda: extension in cls.NUMPY_TXT_EXT,
-                        lambda: np.atleast_2d(cls._numpy_load_txt(data_stream)),
-                    ),
-                    (
-                        lambda: extension in cls.NUMPY_NATIVE_EXT,
-                        lambda: np.atleast_2d(np.load(data_stream)),
-                    ),
-                )
-
-                for cond, fn in switches:
-                    if cond():
-                        return fn()
+            data = cls.load_data_from_stream(data_stream, extension)
+            if data is not None:
+                return data
         except Exception as e:
             raise Exception(f"Loading data error: {e}")
         finally:

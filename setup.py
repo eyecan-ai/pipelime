@@ -18,6 +18,10 @@ test_requirements = [
     "pytest>=3",
 ]
 
+extras_requirements = {
+    'minio': ['minio']
+}
+
 setup(
     author="daniele de gregorio",
     author_email="daniele.degregorio@eyecan.ai",
@@ -40,6 +44,7 @@ setup(
         ],
     },
     install_requires=requirements,
+    extras_require=extras_requirements,
     license="GNU General Public License v3",
     long_description=readme,
     include_package_data=True,

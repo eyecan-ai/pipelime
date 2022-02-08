@@ -41,7 +41,7 @@ class RemoteRegister(ABCMeta):
                 remote_instance = remote_class(netloc, **kwargs)
                 cls.REMOTE_INSTANCES[(scheme, netloc)] = remote_instance
             else:
-                logger.warning(f"Unknown remote scheme {scheme}.")
+                logger.warning(f"Unknown remote scheme '{scheme}'.")
         return remote_instance
 
 
@@ -447,10 +447,14 @@ class S3Remote(BaseRemote):
             logger.error("S3 remote needs `minio` python package.")
             self._client = None
 
+    @property
+    def client(self):
+        return self._client
+
     def _maybe_create_bucket(self, target_base_path: str):
         if not self._client.bucket_exists(target_base_path):  # type: ignore
             logger.info(
-                f"Creating bucket {target_base_path} on S3 remote {self.netloc}."
+                f"Creating bucket '{target_base_path}' on S3 remote {self.netloc}."
             )
             self._client.make_bucket(target_base_path)  # type: ignore
 
@@ -479,7 +483,7 @@ class S3Remote(BaseRemote):
                 hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
                 return hash_fn()
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return None
 
     def target_exists(self, target_base_path: str, target_name: str) -> bool:
@@ -493,7 +497,7 @@ class S3Remote(BaseRemote):
             except StopIteration:
                 return False
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return False
 
     def _upload(
@@ -514,7 +518,7 @@ class S3Remote(BaseRemote):
                 )
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False
@@ -528,9 +532,9 @@ class S3Remote(BaseRemote):
     ) -> bool:
         if self.is_valid:
             if not self._client.bucket_exists(source_base_path):  # type: ignore
-                logger.warning(
-                    f"Bucket {source_base_path} does not exist "
-                    f"on S3 remote {self.netloc}."
+                logger.debug(
+                    f"Bucket '{source_base_path}' does not exist "
+                    f"on S3 remote '{self.netloc}'."
                 )
                 return False
 
@@ -546,7 +550,7 @@ class S3Remote(BaseRemote):
                     local_stream.write(data)
                 ok = True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
             finally:
                 if response:
@@ -583,7 +587,7 @@ class FileRemote(BaseRemote):
 
     def _maybe_create_root(self, target_base_path: Path):
         if not target_base_path.exists():
-            logger.info(f"Creating folder tree {target_base_path}.")
+            logger.info(f"Creating folder tree '{target_base_path}'.")
             target_base_path.mkdir(parents=True, exist_ok=True)
         pldir = target_base_path / self._PL_FOLDER_
         if not pldir.is_dir():
@@ -625,7 +629,7 @@ class FileRemote(BaseRemote):
                 hash_fn = getattr(hashlib, self._DEFAULT_HASH_FN_)
                 return hash_fn()
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
         return None
 
     def target_exists(self, target_base_path: str, target_name: str) -> bool:
@@ -650,7 +654,7 @@ class FileRemote(BaseRemote):
 
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False
@@ -665,8 +669,8 @@ class FileRemote(BaseRemote):
         if self.is_valid:
             try:
                 source_full_path = self._make_file_path(source_base_path, source_name)
-                if not source_full_path.exists():
-                    logger.warning(f"File {source_full_path} does not exist.")
+                if not source_full_path.is_file():
+                    logger.debug(f"File '{source_full_path}' does not exist.")
                     return False
 
                 with source_full_path.open("rb") as source:
@@ -675,7 +679,7 @@ class FileRemote(BaseRemote):
 
                 return True
             except Exception as exc:
-                logger.warning(str(exc))
+                logger.debug(str(exc))
                 return False
 
         return False
