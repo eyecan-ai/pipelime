@@ -688,3 +688,80 @@ class TestCLIUnderfolderOperationUpload:
         _move_objects("remote-a", "tmpbkt-a")
         with pytest.raises(Exception):
             self._compare_dataset(input_folder, output_folder, uploaded_keys)
+
+    def test_cli_remove_remote(self, tmp_path, sample_underfolder_minimnist):
+        from pipelime.cli.underfolder.operations import remove_remote
+        from urllib.parse import ParseResult
+
+        # input/output
+        input_folder = str(sample_underfolder_minimnist["folder"])
+
+        output_folder_a = tmp_path / "output_a"
+        output_folder_a.mkdir(parents=True)
+        output_folder_a = str(output_folder_a)
+
+        output_folder_b = tmp_path / "output_b"
+        output_folder_b.mkdir(parents=True)
+        output_folder_b = str(output_folder_b)
+
+        # data lakes
+        remote_root_a = tmp_path / "remote_a"
+        remote_root_a.mkdir(parents=True)
+        remote_root_a = remote_root_a.as_posix()
+
+        remote_root_b = tmp_path / "remote_b"
+        remote_root_b.mkdir(parents=True)
+        remote_root_b = remote_root_b.as_posix()
+
+        remote_urls = [
+            ParseResult(
+                scheme="file",
+                netloc="localhost",
+                path=remote_root_a,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+            ParseResult(
+                scheme="file",
+                netloc="",
+                path=remote_root_b,
+                params="",
+                query="",
+                fragment="",
+            ).geturl(),
+        ]
+
+        uploaded_keys = self._cli_upload(
+            input_folder,
+            output_folder_a,
+            remote_urls,
+        )
+
+        # remove remote_root_a
+        options = (
+            [
+                "-i",
+                output_folder_a,
+                "-o",
+                output_folder_b,
+                "--hardlink",
+                "-r",
+                remote_urls[0],
+            ]
+            + [a for k in uploaded_keys for a in ["-k", k]]
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(remove_remote, options)
+        assert result.exit_code == 0
+
+        # check local data
+        self._compare_dataset(input_folder, output_folder_b, uploaded_keys)
+
+        # make remote unavailable
+        Path(remote_root_b).rename(remote_root_b + "_")
+        import pytest
+
+        with pytest.raises(Exception):
+            self._compare_dataset(input_folder, output_folder_b, uploaded_keys)

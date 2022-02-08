@@ -847,7 +847,7 @@ def operation_remap_keys(
     writer(output_dataset)
 
 
-@click.command("upload", help="Upload underfolder data to remote")
+@click.command("remote_add", help="Upload underfolder data to remote")
 @click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
 @click.option(
     "-r",
@@ -947,6 +947,81 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
             else UnderfolderWriterV2.CopyMode.DEEP_COPY
         ),
         reader_template=template,
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
+    )
+    writer(sseq)
+
+
+@click.command("remote_remove", help="Remove remote from list")
+@click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
+@click.option(
+    "-r",
+    "--remote",
+    required=True,
+    multiple=True,
+    help="For each remote you must provide "
+    "'<scheme>://<netloc>/<base_path>' (repeat for each remote)",
+)
+@click.option(
+    "-k",
+    "--key",
+    required=True,
+    multiple=True,
+    help="Keys to upload (repeat for each key)",
+)
+@click.option(
+    "--copy",
+    "copy_mode",
+    flag_value="copy",
+    help="Always deep copy source data (default)",
+    default=True,
+)
+@click.option(
+    "--symlink", "copy_mode", flag_value="symlink", help="Sym-link source data"
+)
+@click.option(
+    "--hardlink", "copy_mode", flag_value="hardlink", help="Hard-link source data"
+)
+@click.option(
+    "-o", "--output_folder", required=True, type=str, help="Output Underfolder"
+)
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def remove_remote(input_folder, remote, key, copy_mode, output_folder):
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+    from pipelime.sequences.samples import SamplesSequence
+    from pipelime.sequences.stages import StageRemoveRemote, RemoteParams
+    from urllib.parse import urlparse, unquote_plus
+
+    remote_params = [urlparse(rm) for rm in remote]
+    remote_params = [
+        RemoteParams(
+            scheme=rm.scheme,
+            netloc=rm.netloc,
+            base_path=unquote_plus(rm.path)[1:],
+        )
+        for rm in remote_params
+    ]
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    sseq = SamplesSequence(
+        dataset,
+        stage=StageRemoveRemote(
+            remotes=remote_params,
+            key_list=key,
+        ),
+    )
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+        if copy_mode == "hardlink"
+        else (
+            UnderfolderWriterV2.CopyMode.SYM_LINK
+            if copy_mode == "symlink"
+            else UnderfolderWriterV2.CopyMode.DEEP_COPY
+        ),
+        reader_template=dataset.get_reader_template(),
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(sseq)
