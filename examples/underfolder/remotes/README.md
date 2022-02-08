@@ -26,7 +26,8 @@ pipelime underfolder remote_remove -i path/to/input -o path/to/output -r s3://17
 
 Note that the file is **not** removed on the remote.
 
-Reading a dataset with data on remotes is straightforward, provided that at list one remote is accessible. Then, actual data can be easily cached:
+Reading a dataset with data on remotes is straightforward, provided that at list one
+remote is accessible. Then, actual data can be easily cached:
 
 ```python
 reader = UnderfolderReader("path/to/dataset")
@@ -41,5 +42,18 @@ cached_seq = CachedSamplesSequence(
 )
 ```
 
-The first iteration over `cached_seq` will _transparently_ download the data from the remote, then subsequent calls will just pick the cached binary files. This way, a simple git-clone
+The first iteration over `cached_seq` will _transparently_ download the data from the remote,
+then subsequent calls will just pick the cached binary files. This way, a simple git-clone
 of the data repository can be enough to share any binary dataset.
+
+### WARNING
+
+The remote must be accessible in order to retrieve any data. If you need to, eg, set the
+access and secret keys of an S3 data server from code, make sure to create the remote
+interface _before_ iterating over the data:
+
+```python
+from pipelime.filesystem.remotes import create_remote
+
+create_remote("s3", "172.218.0.0:9000", access_key='user', secret_key='pwd', secure_connection=False)
+```
