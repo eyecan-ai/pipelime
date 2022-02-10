@@ -6,7 +6,6 @@ import uuid
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import click
-from pytest import raises
 import yaml
 from loguru import logger
 from yaml.scanner import ScannerError

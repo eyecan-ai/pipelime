@@ -34,6 +34,8 @@ class FSToolkit(object):
 
     PICKLE_EXT = ("pkl", "pickle")
 
+    BINARY_EXT = ("bin",)
+
     REMOTE_EXT = ("plr", "rmt", "remote")
 
     # Declare TREE structure
@@ -131,6 +133,11 @@ class FSToolkit(object):
         return ext in cls.PICKLE_EXT
 
     @classmethod
+    def is_binary_file(cls, filename: str):
+        ext = cls.get_file_extension(filename)
+        return ext in cls.BINARY_EXT
+
+    @classmethod
     def _download_from_remote_list(
         cls, remote_list: Union[Sequence[str], TextIO]
     ) -> Tuple[str, BytesIO]:
@@ -186,7 +193,7 @@ class FSToolkit(object):
     @classmethod
     def load_data_from_stream(
         cls, data_stream: BinaryIO, extension: str
-    ) -> Union[None, np.ndarray, dict]:
+    ) -> Union[None, np.ndarray, dict, bytes]:
         if cls.is_image_file(data_stream):
             return np.array(imageio.imread(data_stream))
 
@@ -208,6 +215,10 @@ class FSToolkit(object):
                 lambda: pickle.load(data_stream),
             ),
             (
+                lambda: extension in cls.BINARY_EXT,
+                lambda: data_stream.read(),
+            ),
+            (
                 lambda: extension in cls.NUMPY_TXT_EXT,
                 lambda: np.atleast_2d(cls._numpy_load_txt(data_stream)),
             ),
@@ -225,7 +236,7 @@ class FSToolkit(object):
     @classmethod
     def load_remote_data(
         cls, remote_list: Sequence[str]
-    ) -> Union[None, np.ndarray, dict]:
+    ) -> Union[None, np.ndarray, dict, bytes]:
         try:
             extension, data_stream = cls._download_from_remote_list(remote_list)
             data = cls.load_data_from_stream(data_stream, extension)
@@ -236,7 +247,7 @@ class FSToolkit(object):
         raise NotImplementedError(f"Unknown data extension: {extension}")
 
     @classmethod
-    def load_data(cls, filename: str) -> Union[None, np.ndarray, dict]:
+    def load_data(cls, filename: str) -> Union[None, np.ndarray, dict, bytes]:
         """Load data from file based on its extension
 
         :param filename: target filename
@@ -308,6 +319,10 @@ class FSToolkit(object):
                 (
                     lambda: DataCoding.is_pickle_extension(extension),
                     lambda: pickle.dump(data, data_stream),
+                ),
+                (
+                    lambda: extension in cls.BINARY_EXT,
+                    lambda: data_stream.write(data),
                 ),
                 (
                     lambda: extension in cls.REMOTE_EXT,

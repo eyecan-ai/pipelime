@@ -143,17 +143,17 @@ class StageAugmentations(SampleStage):
     def __call__(self, x: Sample) -> Sample:
 
         try:
-            out = x.copy()
+            x = x.copy()
             to_transform = {}
-            for k, data in x.items():
+            for k in x.keys():
                 if k in self._targets:
-                    to_transform[k] = data
+                    to_transform[k] = x[k]
 
             _transformed = self._transform(**to_transform)
             for k in self._targets.keys():
-                out[k] = _transformed[k]
+                x[k] = _transformed[k]
 
-            return out
+            return x
         except Exception as e:
             raise Exception(f"Stage[{self.__class__.__name__}] -> {e}")
 
