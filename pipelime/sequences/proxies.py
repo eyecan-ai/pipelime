@@ -235,3 +235,32 @@ class SortedSamplesSequence(SamplesSequence):
         elif source.stage is not None:
             stage = StageCompose([source.stage, stage])
         super().__init__(sorted(source.samples, key=key_fn), stage)
+
+
+class SlicedSamplesSequence(SamplesSequence):
+    def __init__(
+        self,
+        source: SamplesSequence,
+        start_idx: Optional[int] = None,
+        end_idx: Optional[int] = None,
+        step: Optional[int] = None,
+        stage: Optional[SampleStage] = None,
+    ):
+        """Extract a slice [start_idx:end_idx:step] from the input sequence.
+
+        Args:
+            source (SamplesSequence): the SamplesSequence to slice.
+            start_idx (Optional[int], optional): the first index.
+                Defaults to None (ie, first element).
+            end_idx (Optional[int], optional): the final index.
+                Defaults to None (ie, last element).
+            step_idx (Optional[int], optional): the slice step.
+                Defaults to None (ie, 1).
+            stage (Optional[SampleStage], optional): a Stage to apply to the samples.
+                Defaults to None.
+        """
+        if stage is None:
+            stage = source.stage
+        elif source.stage is not None:
+            stage = StageCompose([source.stage, stage])
+        super().__init__(source.samples[start_idx:end_idx:step], stage)

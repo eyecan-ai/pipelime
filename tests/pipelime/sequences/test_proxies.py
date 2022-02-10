@@ -255,3 +255,18 @@ class TestSequenceProxy:
             for k, v in out_item.items():
                 assert k in src_item
                 assert v == src_item[k]
+
+    def test_sliced_seq_proxy(self):
+        n_items = 10
+        src = self._make_random_source(n_items)
+
+        slc_sseq = sp.SlicedSamplesSequence(
+            src, 2, 9, 3
+        )
+
+        sliced_src = src.samples[2:9:3]
+        assert len(slc_sseq) == len(sliced_src)
+        for src_item, out_item in zip(sliced_src, slc_sseq):
+            for k, v in out_item.items():
+                assert k in src_item
+                assert v == src_item[k]
