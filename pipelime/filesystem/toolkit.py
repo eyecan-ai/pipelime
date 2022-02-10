@@ -236,7 +236,7 @@ class FSToolkit(object):
     @classmethod
     def load_remote_data(
         cls, remote_list: Sequence[str]
-    ) -> Union[None, np.ndarray, dict]:
+    ) -> Union[None, np.ndarray, dict, bytes]:
         try:
             extension, data_stream = cls._download_from_remote_list(remote_list)
             data = cls.load_data_from_stream(data_stream, extension)

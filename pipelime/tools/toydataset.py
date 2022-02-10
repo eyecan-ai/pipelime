@@ -121,6 +121,7 @@ class ToyDatasetGenerator(object):
             bboxes.append(box)
             keypoints.extend(kps)
 
+        rnd_bin = np.random.randint(1024)
         data = self.generate_2d_objects_images(size, objects)
         data.update(
             {
@@ -128,6 +129,7 @@ class ToyDatasetGenerator(object):
                 "keypoints": keypoints,
                 "label": np.random.randint(max_label + 1),
                 "id": str(uuid.uuid1()),
+                "bin": rnd_bin.to_bytes((rnd_bin.bit_length() + 7) // 8, "big"),
             }
         )
         return data
@@ -166,6 +168,7 @@ class ToyDatasetGenerator(object):
                 f"keypoints{suffix}": sample["keypoints"],
                 f"label{suffix}": sample["label"],
                 f"id{suffix}": sample["id"],
+                f"bin{suffix}": int.from_bytes(sample["bin"], "big"),
                 f"index{suffix}": idx,
                 f"suffix": suffix,
             }
@@ -178,8 +181,12 @@ class ToyDatasetGenerator(object):
             mask_name = f"{name}_mask{suffix}.png"
             instances_name = f"{name}_inst{suffix}.png"
             metadata_name = f"{name}_metadata{suffix}.yml"
+            metadataj_name = f"{name}_metadataj{suffix}.json"
+            # metadatat_name = f"{name}_metadatat{suffix}.toml"
             keypoints_name = f"{name}_keypoints{suffix}.txt"
+            keypointsp_name = f"{name}_keypointsp{suffix}.pickle"
             bboxes_name = f"{name}_bboxes{suffix}.npy"
+            bin_name = f"{name}_bin{suffix}.bin"
 
             FSToolkit.store_data(str(output_folder / image_name), sample["rgb"])
             FSToolkit.store_data(str(output_folder / mask_name), sample["mask"])
@@ -189,5 +196,11 @@ class ToyDatasetGenerator(object):
             FSToolkit.store_data(
                 str(output_folder / keypoints_name), sample["keypoints"]
             )
+            FSToolkit.store_data(
+                str(output_folder / keypointsp_name), sample["keypoints"]
+            )
             FSToolkit.store_data(str(output_folder / bboxes_name), sample["bboxes"])
+            FSToolkit.store_data(str(output_folder / bin_name), sample["bin"])
             FSToolkit.store_data(str(output_folder / metadata_name), metadata)
+            FSToolkit.store_data(str(output_folder / metadataj_name), metadata)
+            # FSToolkit.store_data(str(output_folder / metadatat_name), metadata)
