@@ -187,7 +187,9 @@ class PlainSample(Sample):
 
 
 class FileSystemSample(Sample):
-    def __init__(self, data_map: MutableMapping[str, str], lazy: bool = True, id: Hashable = None):
+    def __init__(
+        self, data_map: MutableMapping[str, str], lazy: bool = True, id: Hashable = None
+    ):
         """Creates a FileSystemSample based on a key/filename map
 
         :param data_map: key/filename map
@@ -253,6 +255,8 @@ class FileSystemSample(Sample):
             self._filesmap[new_key] = self._filesmap.pop(old_key)
             if old_key in self._cached:
                 self._cached[new_key] = self._cached.pop(old_key)
+        if new_key not in self._cached and old_key in self._cached:
+            self._cached[new_key] = self._cached.pop(old_key)
 
     def metaitem(self, key: Any):
         if key in self._filesmap:
