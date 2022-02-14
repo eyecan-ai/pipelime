@@ -10,21 +10,18 @@ pipelime piper execute -i dag.yml -p params.yml
 
 The demo graph should execute this kind of dag:
 
-```
-┌───────────┐    ┌───────────┐    ┌────────────┐
-│ Toy       │    │ Subsample │    │ Detection  │
-│ Generator ├────►           ├────►            ├───┐
-└───────────┘    └───────────┘    └────────────┘   │
-                                                   │
-┌───────────┐    ┌───────────┐    ┌────────────┐   │ ┌────────────┐
-│ Toy       │    │ Subsample │    │ Detection  │   │ │ Summation  │
-│ Generator ├────►           ├────►            ├───┼─►            │
-└───────────┘    └───────────┘    └────────────┘   │ └────────────┘
-                                                   │
-┌───────────┐    ┌───────────┐    ┌────────────┐   │
-│ Toy       │    │ Subsample │    │ Detection  ├───┘
-│ Generator ├────►           ├────►            │
-└───────────┘    └───────────┘    └────────────┘
+
+```mermaid
+  graph TD;
+      id0[(ToyGenerator_0)]-->Subsample_0;
+      id1[(ToyGenerator_1)]-->Subsample_1;
+      id2[(ToyGenerator_2)]-->Subsample_2;
+      Subsample_0-->Detection_0;
+      Subsample_1-->Detection_1;
+      Subsample_2-->Detection_2;
+      Detection_0-->Summation;
+      Detection_1-->Summation;
+      Detection_2-->Summation;
 ```
 
 As described in **dag.yml** file. The Dag shows the execution of mixed underfolder baked
