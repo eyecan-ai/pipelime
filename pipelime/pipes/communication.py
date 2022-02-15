@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Callable
 from choixe.bulletins import BulletinBoard, Bulletin
 from loguru import logger
 
@@ -17,14 +18,24 @@ class PiperCommunicationChannel(ABC):
         return self._token
 
     @abstractmethod
-    def send(self, id: str, payload: any):
+    def send(self, id: str, payload: any) -> bool:
         """Send a value to the communication channel.
 
         :param id: sender id
         :type id: str
         :param payload: payload to send
         :type payload: any
+        :return: True if send was successful
+        :rtype: bool
         """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def register_callback(self, callback: Callable) -> bool:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def listen(self) -> None:
         raise NotImplementedError()
 
 
@@ -81,3 +92,15 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
             )
             return True
         return False
+
+    def register_callback(self, callback: Callable) -> bool:
+        def bulletin_helper(bulletin: Bulletin) -> None:
+            callback(bulletin.metadata)
+
+        if self.valid:
+            self._client.register_callback(bulletin_helper)
+            return True
+        return False
+
+    def listen(self) -> None:
+        self._client.wait_for_bulletins()
