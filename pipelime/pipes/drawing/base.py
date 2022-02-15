@@ -12,3 +12,7 @@ class NodesGraphDrawer(ABC):
     @abstractmethod
     def draw(self, graph: DAGNodesGraph) -> np.ndarray:
         raise NotImplementedError()
+
+    @abstractmethod
+    def representation(self, graph: DAGNodesGraph) -> str:
+        raise NotImplementedError()

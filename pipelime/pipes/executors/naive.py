@@ -2,10 +2,14 @@ from pathlib import Path
 import subprocess
 from typing import Any, Dict, List, Sequence, Tuple
 import rich
+from pipelime.pipes.communication import (
+    PiperCommunicationChannel,
+    PiperCommunicationChannelFactory,
+)
 from pipelime.pipes.executors.base import NodeModelExecutionParser, NodesGraphExecutor
 from pipelime.pipes.graph import GraphNodeOperation, DAGNodesGraph
 from pipelime.pipes.model import NodeModel
-from pipelime.pipes.piper import PiperNamespace
+from pipelime.pipes.piper import Piper, PiperCommand, PiperNamespace
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.validation import OperationValidate, SampleSchema, SchemaLoader
 from loguru import logger
@@ -136,6 +140,7 @@ class NaiveGraphExecutor(NodesGraphExecutor):
 
                     schema_file = SchemaLoader.load(schema_file)
                     try:
+
                         op = OperationValidate(sample_schema=schema_file)
                         op(reader)
                     except SampleSchema.ValidationError as e:
@@ -206,10 +211,14 @@ class NaiveGraphExecutor(NodesGraphExecutor):
 
         parser = NaiveNodeModelExecutionParser()
         self._validated_paths.clear()
+        channel: PiperCommunicationChannel = (
+            PiperCommunicationChannelFactory.create_channel(token=token)
+        )
 
         for layer in graph.build_execution_stack():
             for node in layer:
                 node: GraphNodeOperation
+
                 command_chunks: List = parser.build_command_chunks(
                     node_model=node.node_model
                 )

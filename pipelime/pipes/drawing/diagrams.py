@@ -76,3 +76,6 @@ class DiagramsNodesGraphDrawer(NodesGraphDrawer):
             pass
         img = imageio.imread(f"{f.name}.png")
         return img
+
+    def representation(self, graph: DAGNodesGraph) -> str:
+        raise NotImplementedError(f"Diagrams does not support representation")
