@@ -1,5 +1,6 @@
 import functools
 import hashlib
+from itertools import count
 from typing import Dict, Optional, Sequence
 import uuid
 
@@ -589,6 +590,13 @@ class TestOperationFilterByScript(object):
 
 
 class TestMappableOperation(object):
+    class CountCallback:
+        def __init__(self):
+            self.counter = 0
+
+        def __call__(self, data: dict) -> None:
+            self.counter += 1
+
     class OperationPlusOne(MappableOperation):
         def __init__(self, key: str, **kwargs) -> None:
             super().__init__(**kwargs)
@@ -616,10 +624,16 @@ class TestMappableOperation(object):
         key = "number"
 
         dataset = plain_samples_sequence_generator("d0_", N)
-        op = self.OperationPlusOne(key, progress_bar=pb, num_workers=workers)
+        callback = self.CountCallback()
+        op = self.OperationPlusOne(
+            key, progress_bar=pb, num_workers=workers, progress_callback=callback
+        )
 
         out = op(dataset)
         _plug_test(op, check_serialization=False)
+
+        # Check callback was called the right number of times
+        assert callback.counter == len(dataset)
 
         expected_numbers = [x[key] + 1 for x in dataset]
         out_numbers = [x[key] for x in out]
@@ -629,10 +643,12 @@ class TestMappableOperation(object):
         for x, y in zip(expected_numbers, out_numbers):
             assert x == y, (expected_numbers, out_numbers)
 
-        op = self.OperationLessThan10(key)
+        callback = self.CountCallback()
+        op = self.OperationLessThan10(key, progress_callback=callback)
         out = op(dataset)
 
         assert len(out) == 10
+        assert callback.counter == len(dataset)
 
 
 class TestOperationStage(object):

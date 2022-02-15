@@ -12,7 +12,7 @@ import pydash as py_
 import rich
 from choixe.spooks import Spook
 from loguru import logger
-from rich.progress import track
+from pipelime.tools.progress import pipelime_track
 from schema import Or, Schema
 
 from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
@@ -138,7 +138,12 @@ class MappableOperation(SequenceOperation):
     kind of operation.
     """
 
-    def __init__(self, num_workers: int = 0, progress_bar: bool = False) -> None:
+    def __init__(
+        self,
+        num_workers: int = 0,
+        progress_bar: bool = False,
+        progress_callback: Optional[Callable[[dict], None]] = None,
+    ) -> None:
         """Constructor for `MappableOperation` subclasses
 
         :param num_workers: the number of multiprocessing workers, set to -1 to spawn as
@@ -146,10 +151,14 @@ class MappableOperation(SequenceOperation):
         :type num_workers: int, optional
         :param progress_bar: Enable/disable rich progress bar printing on stdout, defaults to False
         :type progress_bar: bool, optional
+        :param progress_callback: callback function to call with progress information,
+        defaults to None
+        :type progress_callback: Optional[Callable[[dict], None]], optional
         """
         super().__init__()
         self._num_workers = num_workers
         self._progress_bar = progress_bar
+        self._progress_callback = progress_callback
         self.pbar_desc = f"{self.__class__.__name__}..."
 
     def input_port(self) -> OperationPort:
@@ -179,12 +188,19 @@ class MappableOperation(SequenceOperation):
             pool = multiprocessing.Pool(processes=num_workers)
             new_sequence = pool.imap(self.apply_to_sample, x)
 
-            if self._progress_bar:
-                new_sequence = track(new_sequence, total=total)
+            new_sequence = pipelime_track(
+                new_sequence,
+                total=total,
+                track_callback=self._progress_callback,
+                disable=not self._progress_bar,
+            )
 
         else:
-            if self._progress_bar:
-                x = track(x)
+            x = pipelime_track(
+                x,
+                track_callback=self._progress_callback,
+                disable=not self._progress_bar,
+            )
 
             for sample in x:
                 new_sample = self.apply_to_sample(sample)
