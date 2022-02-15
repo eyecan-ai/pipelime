@@ -2,8 +2,9 @@ import os
 from typing import Dict, Sequence
 from pathlib import Path
 from pipelime.converters.base import UnderfolderConverter
+from pipelime.sequences.readers.base import ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample, SamplesSequence
-from pipelime.sequences.writers.filesystem import UnderfolderWriter
+from pipelime.sequences.writers.filesystem import UnderfolderWriter, UnderfolderWriterV2
 import re
 
 
@@ -152,16 +153,17 @@ class Subfolders2Underfolder(UnderfolderConverter):
             sample["classmap"] = self._classmap
             samples.append(sample)
 
-        writer = UnderfolderWriter(
+        writer = UnderfolderWriterV2(
             folder=output_folder,
-            root_files_keys=["classmap"],
-            extensions_map={
-                "image": self._images_extension,
-                "metadata": "yml",
-                "classmap": "yml",
-            },
-            copy_files=True,
-            use_symlinks=self._use_symlinks,
+            file_handling=UnderfolderWriterV2.FileHandling.COPY_IF_NOT_CACHED,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
+            reader_template=ReaderTemplate(
+                extensions_map={
+                    "image": self._images_extension,
+                    "metadata": "yml",
+                    "classmap": "yml",
+                },
+            ),
             num_workers=self._num_workers,
         )
         writer(SamplesSequence(samples=samples))
