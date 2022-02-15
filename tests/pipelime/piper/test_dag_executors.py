@@ -20,7 +20,6 @@ class TestNaiveGraphExecutor:
         something_checked_control = False
 
         for dag_name, item in piper_dags.items():
-
             folder = item["folder"]
             valid = item.get("valid", False)
             graph = item.get("graph", False)

@@ -90,6 +90,25 @@ def piper_dags(data_folder, piper_commands, tmp_path_factory: pytest.TempPathFac
                 "exception": SampleSchema.ValidationError,
             },
         },
+        "validation_error_noschema_file": {
+            "folder": base_path / "validation_error_noschema_file",
+            "valid": True,
+            "exception": None,
+            "graph": True,
+            "executable": {
+                # If success is TRUE a "final_validation.py" file is needed in the
+                # dag folder
+                "success": False,
+                "executable_placeholders": {
+                    "OUTPUT_FOLDER": tmp_path_factory.mktemp("output_folder"),
+                    "SIZE": 10,
+                    "SCHEMA_GENERATED": base_path
+                    / "validation_error_noschema_file"
+                    / "schema_generated.schema",
+                },
+                "exception": SampleSchema.ValidationError,
+            },
+        },
         "no_params": {
             "folder": base_path / "no_params",
             "valid": True,

@@ -129,8 +129,12 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 reader = UnderfolderReader(folder=path)
                 if schema_file is not None:
 
-                    schema_file = SchemaLoader.load(schema_file)
+                    if not Path(schema_file).exists():
+                        raise SampleSchema.ValidationError(
+                            f'Schema file "{schema_file}" not found'
+                        )
 
+                    schema_file = SchemaLoader.load(schema_file)
                     try:
                         op = OperationValidate(sample_schema=schema_file)
                         op(reader)
@@ -143,7 +147,7 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                     # Add path to validated paths to avoid validating it twice
                     self._validated_paths.add(path)
 
-            except FileNotFoundError:
+            except FileNotFoundError as e:
                 pass
 
         return True
