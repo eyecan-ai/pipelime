@@ -1,7 +1,13 @@
 from pathlib import Path
 from typing import Sequence
+
 import click
+
 from pipelime.pipes.piper import Piper, PiperCommand
+
+hardlink_option = click.option(
+    "--hardlink", is_flag=True, help="Use hardlinks for cached items"
+)
 
 
 @click.command("sum", help="Sum input underfolders")
@@ -27,16 +33,18 @@ from pipelime.pipes.piper import Piper, PiperCommand
     type=str,
     help="Convert a root file into an item to avoid conflicts [multiple]",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folders"], outputs=["output_folder"])
 def operation_sum(
     input_folders: Sequence[str],
     output_folder: str,
     convert_root_file: Sequence[str],
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import OperationResetIndices, OperationSum
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     pipercmd = PiperCommand.instance
 
@@ -52,15 +60,19 @@ def operation_sum(
 
         prototype_reader = datasets[0]
         template = prototype_reader.get_reader_template()
+        template.root_files_keys = list(
+            set(template.root_files_keys) - set(convert_root_file)
+        )
 
-        writer = UnderfolderWriter(
+        copy_mode = (
+            UnderfolderWriterV2.CopyMode.HARD_LINK
+            if hardlink
+            else UnderfolderWriterV2.CopyMode.DEEP_COPY
+        )
+        writer = UnderfolderWriterV2(
             folder=output_folder,
-            copy_files=True,
-            root_files_keys=list(
-                set(template.root_files_keys) - set(convert_root_file)
-            ),
-            extensions_map=template.extensions_map,
-            zfill=template.idx_length,
+            copy_mode=copy_mode,
+            reader_template=template,
             progress_callback=pipercmd.generate_progress_callback(),
         )
         writer(output_dataset)
@@ -82,16 +94,20 @@ def operation_sum(
     type=click.Path(),
     help="Output Underfolder",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folders"], outputs=["output_folder"])
 def operation_mix(
     input_folders: Sequence[str],
     output_folder: str,
+    hardlink: bool,
 ):
 
     from click import ClickException
+
     from pipelime.sequences.operations import OperationMix
+    from pipelime.sequences.readers.base import ReaderTemplate
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     if len(input_folders) > 0:
         datasets = [
@@ -110,16 +126,23 @@ def operation_mix(
 
         root_files = []
         ext_map = {}
+        idx_length = 0
         for d in datasets:
             template = d.get_reader_template()
             root_files.extend(template.root_files_keys)
             ext_map.update(template.extensions_map)
+            idx_length = max(idx_length, template.idx_length)
+        template = ReaderTemplate(ext_map, root_files, idx_length)
 
-        writer = UnderfolderWriter(
+        copy_mode = (
+            UnderfolderWriterV2.CopyMode.HARD_LINK
+            if hardlink
+            else UnderfolderWriterV2.CopyMode.DEEP_COPY
+        )
+        writer = UnderfolderWriterV2(
             folder=output_folder,
-            copy_files=True,
-            root_files_keys=root_files,
-            extensions_map=ext_map,
+            copy_mode=copy_mode,
+            reader_template=template,
             progress_callback=PiperCommand.instance.generate_progress_callback(),
         )
         writer(output_dataset)
@@ -154,17 +177,19 @@ def operation_mix(
     type=click.Path(),
     help="Output Underfolder",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_subsample(
     input_folder: str,
     factor: float,
     start: float,
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import OperationResetIndices, OperationSubsample
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -179,11 +204,15 @@ def operation_subsample(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_subsample(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -211,18 +240,20 @@ def operation_subsample(
     type=int,
     help="Random seed",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_shuffle(
     input_folder: str,
     output_folder: str,
     seed: int,
+    hardlink: bool,
 ):
 
     PiperCommand.instance
 
     from pipelime.sequences.operations import OperationResetIndices, OperationShuffle
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
@@ -232,11 +263,15 @@ def operation_shuffle(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_shuffle(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -266,17 +301,20 @@ def operation_shuffle(
     type=float,
     help="Splits percentages [multple]",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folders"])
 def operation_split(
     input_folder: str,
     output_folders: Sequence[str],
     splits: Sequence[float],
+    hardlink: bool,
 ):
 
     from functools import reduce
+
     from pipelime.sequences.operations import OperationResetIndices, OperationSplits
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -299,12 +337,16 @@ def operation_split(
     op_reindex = OperationResetIndices()
     output_datasets_map = op_splits(dataset)
 
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
     for index, (path, dataset) in enumerate(output_datasets_map.items()):
-        writer = UnderfolderWriter(
+        writer = UnderfolderWriterV2(
             folder=path,
-            copy_files=True,
-            root_files_keys=template.root_files_keys,
-            extensions_map=template.extensions_map,
+            copy_mode=copy_mode,
+            reader_template=template,
             progress_callback=PiperCommand.instance.generate_progress_callback(
                 chunk_index=index,
                 total_chunks=len(output_datasets_map),
@@ -335,11 +377,13 @@ def operation_split(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterbyquery(
     input_folder: str,
     query: str,
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import (
@@ -347,7 +391,7 @@ def operation_filterbyquery(
         OperationResetIndices,
     )
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -359,11 +403,15 @@ def operation_filterbyquery(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_filterbyquery(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -398,6 +446,7 @@ def operation_filterbyquery(
     type=click.Path(),
     help="Output Underfolder for negative matches",
 )
+@hardlink_option
 @Piper.command(
     inputs=["input_folder"],
     outputs=["output_folder_1", "output_folder_2"],
@@ -407,6 +456,7 @@ def operation_splitbyquery(
     query: str,
     output_folder_1: str,
     output_folder_2: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import (
@@ -414,7 +464,7 @@ def operation_splitbyquery(
         OperationSplitByQuery,
     )
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -428,14 +478,18 @@ def operation_splitbyquery(
 
     output_folders = [output_folder_1, output_folder_2]
 
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
     for index, (output_folder, output_dataset) in enumerate(
         zip(output_folders, output_datasets)
     ):
-        writer = UnderfolderWriter(
+        writer = UnderfolderWriterV2(
             folder=output_folder,
-            copy_files=True,
-            root_files_keys=template.root_files_keys,
-            extensions_map=template.extensions_map,
+            copy_mode=copy_mode,
+            reader_template=template,
             progress_callback=PiperCommand.instance.generate_progress_callback(
                 chunk_index=index, total_chunks=len(output_folders)
             ),
@@ -465,11 +519,13 @@ def operation_splitbyquery(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterbyscript(
     input_folder: str,
     script: str,
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import (
@@ -477,7 +533,7 @@ def operation_filterbyscript(
         OperationResetIndices,
     )
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -489,11 +545,15 @@ def operation_filterbyscript(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_filterbyquery(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -528,17 +588,19 @@ def operation_filterbyscript(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_filterkeys(
     input_folder: str,
     keys: Sequence[str],
     negate: bool,
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import OperationFilterKeys, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -550,11 +612,15 @@ def operation_filterkeys(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_filterbyquery(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -583,16 +649,18 @@ def operation_filterkeys(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_orderby(
     input_folder: str,
     keys: Sequence[str],
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import OperationOrderBy, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -604,11 +672,15 @@ def operation_orderby(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_filterbyquery(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -643,11 +715,13 @@ def operation_orderby(
     type=str,
     help="Prefix for each output underfolder",
 )
+@hardlink_option
 def operation_split_by_value(
     input_folder: str,
     key: str,
     output_folder: str,
     output_prefix: str,
+    hardlink: bool,
 ):
 
     # #### CANNOT BE PIPER-ED!! DYNAMIC OUTPUTS PATHS SHOULD BE AVOIDED #####
@@ -659,7 +733,7 @@ def operation_split_by_value(
         OperationSplitByValue,
     )
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     dataset = UnderfolderReader(input_folder)
     template = dataset.get_reader_template()
@@ -668,13 +742,19 @@ def operation_split_by_value(
     splits = op_split(dataset)
 
     zfill = max(ceil(log10(len(splits) + 1)), 1)
+
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
     for i, split in enumerate(splits):
         op_reindex = OperationResetIndices()
         split = op_reindex(split)
-        UnderfolderWriter(
+        UnderfolderWriterV2(
             Path(output_folder) / f"{output_prefix}_{str(i).zfill(zfill)}",
-            root_files_keys=template.root_files_keys,
-            extensions_map=template.extensions_map,
+            copy_mode=copy_mode,
+            reader_template=template,
         )(split)
 
 
@@ -700,16 +780,18 @@ def operation_split_by_value(
     type=click.Path(),
     help="Output Underfolder for grouped dataset",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_groupby(
     input_folder: str,
     key: str,
     output_folder: str,
+    hardlink: bool,
 ):
 
     from pipelime.sequences.operations import OperationGroupBy, OperationResetIndices
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -720,9 +802,14 @@ def operation_groupby(
     op_reindex = OperationResetIndices()
     output_dataset = op_reindex(op_filterbyquery(dataset))
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
+        copy_mode=copy_mode,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -805,19 +892,19 @@ def summary(
     type=click.Path(),
     help="Output Underfolder for positive matches",
 )
+@hardlink_option
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_remap_keys(
     input_folder: str,
     keys: Sequence[str],
     remove_: bool,
     output_folder: str,
+    hardlink: bool,
 ):
 
-    from pipelime.sequences.operations import (
-        OperationRemapKeys,
-    )
+    from pipelime.sequences.operations import OperationRemapKeys
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriter
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     PiperCommand.instance
 
@@ -837,11 +924,15 @@ def operation_remap_keys(
     op = OperationRemapKeys(remap=keys_map, remove_missing=remove_)
     output_dataset = op(dataset)
 
-    writer = UnderfolderWriter(
+    copy_mode = (
+        UnderfolderWriterV2.CopyMode.HARD_LINK
+        if hardlink
+        else UnderfolderWriterV2.CopyMode.DEEP_COPY
+    )
+    writer = UnderfolderWriterV2(
         folder=output_folder,
-        copy_files=True,
-        root_files_keys=template.root_files_keys,
-        extensions_map=template.extensions_map,
+        copy_mode=copy_mode,
+        reader_template=template,
         progress_callback=PiperCommand.instance.generate_progress_callback(),
     )
     writer(output_dataset)
@@ -884,11 +975,12 @@ def operation_remap_keys(
 )
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
+    from urllib.parse import unquote_plus, urlparse
+
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
     from pipelime.sequences.samples import SamplesSequence
-    from pipelime.sequences.stages import StageUploadToRemote, RemoteParams
-    from urllib.parse import urlparse, unquote_plus
+    from pipelime.sequences.stages import RemoteParams, StageUploadToRemote
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     def _convert_val(val: str):
         if val == "True":
@@ -987,11 +1079,12 @@ def upload_to_remote(input_folder, remote, key, copy_mode, output_folder):
 )
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def remove_remote(input_folder, remote, key, copy_mode, output_folder):
+    from urllib.parse import unquote_plus, urlparse
+
     from pipelime.sequences.readers.filesystem import UnderfolderReader
-    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
     from pipelime.sequences.samples import SamplesSequence
-    from pipelime.sequences.stages import StageRemoveRemote, RemoteParams
-    from urllib.parse import urlparse, unquote_plus
+    from pipelime.sequences.stages import RemoteParams, StageRemoveRemote
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 
     remote_params = [urlparse(rm) for rm in remote]
     remote_params = [
@@ -1074,7 +1167,7 @@ def remove_remote(input_folder, remote, key, copy_mode, output_folder):
 def dump(
     input_folder, output_folder, keys, negated, start, stop, step, format, link_type
 ):
-    from pipelime.cli.dump import dump_data, LinkType
+    from pipelime.cli.dump import LinkType, dump_data
     from pipelime.sequences.readers.filesystem import UnderfolderReader
 
     reader = UnderfolderReader(input_folder)
