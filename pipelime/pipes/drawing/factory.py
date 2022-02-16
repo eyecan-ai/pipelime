@@ -1,5 +1,4 @@
 from typing import Sequence
-from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
 from pipelime.pipes.drawing.graphviz import GraphvizNodesGraphDrawer
 from pipelime.pipes.drawing.mermaid import MermaidNodesGraphDrawer
 from pipelime.pipes.drawing.base import NodesGraphDrawer
@@ -8,7 +7,6 @@ from pipelime.pipes.drawing.base import NodesGraphDrawer
 class NodesGraphDrawerFactory:
 
     FACTORY_MAP = {
-        "diagrams": DiagramsNodesGraphDrawer,
         "graphviz": GraphvizNodesGraphDrawer,
         "mermaid": MermaidNodesGraphDrawer,
     }
