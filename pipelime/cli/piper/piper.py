@@ -91,7 +91,6 @@ def draw(
     open: bool,
 ):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.filesystem.toolkit import FSToolkit
     from pipelime.pipes.graph import DAGNodesGraph
