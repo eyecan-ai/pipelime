@@ -1,6 +1,9 @@
+import json
 from abc import ABC, abstractmethod
 from typing import Callable
-from choixe.bulletins import BulletinBoard, Bulletin
+
+import redis
+from choixe.bulletins import Bulletin, BulletinBoard
 from loguru import logger
 
 
@@ -31,18 +34,21 @@ class PiperCommunicationChannel(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def register_callback(self, callback: Callable) -> bool:
+    def register_callback(self, callback: Callable[[dict], None]) -> bool:
+        """Register a callback to call every time a message is received"""
         raise NotImplementedError()
 
     @abstractmethod
     def listen(self) -> None:
+        """Wait for new messages"""
         raise NotImplementedError()
 
 
 class PiperCommunicationChannelFactory:
     @classmethod
     def create_channel(cls, token: str) -> PiperCommunicationChannel:
-        return PiperCommunicationChannelBulletinBoard(token)
+        # return PiperCommunicationChannelBulletinBoard(token)
+        return PiperCommunicationChannelRedis(token)
 
 
 class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
@@ -93,7 +99,7 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
             return True
         return False
 
-    def register_callback(self, callback: Callable) -> bool:
+    def register_callback(self, callback: Callable[[dict], None]) -> bool:
         def bulletin_helper(bulletin: Bulletin) -> None:
             callback(bulletin.metadata)
 
@@ -104,3 +110,45 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
 
     def listen(self) -> None:
         self._client.wait_for_bulletins()
+
+
+class PiperCommunicationChannelRedis(PiperCommunicationChannel):
+    def __init__(self, token: str) -> None:
+        super().__init__(token)
+
+        self._db = None
+
+        try:
+            self._db = redis.Redis()
+            self._pubsub = self._db.pubsub()
+        except Exception as e:
+            logger.error(f"{self.__class__.__name__} No Redis server!|{e}")
+
+    @property
+    def valid(self) -> bool:
+        return self._db is not None
+
+    def send(self, id: str, payload: any) -> bool:
+        if self.valid:
+            data = {"id": id, "token": self._token, "payload": payload}
+            msg = json.dumps(data).encode("utf-8")
+            self._db.publish(self._token, msg)
+            return True
+        return False
+
+    def listen(self) -> None:
+        for _ in self._pubsub.listen():
+            pass
+
+    def register_callback(self, callback: Callable[[dict], None]) -> bool:
+
+        # Callback helper that converts bytes to dictionary before call
+        def redis_helper(msg: dict):
+            json_string = msg["data"].decode("utf-8")
+            data = json.loads(json_string)
+            callback(data)
+
+        if self.valid:
+            self._pubsub.subscribe(**{self._token: redis_helper})
+            return True
+        return False

@@ -64,25 +64,24 @@ def piper_watcher(token: str):
 
     tasks_map = {}
 
+    def callback(data: dict):
+        chunk_progress = ChunkProgress(
+            id=data["id"],
+            chunk_index=data["payload"]["_progress"]["chunk_index"],
+            progress=data["payload"]["_progress"]["progress_data"]["advance"]
+            / data["payload"]["_progress"]["progress_data"]["total"],
+        )
+
+        if chunk_progress.id not in tasks_map:
+            tasks_map[chunk_progress.id] = {}
+        if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
+            tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
+
+        tasks_map[chunk_progress.id][
+            chunk_progress.chunk_index
+        ] += chunk_progress.progress
+
     def listener_thread():
-        def callback(data: dict):
-
-            chunk_progress = ChunkProgress(
-                id=data["id"],
-                chunk_index=data["payload"]["_progress"]["chunk_index"],
-                progress=data["payload"]["_progress"]["progress_data"]["advance"]
-                / data["payload"]["_progress"]["progress_data"]["total"],
-            )
-
-            if chunk_progress.id not in tasks_map:
-                tasks_map[chunk_progress.id] = {}
-            if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
-                tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
-
-            tasks_map[chunk_progress.id][
-                chunk_progress.chunk_index
-            ] += chunk_progress.progress
-
         channel = PiperCommunicationChannelFactory.create_channel(token)
         channel.register_callback(callback)
         channel.listen()
