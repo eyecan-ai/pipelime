@@ -1,8 +1,6 @@
 from typing import Callable
 from pytest import TempPathFactory
 import pytest
-import rich
-from pipelime.pipes import executors
 from pipelime.pipes.parsers.factory import DAGConfigParserFactory
 from pipelime.pipes.graph import DAGNodesGraph
 from pipelime.pipes.executors.naive import (

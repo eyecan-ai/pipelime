@@ -1,3 +1,5 @@
+from typing import Sequence
+from pathlib import Path
 import numpy as np
 from pipelime.pipes.drawing.base import NodesGraphDrawer
 from pipelime.pipes.graph import (
@@ -7,9 +9,9 @@ from pipelime.pipes.graph import (
     DAGNodesGraph,
 )
 from tempfile import NamedTemporaryFile
-import imageio
 from diagrams.custom import Custom
 import pathlib
+import imageio
 
 
 def get_asset_path(asset_name) -> str:
@@ -78,4 +80,18 @@ class DiagramsNodesGraphDrawer(NodesGraphDrawer):
         return img
 
     def representation(self, graph: DAGNodesGraph) -> str:
-        raise NotImplementedError(f"Diagrams does not support representation")
+        return ""
+
+    def exportable_formats(self) -> Sequence[str]:
+        return ["png"]
+
+    def export(self, graph: DAGNodesGraph, filename: str, format: str):
+        super().export(graph, filename, format)
+
+        if format is None:
+            format = Path(filename).suffix[1:]
+
+        import imageio
+
+        img = self.draw(graph)
+        imageio.imwrite(filename, img)

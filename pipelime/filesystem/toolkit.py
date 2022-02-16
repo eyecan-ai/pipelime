@@ -353,3 +353,14 @@ class FSToolkit(object):
         finally:
             if data_stream is not None:
                 data_stream.close()
+
+    @classmethod
+    def start_file(cls, filename: str):
+        import subprocess, os, platform
+
+        if platform.system() == "Darwin":  # macOS
+            subprocess.call(("open", filename))
+        elif platform.system() == "Windows":  # Windows
+            os.startfile(filename)
+        else:  # linux variants #TODO: verify!
+            subprocess.call(("xdg-open", filename))
