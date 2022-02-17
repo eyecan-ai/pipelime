@@ -1,5 +1,6 @@
 import json
 from abc import ABC, abstractmethod
+import os
 from typing import Callable
 
 import redis
@@ -9,10 +10,10 @@ from loguru import logger
 
 class PiperCommunicationChannel(ABC):
     def __init__(self, token: str) -> None:
-        """Generics Piper communication channel.
+        """Generic Piper communication channel.
 
-        :param token: The token to use for the communication.
-        :type token: str
+        Args:
+            token (str): The token to use for the communication.
         """
         self._token = token
 
@@ -24,12 +25,12 @@ class PiperCommunicationChannel(ABC):
     def send(self, id: str, payload: any) -> bool:
         """Send a value to the communication channel.
 
-        :param id: sender id
-        :type id: str
-        :param payload: payload to send
-        :type payload: any
-        :return: True if send was successful
-        :rtype: bool
+        Args:
+            id (str): sender id
+            payload (any): payload to send
+
+        Returns:
+            bool: True if send was successful
         """
         raise NotImplementedError()
 
@@ -42,13 +43,6 @@ class PiperCommunicationChannel(ABC):
     def listen(self) -> None:
         """Wait for new messages"""
         raise NotImplementedError()
-
-
-class PiperCommunicationChannelFactory:
-    @classmethod
-    def create_channel(cls, token: str) -> PiperCommunicationChannel:
-        # return PiperCommunicationChannelBulletinBoard(token)
-        return PiperCommunicationChannelRedis(token)
 
 
 class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
@@ -113,7 +107,19 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
 
 
 class PiperCommunicationChannelRedis(PiperCommunicationChannel):
+    """`PiperCommunicationChannel` implementation for Redis backend.
+
+    It uses a redis client to send/receive messages using redis pub/sub implementation.
+    This channel needs an active redis instance. If no redis server is
+    available, the channel will not work and an error message will be logged.
+    """
+
     def __init__(self, token: str) -> None:
+        """Constructor for `PiperCommunicationChannelRedis`
+
+        Args:
+            token (str): The token to use for the communication.
+        """
         super().__init__(token)
 
         self._db = None
@@ -152,3 +158,38 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
             self._pubsub.subscribe(**{self._token: redis_helper})
             return True
         return False
+
+
+class PiperCommunicationChannelFactory:
+    """Factory for `PiperCommunicationChannel` objects"""
+
+    CHANNEL_TYPE_VARNAME = "PIPELINE_PIPER_CHANNEL_TYPE"
+    """Name of the environment variable with the channel type"""
+
+    BULLETIN_BOARD = "BULLETIN"
+    """Channel type env value for Choixe BulletinBoard"""
+    REDIS = "REDIS"
+    """Channel type env value for Redis"""
+
+    _default_channel_cls = PiperCommunicationChannelBulletinBoard
+
+    _cls_map = {
+        BULLETIN_BOARD: PiperCommunicationChannelBulletinBoard,
+        REDIS: PiperCommunicationChannelRedis,
+    }
+
+    @classmethod
+    def create_channel(cls, token: str) -> PiperCommunicationChannel:
+        """Instantiates a `PiperCommunicationChannel` with a given token.
+        The type of the returned channel can be controlled by setting an environment
+        variable.
+
+        Args:
+            token (str): The token used for communication
+
+        Returns:
+            PiperCommunicationChannel: The instanced communication channel
+        """
+        channel_type = os.getenv(cls.CHANNEL_TYPE_VARNAME)
+        channel_cls = cls._cls_map.get(channel_type, cls._default_channel_cls)
+        return channel_cls(token)
