@@ -1,8 +1,6 @@
 from typing import Optional
 import click
 
-from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
-
 
 @click.group()
 def piper():
@@ -68,7 +66,8 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
 @click.option(
     "-b",
     "--draw_backend",
-    type=click.Choice(NodesGraphDrawerFactory.available_backends()),
+    # TODO: don't use factory list to avoid missing dependencies check on Workflows
+    type=click.Choice(["graphviz", "mermaid"]),
     default="diagrams",
 )
 @click.option(
@@ -91,6 +90,7 @@ def draw(
     open: bool,
 ):
 
+    from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.filesystem.toolkit import FSToolkit
     from pipelime.pipes.graph import DAGNodesGraph
