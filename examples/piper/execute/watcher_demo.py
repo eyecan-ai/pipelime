@@ -1,12 +1,13 @@
-from choixe.bulletins import BulletinBoard, Bulletin
+import threading
+import time
+
 import click
 from pydantic import BaseModel
 import rich
-import random
-import time
 from rich.live import Live
 from rich.table import Table
-import threading
+
+from pipelime.pipes.communication import PiperCommunicationChannelFactory
 
 
 def percentage_string(v: float):
@@ -64,32 +65,30 @@ def piper_watcher(token: str):
 
     tasks_map = {}
 
-    def bulletin_thread():
-        def bulletin_update(bulletin: Bulletin):
+    def callback(data: dict):
+        chunk_progress = ChunkProgress(
+            id=data["id"],
+            chunk_index=data["payload"]["_progress"]["chunk_index"],
+            progress=data["payload"]["_progress"]["progress_data"]["advance"]
+            / data["payload"]["_progress"]["progress_data"]["total"],
+        )
 
-            chunk_progress = ChunkProgress(
-                id=bulletin.metadata["id"],
-                chunk_index=bulletin.metadata["payload"]["_progress"]["chunk_index"],
-                progress=bulletin.metadata["payload"]["_progress"]["progress_data"][
-                    "advance"
-                ]
-                / bulletin.metadata["payload"]["_progress"]["progress_data"]["total"],
-            )
+        if chunk_progress.id not in tasks_map:
+            tasks_map[chunk_progress.id] = {}
+        if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
+            tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
 
-            if chunk_progress.id not in tasks_map:
-                tasks_map[chunk_progress.id] = {}
-            if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
-                tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
+        tasks_map[chunk_progress.id][
+            chunk_progress.chunk_index
+        ] += chunk_progress.progress
 
-            tasks_map[chunk_progress.id][
-                chunk_progress.chunk_index
-            ] += chunk_progress.progress
+    def listener_thread():
+        channel = PiperCommunicationChannelFactory.create_channel(token)
+        rich.print(f"Channel class: {channel.__class__}")
+        channel.register_callback(callback)
+        channel.listen()
 
-        main_board = BulletinBoard(session_id=token)
-        main_board.register_callback(bulletin_update)
-        main_board.wait_for_bulletins()
-
-    thread = threading.Thread(target=bulletin_thread, daemon=True)
+    thread = threading.Thread(target=listener_thread, daemon=True)
     thread.start()
 
     with Live(generate_table(tasks_map), refresh_per_second=4) as live:
