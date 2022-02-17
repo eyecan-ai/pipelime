@@ -1,3 +1,4 @@
+from calendar import c
 from typing import Optional
 import click
 
@@ -7,18 +8,24 @@ def piper():
     pass
 
 
-@piper.command("compile")
+@piper.command(
+    "compile",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
     type=click.Path(),
-    default="",
+    default="params.yml",
 )
 @click.option(
     "-o",
@@ -26,8 +33,16 @@ def piper():
     type=click.Path(),
     default="",
 )
-def compile(piper_file: str, piper_params_file: str, output_file: str):
+@click.pass_context
+def compile(
+    ctx: click.Context,
+    piper_file: str,
+    piper_params_file: str,
+    output_file: str,
+):
 
+    import rich
+    from pipelime.tools.click import ClickTools
     from choixe.configurations import XConfig
     import rich
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
@@ -37,6 +52,7 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
         dag = DAGConfigParserFactory.parse_file(
             cfg_file=piper_file,
             params_file=piper_params_file,
+            additional_args=ClickTools.parse_additional_args(ctx),  # additional args
         )
     except KeyError as e:
         raise click.UsageError(f"Something is missing! -> {e}")
@@ -50,18 +66,24 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
         rich.print(cfg.to_dict())
 
 
-@piper.command("draw")
+@piper.command(
+    "draw",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
-    type=click.Path(),
-    default="",
+    type=click.Path(exists=True),
+    default="params.yml",
 )
 @click.option(
     "-b",
@@ -82,7 +104,9 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
     default=False,
     help="If TRUE, Open the output with corresponding default app",
 )
+@click.pass_context
 def draw(
+    ctx: click.Context,
     piper_file: str,
     piper_params_file: str,
     draw_backend: str,
@@ -94,6 +118,7 @@ def draw(
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.filesystem.toolkit import FSToolkit
     from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.tools.click import ClickTools
     import numpy as np
     import rich
     import cv2
@@ -102,6 +127,7 @@ def draw(
     dag = DAGConfigParserFactory.parse_file(
         cfg_file=piper_file,
         params_file=piper_params_file,
+        additional_args=ClickTools.parse_additional_args(ctx),  # additional args
     )
 
     # Graph
@@ -126,18 +152,24 @@ def draw(
         cv2.waitKey(0)
 
 
-@piper.command("execute")
+@piper.command(
+    "execute",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
     type=click.Path(),
-    default="",
+    default="params.yml",
 )
 @click.option(
     "-b",
@@ -151,18 +183,25 @@ def draw(
     type=str,
     default="",
 )
+@click.pass_context
 def execute(
-    piper_file: str, piper_params_file: str, execution_backend: str, token: str
+    ctx: click.Context,
+    piper_file: str,
+    piper_params_file: str,
+    execution_backend: str,
+    token: str,
 ):
 
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.pipes.executors.naive import NaiveGraphExecutor
     from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.tools.click import ClickTools
 
     # DAG Model (abstraction layer to allow several parsing methods)
     dag = DAGConfigParserFactory.parse_file(
         cfg_file=piper_file,
         params_file=piper_params_file,
+        additional_args=ClickTools.parse_additional_args(ctx),  # additional args
     )
 
     # Graph
