@@ -68,7 +68,7 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
     "--draw_backend",
     # TODO: don't use factory list to avoid missing dependencies check on Workflows
     type=click.Choice(["graphviz", "mermaid"]),
-    default="diagrams",
+    default="graphviz",
 )
 @click.option(
     "-o",
