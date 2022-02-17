@@ -157,7 +157,7 @@ class FSToolkit(object):
                 data_stream.seek(0)
                 break
         else:  # no remote loaded
-            raise Exception(f"remote loading error")
+            raise Exception("remote loading error")
         return extension, data_stream
 
     @classmethod
@@ -353,3 +353,16 @@ class FSToolkit(object):
         finally:
             if data_stream is not None:
                 data_stream.close()
+
+    @classmethod
+    def start_file(cls, filename: str):
+        import subprocess
+        import os
+        import platform
+
+        if platform.system() == "Darwin":  # macOS
+            subprocess.call(("open", filename))
+        elif platform.system() == "Windows":  # Windows
+            os.startfile(filename)
+        else:  # linux variants #TODO: verify!
+            subprocess.call(("xdg-open", filename))

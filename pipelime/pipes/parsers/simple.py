@@ -1,12 +1,10 @@
 import copy
-from typing import Callable, Optional, Sequence, Set, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 import re
 import pydash
 from pipelime.pipes.parsers.base import DAGConfigParser
 from pipelime.tools.dictionaries import DictionaryUtils
-import networkx as nx
-import itertools
-from pipelime.pipes.model import NodeModel, DAGModel
+from pipelime.pipes.model import DAGModel
 
 
 class DAGSimpleParser(DAGConfigParser):

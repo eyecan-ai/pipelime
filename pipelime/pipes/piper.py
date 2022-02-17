@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import io
 import subprocess
 import uuid
 from typing import Any, Callable, Dict, Optional, Sequence, Union
@@ -166,7 +167,9 @@ class Piper:
             value (bool): The value of the eager option.
         """
         if value:
-            click.echo(ctx.command.to_info_dict(ctx))
+            stream = io.StringIO()
+            yaml.safe_dump(ctx.command.to_info_dict(ctx), stream)
+            click.echo(stream.getvalue())  # (ctx.command.to_info_dict(ctx))
             ctx.exit()
 
     @staticmethod
@@ -235,7 +238,7 @@ class Piper:
         if pipe.returncode == 0:
             try:
                 info = yaml.safe_load(stdout)
-            except ScannerError as e:
+            except ScannerError:
                 logger.error(f"{command} is not a valid Piper command!")
                 info = None
         else:
@@ -289,18 +292,20 @@ class Piper:
         }
 
         # For each inputs check if a corresponding click command option is present
-        for i in inputs_list:
-            if i not in commands_map:
-                raise KeyError(f"Input '{i}' is not a valid Piper command option!")
-            description[PiperNamespace.NAME_INPUTS][i] = commands_map[i]
-            del commands_map[i]
+        if inputs_list is not None:
+            for i in inputs_list:
+                if i not in commands_map:
+                    raise KeyError(f"Input '{i}' is not a valid Piper command option!")
+                description[PiperNamespace.NAME_INPUTS][i] = commands_map[i]
+                del commands_map[i]
 
         # For each outputs check if a corresponding click command option is present
-        for o in outputs_list:
-            if o not in commands_map:
-                raise KeyError(f"Output '{o}' is not a valid Piper command option!")
-            description[PiperNamespace.NAME_OUTPUTS][o] = commands_map[o]
-            del commands_map[o]
+        if outputs_list is not None:
+            for o in outputs_list:
+                if o not in commands_map:
+                    raise KeyError(f"Output '{o}' is not a valid Piper command option!")
+                description[PiperNamespace.NAME_OUTPUTS][o] = commands_map[o]
+                del commands_map[o]
 
         # Adds remaining options as generic arguments
         description[PiperNamespace.NAME_ARGS] = commands_map

@@ -170,7 +170,7 @@ class ToyDatasetGenerator(object):
                 f"id{suffix}": sample["id"],
                 f"bin{suffix}": int.from_bytes(sample["bin"], "big"),
                 f"index{suffix}": idx,
-                f"suffix": suffix,
+                "suffix": suffix,
             }
 
             metadata = json.loads(json.dumps(metadata))

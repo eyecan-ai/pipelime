@@ -1,3 +1,4 @@
+import functools
 import multiprocessing
 import re
 import shutil
@@ -84,7 +85,11 @@ class UnderfolderWriter(BaseWriter):
         self._remove_duplicates = remove_duplicates
         self._num_workers = num_workers
         self._progress_callback = progress_callback
-
+        self._track = (
+            pipelime_track
+            if progress_callback is None
+            else functools.partial(pipelime_track, disable=True)
+        )
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         self._datafolder.mkdir(parents=True, exist_ok=True)
 
@@ -158,7 +163,7 @@ class UnderfolderWriter(BaseWriter):
                 processes=None if self._num_workers == -1 else self._num_workers
             )
             list(
-                pipelime_track(
+                self._track(
                     pool.imap_unordered(self._process_sample, x),
                     total=len(x),
                     description="Writing Underfolder",
@@ -167,7 +172,7 @@ class UnderfolderWriter(BaseWriter):
             )
         else:
             self._saved_root_keys = {}
-            for sample in pipelime_track(
+            for sample in self._track(
                 x,
                 description="Writing Underfolder",
                 track_callback=self._progress_callback,
@@ -302,11 +307,16 @@ class UnderfolderWriterV2(UnderfolderWriter):
             elif self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
                 output_file.symlink_to(path)
             elif self._copy_mode is UnderfolderWriterV2.CopyMode.HARD_LINK:
-                try:
-                    # (new in version 3.10)
-                    output_file.hardlink_to(path)  # type: ignore
-                except AttributeError:
-                    import os
+
+                # TODO: if you call the writer __call__ multiple times, due to batching,
+                # and the root_files_keys are the same, the hard link will throw an error
+                # because the file already exists. This is a workaround for now.
+                if not output_file.exists():
+                    try:
+                        # (new in version 3.10)
+                        output_file.hardlink_to(path)  # type: ignore
+                    except AttributeError:
+                        import os
 
                     os.link(path, output_file)
 

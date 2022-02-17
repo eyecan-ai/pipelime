@@ -1,5 +1,4 @@
 import pytest
-import rich
 from pipelime.pipes.parsers.factory import DAGConfigParserFactory
 from pipelime.pipes.model import DAGModel
 from choixe.configurations import XConfig

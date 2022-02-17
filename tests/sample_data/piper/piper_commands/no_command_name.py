@@ -1,6 +1,5 @@
 import click
-from pipelime.pipes.piper import Piper, PiperCommand
-from pipelime.tools.progress import pipelime_track
+from pipelime.pipes.piper import Piper
 
 
 @click.command()

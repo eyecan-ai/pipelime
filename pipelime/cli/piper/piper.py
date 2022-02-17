@@ -66,7 +66,8 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
 @click.option(
     "-b",
     "--draw_backend",
-    type=click.Choice(["diagrams"]),
+    # TODO: don't use factory list to avoid missing dependencies check on Workflows
+    type=click.Choice(["graphviz", "mermaid"]),
     default="diagrams",
 )
 @click.option(
@@ -75,10 +76,23 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
     type=click.Path(),
     default="",
 )
-def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file: str):
+@click.option(
+    "--open/--no-open",
+    type=bool,
+    default=False,
+    help="If TRUE, Open the output with corresponding default app",
+)
+def draw(
+    piper_file: str,
+    piper_params_file: str,
+    draw_backend: str,
+    output_file: str,
+    open: bool,
+):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
+    from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
+    from pipelime.filesystem.toolkit import FSToolkit
     from pipelime.pipes.graph import DAGNodesGraph
     import numpy as np
     import rich
@@ -97,17 +111,17 @@ def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file
     graph_image: Optional[np.ndarray] = None
 
     # Draw with selected backend
-    if draw_backend == "diagrams":
-        drawer = DiagramsNodesGraphDrawer()
-        graph_image = drawer.draw(graph=graph)
-    else:
-        raise NotImplementedError(f"Drawing backend {draw_backend} not implemented")
+    drawer = NodesGraphDrawerFactory.create(draw_backend)
 
     # Show or Write
     if len(output_file) > 0:
-        cv2.imwrite(output_file, cv2.cvtColor(graph_image, cv2.COLOR_RGB2BGR))
-        rich.print("graph image saved to:", output_file)
+        drawer.export(graph, output_file)
+        if open:
+            FSToolkit.start_file(output_file)
+        else:
+            rich.print("graph image saved to:", output_file)
     else:
+        graph_image = drawer.draw(graph=graph)
         cv2.imshow("graph", cv2.cvtColor(graph_image, cv2.COLOR_RGB2BGR))
         cv2.waitKey(0)
 
@@ -141,7 +155,6 @@ def execute(
     piper_file: str, piper_params_file: str, execution_backend: str, token: str
 ):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.pipes.executors.naive import NaiveGraphExecutor
     from pipelime.pipes.graph import DAGNodesGraph
