@@ -194,9 +194,6 @@ class FSToolkit(object):
     def load_data_from_stream(
         cls, data_stream: BinaryIO, extension: str
     ) -> Union[None, np.ndarray, dict, bytes]:
-        if cls.is_image_file(data_stream):
-            return np.array(imageio.imread(data_stream))
-
         switches = (
             (
                 lambda: extension in cls.YAML_EXT,
@@ -225,6 +222,11 @@ class FSToolkit(object):
             (
                 lambda: extension in cls.NUMPY_NATIVE_EXT,
                 lambda: np.atleast_2d(np.load(data_stream)),
+            ),
+            # image must be tested last, since it looks at the binary content
+            (
+                lambda: cls.is_image_file(data_stream),
+                lambda: np.array(imageio.imread(data_stream)),
             ),
         )
 
