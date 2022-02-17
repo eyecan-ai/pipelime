@@ -1,7 +1,8 @@
 import pytest
 from pipelime.pipes.parsers.factory import DAGConfigParserFactory
 from pipelime.pipes.graph import DAGNodesGraph
-from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
+
+
 from pytest import TempPathFactory
 
 
@@ -13,9 +14,11 @@ class TestDrawDAGNodesGraph:
         something_checked_control = False
 
         try:
-            backends = NodesGraphDrawerFactory.available_backends()
+            from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
         except ImportError as e:
-            pytest.skip(f"Backend import problem: {e}")
+            pytest.skip(f"Backend not installed: {e}")
+
+        backends = NodesGraphDrawerFactory.available_backends()
 
         for dag_name, item in piper_dags.items():
 
