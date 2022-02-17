@@ -21,6 +21,33 @@ class MermaidNodesGraphDrawer(NodesGraphDrawer):
     DATA_NAME = "data"
     MERMAID_SERVICE_URL = "https://mermaid.ink/img/{}"
 
+    def _is_node_file(self, node: GraphNodeData) -> bool:
+        """Returns True if the node path is (or could be) a file
+
+        Args:
+            node (GraphNodeData):  input node
+
+        Returns:
+            bool:  True if the node path is (or could be) a file
+        """
+        return len(Path(node.path).suffix) > 0
+
+    def _data_node_shape(self, node: GraphNodeData) -> str:
+        """Returns the shape string of a data node
+
+        Args:
+            node (GraphNodeData): input node
+
+        Returns:
+            str: shape of the node
+        """
+
+        return (
+            f"{node.name}[[{node.name}]]"
+            if self._is_node_file(node)
+            else f"{node.name}[({node.name})]"
+        )
+
     def _node_representation(self, node: GraphNode) -> str:
         """Returns the string mermaid representation of a node
 
@@ -38,7 +65,7 @@ class MermaidNodesGraphDrawer(NodesGraphDrawer):
         if isinstance(node, GraphNodeOperation):
             out = f"{node.name}:::{MermaidNodesGraphDrawer.OPERATION_NAME}"
         elif isinstance(node, GraphNodeData):
-            out = f"{node.name}:::{MermaidNodesGraphDrawer.DATA_NAME}"
+            out = f"{self._data_node_shape(node)}:::{MermaidNodesGraphDrawer.DATA_NAME}"
         else:
             raise ValueError(f"Unknown node type: {type(node)}")
 
@@ -50,13 +77,13 @@ class MermaidNodesGraphDrawer(NodesGraphDrawer):
         """
         Returns the style attributes for an operation node
         """
-        return {"fill": "#03A9F4", "stroke": "#0288D1", "color": "#fff"}
+        return {"fill": "#03A9F4", "stroke": "#fafafa", "color": "#fff"}
 
     def _style_attrs_data(self) -> dict:
         """
         Returns the style attributes for a data node
         """
-        return {"fill": "#009688", "stroke": "#004D40", "color": "#fff"}
+        return {"fill": "#009688", "stroke": "#fafafa", "color": "#fff"}
 
     def _classdef_row(self, name: str, style_attrs: dict) -> str:
         """Returns the string representation of a class (style) definition
@@ -70,7 +97,7 @@ class MermaidNodesGraphDrawer(NodesGraphDrawer):
         """
 
         def style_string(x):
-            ",".join([f"{k}:{v}" for k, v in x.items()])
+            return ",".join([f"{k}:{v}" for k, v in x.items()])
 
         return f"classDef {name} {style_string(style_attrs)};"
 

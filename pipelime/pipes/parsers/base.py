@@ -47,7 +47,12 @@ class DAGConfigParser(ABC):
             global_data = XConfig(params_file)
 
             if additional_args is not None:
-                global_data.replace_variables_map(additional_args)
+
+                # Replace placeholders filling default values if not provided
+                global_data.replace_variables_map(
+                    additional_args,
+                    replace_defaults=True,
+                )
 
             # Checks for placeholders, if any close the execution!
             global_data.check_available_placeholders(close_app=True)

@@ -40,5 +40,5 @@ class TestClickTools:
         # monkey patch
         ctx = SimpleNamespace(**{"args": []})
         ctx.args = args
-        result = ClickTools.parse_additional_arguments(ctx)
+        result = ClickTools.parse_additional_args(ctx)
         assert not DeepDiff(expected, result)
