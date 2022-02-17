@@ -3,12 +3,8 @@ from pytest import TempPathFactory
 import pytest
 from pipelime.pipes.parsers.factory import DAGConfigParserFactory
 from pipelime.pipes.graph import DAGNodesGraph
-from pipelime.pipes.executors.naive import (
-    NaiveGraphExecutor,
-    NaiveNodeModelExecutionParser,
-)
+from pipelime.pipes.executors.naive import NaiveGraphExecutor
 from pipelime.tools.modules import ModulesUtils
-import networkx as nx
 from choixe.configurations import XConfig
 
 

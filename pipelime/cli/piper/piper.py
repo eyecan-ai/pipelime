@@ -155,7 +155,6 @@ def execute(
     piper_file: str, piper_params_file: str, execution_backend: str, token: str
 ):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.pipes.executors.naive import NaiveGraphExecutor
     from pipelime.pipes.graph import DAGNodesGraph

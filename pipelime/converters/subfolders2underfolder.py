@@ -4,7 +4,7 @@ from pathlib import Path
 from pipelime.converters.base import UnderfolderConverter
 from pipelime.sequences.readers.base import ReaderTemplate
 from pipelime.sequences.samples import FileSystemSample, SamplesSequence
-from pipelime.sequences.writers.filesystem import UnderfolderWriter, UnderfolderWriterV2
+from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
 import re
 
 

@@ -168,7 +168,7 @@ class Piper:
         """
         if value:
             stream = io.StringIO()
-            data = yaml.safe_dump(ctx.command.to_info_dict(ctx), stream)
+            yaml.safe_dump(ctx.command.to_info_dict(ctx), stream)
             click.echo(stream.getvalue())  # (ctx.command.to_info_dict(ctx))
             ctx.exit()
 
@@ -238,7 +238,7 @@ class Piper:
         if pipe.returncode == 0:
             try:
                 info = yaml.safe_load(stdout)
-            except ScannerError as e:
+            except ScannerError:
                 logger.error(f"{command} is not a valid Piper command!")
                 info = None
         else:

@@ -1,8 +1,6 @@
 from choixe.bulletins import BulletinBoard, Bulletin
 import click
 from pydantic import BaseModel
-import rich
-import random
 import time
 from rich.live import Live
 from rich.table import Table

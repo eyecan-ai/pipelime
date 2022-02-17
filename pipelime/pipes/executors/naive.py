@@ -1,15 +1,10 @@
 from pathlib import Path
 import subprocess
 from typing import Any, Dict, List, Sequence, Tuple
-import rich
-from pipelime.pipes.communication import (
-    PiperCommunicationChannel,
-    PiperCommunicationChannelFactory,
-)
 from pipelime.pipes.executors.base import NodeModelExecutionParser, NodesGraphExecutor
 from pipelime.pipes.graph import GraphNodeOperation, DAGNodesGraph
 from pipelime.pipes.model import NodeModel
-from pipelime.pipes.piper import Piper, PiperCommand, PiperNamespace
+from pipelime.pipes.piper import PiperNamespace
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.validation import OperationValidate, SampleSchema, SchemaLoader
 from loguru import logger
@@ -152,7 +147,7 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                     # Add path to validated paths to avoid validating it twice
                     self._validated_paths.add(path)
 
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 pass
 
         return True
@@ -211,9 +206,9 @@ class NaiveGraphExecutor(NodesGraphExecutor):
 
         parser = NaiveNodeModelExecutionParser()
         self._validated_paths.clear()
-        channel: PiperCommunicationChannel = (
-            PiperCommunicationChannelFactory.create_channel(token=token)
-        )
+        # channel: PiperCommunicationChannel = (
+        #     PiperCommunicationChannelFactory.create_channel(token=token)
+        # )
 
         for layer in graph.build_execution_stack():
             for node in layer:

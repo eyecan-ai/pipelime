@@ -68,7 +68,10 @@ class MermaidNodesGraphDrawer(NodesGraphDrawer):
         Returns:
             str: string representation of the class definition
         """
-        style_string = lambda x: ",".join([f"{k}:{v}" for k, v in x.items()])
+
+        def style_string(x):
+            ",".join([f"{k}:{v}" for k, v in x.items()])
+
         return f"classDef {name} {style_string(style_attrs)};"
 
     def _header_row(self, orientation: str = "TB") -> str:
