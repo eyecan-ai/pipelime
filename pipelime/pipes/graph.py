@@ -47,6 +47,11 @@ class GraphNodeData(GraphNode):
 
 
 class DAGNodesGraph:
+    class GraphAttrs:
+        INPUT_PORT = "input_port"
+        OUTPUT_PORT = "output_port"
+        EDGE_TYPE = "edge_type"
+
     def __init__(self, raw_graph: nx.DiGraph):
         """Initialize the DAG graph starting from a raw directed graph (networkx).
 
@@ -216,28 +221,45 @@ class DAGNodesGraph:
             outputs = node.outputs
 
             if inputs is not None:
-                for _, input_value in inputs.items():
+                for input_name, input_value in inputs.items():
                     if isinstance(input_value, str):
                         input_value = [input_value]
-                    [
-                        g.add_edge(
-                            GraphNodeData(str(x), str(x)),
-                            GraphNodeOperation(node_name, node),
+
+                    attrs = {}
+                    for x in input_value:
+                        n0 = GraphNodeData(str(x), str(x))
+                        n1 = GraphNodeOperation(node_name, node)
+                        g.add_edge(n0, n1)
+                        attrs.update(
+                            {
+                                (n0, n1): {
+                                    DAGNodesGraph.GraphAttrs.INPUT_PORT: input_name,
+                                    DAGNodesGraph.GraphAttrs.EDGE_TYPE: "DATA_2_OPERATION",
+                                }
+                            }
                         )
-                        for x in input_value
-                    ]
+                    nx.set_edge_attributes(g, attrs)
 
             if outputs is not None:
-                for _, output_value in outputs.items():
+                for output_name, output_value in outputs.items():
                     if isinstance(output_value, str):
                         output_value = [output_value]
-                    [
-                        g.add_edge(
-                            GraphNodeOperation(node_name, node),
-                            GraphNodeData(str(x), str(x)),
+
+                    attrs = {}
+                    for x in output_value:
+                        n0 = GraphNodeOperation(node_name, node)
+                        n1 = GraphNodeData(str(x), str(x))
+                        g.add_edge(n0, n1)
+                        attrs.update(
+                            {
+                                (n0, n1): {
+                                    DAGNodesGraph.GraphAttrs.OUTPUT_PORT: output_name,
+                                    DAGNodesGraph.GraphAttrs.EDGE_TYPE: "OPERATION_2_DATA",
+                                }
+                            }
                         )
-                        for x in output_value
-                    ]
+
+                    nx.set_edge_attributes(g, attrs)
 
         return DAGNodesGraph(raw_graph=g)
 

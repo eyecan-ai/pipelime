@@ -1,7 +1,6 @@
 from pathlib import Path
 import subprocess
 from typing import Any, Dict, List, Sequence, Tuple
-import rich
 from pipelime.pipes.executors.base import NodeModelExecutionParser, NodesGraphExecutor
 from pipelime.pipes.graph import GraphNodeOperation, DAGNodesGraph
 from pipelime.pipes.model import NodeModel
@@ -129,9 +128,14 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 reader = UnderfolderReader(folder=path)
                 if schema_file is not None:
 
-                    schema_file = SchemaLoader.load(schema_file)
+                    if not Path(schema_file).exists():
+                        raise SampleSchema.ValidationError(
+                            f'Schema file "{schema_file}" not found'
+                        )
 
+                    schema_file = SchemaLoader.load(schema_file)
                     try:
+
                         op = OperationValidate(sample_schema=schema_file)
                         op(reader)
                     except SampleSchema.ValidationError as e:
@@ -202,10 +206,14 @@ class NaiveGraphExecutor(NodesGraphExecutor):
 
         parser = NaiveNodeModelExecutionParser()
         self._validated_paths.clear()
+        # channel: PiperCommunicationChannel = (
+        #     PiperCommunicationChannelFactory.create_channel(token=token)
+        # )
 
         for layer in graph.build_execution_stack():
             for node in layer:
                 node: GraphNodeOperation
+
                 command_chunks: List = parser.build_command_chunks(
                     node_model=node.node_model
                 )

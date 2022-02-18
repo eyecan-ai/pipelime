@@ -1,12 +1,10 @@
 import copy
-from typing import Callable, Optional, Sequence, Set, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 import re
 import pydash
 from pipelime.pipes.parsers.base import DAGConfigParser
 from pipelime.tools.dictionaries import DictionaryUtils
-import networkx as nx
-import itertools
-from pipelime.pipes.model import NodeModel, DAGModel
+from pipelime.pipes.model import DAGModel
 
 
 class DAGSimpleParser(DAGConfigParser):
@@ -485,12 +483,18 @@ class DAGSimpleParser(DAGConfigParser):
 
         # Parse foreach nodes. Each configuration node could contain a foreach node. This
         # means that the node generates multiple nodes based on a list of values.
-        parsed["nodes"] = self._expand_nodes(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._expand_nodes(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         # Parse the branches. AKA foreach nodes inside nodes inputs/outputs values.
-        parsed["nodes"] = self._expand_nodes_arguments(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._expand_nodes_arguments(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         # Merge multiple arguments as tuples
-        parsed["nodes"] = self._merge_multiple_arguments(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._merge_multiple_arguments(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         return DAGModel(**parsed)

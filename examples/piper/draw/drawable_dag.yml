@@ -8,6 +8,9 @@ nodes:
       - /tmp/pipe/output/A_remapped
       - /tmp/pipe/output/B_remapped
       - /tmp/pipe/output/C_remapped
+      checkpoint: checkpoint.ckpt
+      decoder_config: demo_config.yml
+      random_dataset: /tmp/random_dataset
     inputs_schema:
       input_folders: /path/to/validation_remapped.schema
     outputs:

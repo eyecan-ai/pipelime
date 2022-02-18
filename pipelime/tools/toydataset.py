@@ -121,7 +121,7 @@ class ToyDatasetGenerator(object):
             bboxes.append(box)
             keypoints.extend(kps)
 
-        rnd_bin = np.random.randint(1024)
+        rnd_bin = int(474)  # written as big-endian binary, equals to an image header
         data = self.generate_2d_objects_images(size, objects)
         data.update(
             {
@@ -170,7 +170,7 @@ class ToyDatasetGenerator(object):
                 f"id{suffix}": sample["id"],
                 f"bin{suffix}": int.from_bytes(sample["bin"], "big"),
                 f"index{suffix}": idx,
-                f"suffix": suffix,
+                "suffix": suffix,
             }
 
             metadata = json.loads(json.dumps(metadata))

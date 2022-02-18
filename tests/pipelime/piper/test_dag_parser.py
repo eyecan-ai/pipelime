@@ -1,6 +1,8 @@
 import pytest
-import rich
-from pipelime.pipes.parsers.factory import DAGConfigParserFactory
+from pipelime.pipes.parsers.factory import (
+    DAGConfigParserFactory,
+    DAGConfigParserFactoryConfigurationModel,
+)
 from pipelime.pipes.model import DAGModel
 from choixe.configurations import XConfig
 from deepdiff import DeepDiff
@@ -18,6 +20,11 @@ class TestDAGSimpleParser:
             dag_to_parse = folder / "dag_to_parse.yml"
             dag_parsed = folder / "dag_parsed.yml"
             params = folder / "params.yml"
+
+            # builds/validate the generic parser configuration
+            cfg = DAGConfigParserFactoryConfigurationModel(
+                **(XConfig(dag_to_parse).to_dict())
+            )
 
             if valid:
                 dag = DAGConfigParserFactory.parse_file(

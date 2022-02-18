@@ -1,3 +1,4 @@
+from calendar import c
 from typing import Optional
 import click
 
@@ -7,18 +8,24 @@ def piper():
     pass
 
 
-@piper.command("compile")
+@piper.command(
+    "compile",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
     type=click.Path(),
-    default="",
+    default="params.yml",
 )
 @click.option(
     "-o",
@@ -26,8 +33,16 @@ def piper():
     type=click.Path(),
     default="",
 )
-def compile(piper_file: str, piper_params_file: str, output_file: str):
+@click.pass_context
+def compile(
+    ctx: click.Context,
+    piper_file: str,
+    piper_params_file: str,
+    output_file: str,
+):
 
+    import rich
+    from pipelime.tools.click import ClickTools
     from choixe.configurations import XConfig
     import rich
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
@@ -37,6 +52,7 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
         dag = DAGConfigParserFactory.parse_file(
             cfg_file=piper_file,
             params_file=piper_params_file,
+            additional_args=ClickTools.parse_additional_args(ctx),  # additional args
         )
     except KeyError as e:
         raise click.UsageError(f"Something is missing! -> {e}")
@@ -50,24 +66,31 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
         rich.print(cfg.to_dict())
 
 
-@piper.command("draw")
+@piper.command(
+    "draw",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
-    type=click.Path(),
-    default="",
+    type=click.Path(exists=True),
+    default="params.yml",
 )
 @click.option(
     "-b",
     "--draw_backend",
-    type=click.Choice(["diagrams"]),
-    default="diagrams",
+    # TODO: don't use factory list to avoid missing dependencies check on Workflows
+    type=click.Choice(["graphviz", "mermaid"]),
+    default="graphviz",
 )
 @click.option(
     "-o",
@@ -75,11 +98,27 @@ def compile(piper_file: str, piper_params_file: str, output_file: str):
     type=click.Path(),
     default="",
 )
-def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file: str):
+@click.option(
+    "--open/--no-open",
+    type=bool,
+    default=False,
+    help="If TRUE, Open the output with corresponding default app",
+)
+@click.pass_context
+def draw(
+    ctx: click.Context,
+    piper_file: str,
+    piper_params_file: str,
+    draw_backend: str,
+    output_file: str,
+    open: bool,
+):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
+    from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
+    from pipelime.filesystem.toolkit import FSToolkit
     from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.tools.click import ClickTools
     import numpy as np
     import rich
     import cv2
@@ -88,6 +127,7 @@ def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file
     dag = DAGConfigParserFactory.parse_file(
         cfg_file=piper_file,
         params_file=piper_params_file,
+        additional_args=ClickTools.parse_additional_args(ctx),  # additional args
     )
 
     # Graph
@@ -97,33 +137,39 @@ def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file
     graph_image: Optional[np.ndarray] = None
 
     # Draw with selected backend
-    if draw_backend == "diagrams":
-        drawer = DiagramsNodesGraphDrawer()
-        graph_image = drawer.draw(graph=graph)
-    else:
-        raise NotImplementedError(f"Drawing backend {draw_backend} not implemented")
+    drawer = NodesGraphDrawerFactory.create(draw_backend)
 
     # Show or Write
     if len(output_file) > 0:
-        cv2.imwrite(output_file, cv2.cvtColor(graph_image, cv2.COLOR_RGB2BGR))
-        rich.print("graph image saved to:", output_file)
+        drawer.export(graph, output_file)
+        if open:
+            FSToolkit.start_file(output_file)
+        else:
+            rich.print("graph image saved to:", output_file)
     else:
+        graph_image = drawer.draw(graph=graph)
         cv2.imshow("graph", cv2.cvtColor(graph_image, cv2.COLOR_RGB2BGR))
         cv2.waitKey(0)
 
 
-@piper.command("execute")
+@piper.command(
+    "execute",
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
 @click.option(
     "-i",
     "--piper_file",
     type=click.Path(exists=True),
-    required=True,
+    default="dag.yml",
 )
 @click.option(
     "-p",
     "--piper_params_file",
     type=click.Path(),
-    default="",
+    default="params.yml",
 )
 @click.option(
     "-b",
@@ -137,19 +183,25 @@ def draw(piper_file: str, piper_params_file: str, draw_backend: str, output_file
     type=str,
     default="",
 )
+@click.pass_context
 def execute(
-    piper_file: str, piper_params_file: str, execution_backend: str, token: str
+    ctx: click.Context,
+    piper_file: str,
+    piper_params_file: str,
+    execution_backend: str,
+    token: str,
 ):
 
-    from pipelime.pipes.drawing.diagrams import DiagramsNodesGraphDrawer
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.pipes.executors.naive import NaiveGraphExecutor
     from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.tools.click import ClickTools
 
     # DAG Model (abstraction layer to allow several parsing methods)
     dag = DAGConfigParserFactory.parse_file(
         cfg_file=piper_file,
         params_file=piper_params_file,
+        additional_args=ClickTools.parse_additional_args(ctx),  # additional args
     )
 
     # Graph

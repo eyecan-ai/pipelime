@@ -5,8 +5,15 @@ from choixe.configurations import XConfig
 
 
 class DAGConfigParser(ABC):
+    PARAMS_NAMESPACE = "params"
+    NODES_NAMESPACE = "nodes"
+
     @abstractclassmethod
-    def parse_cfg(self, cfg: dict, global_data: Optional[dict] = None) -> DAGModel:
+    def parse_cfg(
+        self,
+        cfg: dict,
+        global_data: Optional[dict] = None,
+    ) -> DAGModel:
         """Parses the given configuration into a DAGModel.
 
         Args:
@@ -18,7 +25,12 @@ class DAGConfigParser(ABC):
         """
         pass
 
-    def parse_file(self, cfg_file: str, params_file: Optional[str] = None) -> DAGModel:
+    def parse_file(
+        self,
+        cfg_file: str,
+        params_file: Optional[str] = None,
+        additional_args: Optional[dict] = None,
+    ) -> DAGModel:
         """Parses the given configuration file into a DAGModel.
 
         Args:
@@ -30,7 +42,21 @@ class DAGConfigParser(ABC):
         """
 
         cfg = XConfig(cfg_file).to_dict()
-        global_data = None
+        global_data = {}
         if params_file:
-            global_data = XConfig(params_file).to_dict()
+            global_data = XConfig(params_file)
+
+            if additional_args is not None:
+
+                # Replace placeholders filling default values if not provided
+                global_data.replace_variables_map(
+                    additional_args,
+                    replace_defaults=True,
+                )
+
+            # Checks for placeholders, if any close the execution!
+            global_data.check_available_placeholders(close_app=True)
+
+            global_data = global_data.to_dict()
+
         return self.parse_cfg(cfg=cfg, global_data=global_data)

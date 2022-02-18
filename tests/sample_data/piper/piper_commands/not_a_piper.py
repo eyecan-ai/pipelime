@@ -1,5 +1,4 @@
 import click
-from pipelime.pipes.piper import Piper
 
 
 @click.command("not_a_piper")
