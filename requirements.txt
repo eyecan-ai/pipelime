@@ -17,3 +17,4 @@ requests
 joblib
 deepdiff
 networkx
+redis
