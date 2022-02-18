@@ -22,6 +22,7 @@ from pipelime.tools.progress import pipelime_track
 class UnderfolderWriter(BaseWriter):
     DATA_SUBFOLDER = "data"
     DEFAULT_EXTENSION = "pkl"
+    WORKER_ID = 0
 
     def __init__(
         self,
@@ -128,7 +129,7 @@ class UnderfolderWriter(BaseWriter):
                 return True
         return False
 
-    def _process_sample(self, sample: Sample):
+    def _process_sample(self, sample: Sample, only_root_keys: bool = False):
         basename = self._build_sample_basename(sample)
 
         for key in sample.keys():
@@ -139,13 +140,15 @@ class UnderfolderWriter(BaseWriter):
                     itemname = f"{key}.{self._build_item_extension(key)}"
                     output_file = Path(self._folder) / itemname
                     self._write_sample_item(output_file, sample, key)
-            else:
+            elif not only_root_keys:
                 itemname = f"{basename}_{key}.{self._build_item_extension(key)}"
                 output_file = Path(self._datafolder) / itemname
 
                 self._write_sample_item(output_file, sample, key)
 
     def __call__(self, x: SamplesSequence) -> None:
+        if len(x) == 0:
+            return
 
         if isinstance(x, BaseReader) and self._empty_template:
             template = x.get_reader_template()
@@ -156,22 +159,23 @@ class UnderfolderWriter(BaseWriter):
 
         self._zfill = max(self._zfill, x.best_zfill())
 
-        if self._num_workers > 0 or self._num_workers == -1:
-            manager = multiprocessing.Manager()
-            self._saved_root_keys = manager.dict()
-            pool = multiprocessing.Pool(
+        self._saved_root_keys = {}
+        if self._num_workers > 1 or self._num_workers == -1:
+            # first save root keys, if any
+            self._process_sample(x[0], True)
+
+            with multiprocessing.Pool(
                 processes=None if self._num_workers == -1 else self._num_workers
-            )
-            list(
-                self._track(
-                    pool.imap_unordered(self._process_sample, x),
-                    total=len(x),
-                    description="Writing Underfolder",
-                    track_callback=self._progress_callback,
+            ) as pool:
+                list(
+                    self._track(
+                        pool.imap_unordered(self._process_sample, x),
+                        total=len(x),
+                        description="Writing Underfolder",
+                        track_callback=self._progress_callback,
+                    )
                 )
-            )
         else:
-            self._saved_root_keys = {}
             for sample in self._track(
                 x,
                 description="Writing Underfolder",

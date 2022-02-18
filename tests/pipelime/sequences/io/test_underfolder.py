@@ -13,9 +13,7 @@ from pipelime.sequences.readers.filesystem import (
     UnderfolderReader,
 )
 from pipelime.sequences.samples import FileSystemItem, FileSystemSample, Sample
-from pipelime.sequences.writers.filesystem import (
-    UnderfolderWriter, UnderfolderWriterV2
-)
+from pipelime.sequences.writers.filesystem import UnderfolderWriter, UnderfolderWriterV2
 import pytest
 
 
@@ -338,7 +336,8 @@ class TestUnderfolderWriterSymlinks(object):
 
         # check for broken symlinks
         import platform
-        i_am_on_windows = (platform.system() == "Windows")
+
+        i_am_on_windows = platform.system() == "Windows"
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
         for sample in re_reader:
@@ -449,7 +448,7 @@ class TestUnderfolderWriterV2(object):
             source_folder,
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
-            copy_mode=UnderfolderWriterV2.CopyMode.DEEP_COPY
+            copy_mode=UnderfolderWriterV2.CopyMode.DEEP_COPY,
         )
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
@@ -468,12 +467,13 @@ class TestUnderfolderWriterV2(object):
             source_folder,
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
-            copy_mode=UnderfolderWriterV2.CopyMode.SYM_LINK
+            copy_mode=UnderfolderWriterV2.CopyMode.SYM_LINK,
         )
 
         # check for broken symlinks
         import platform
-        i_am_on_windows = (platform.system() == "Windows")
+
+        i_am_on_windows = platform.system() == "Windows"
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
         for sample in re_reader:
@@ -491,7 +491,7 @@ class TestUnderfolderWriterV2(object):
             source_folder,
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
-            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
         )
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
@@ -510,7 +510,7 @@ class TestUnderfolderWriterV2(object):
             source_folder,
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_WRITE_FROM_CACHE,
-            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
         )
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
@@ -529,7 +529,7 @@ class TestUnderfolderWriterV2(object):
             source_folder,
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.COPY_IF_NOT_CACHED,
-            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
         )
 
         re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
@@ -540,7 +540,8 @@ class TestUnderfolderWriterV2(object):
                 assert path.is_file()
                 assert path.stat().st_nlink == 2
 
-    def test_changed_ext(self, toy_dataset_small, tmpdir_factory):
+    @pytest.mark.parametrize("num_threads", [0, 1, 2, 4, -1])
+    def test_changed_ext(self, toy_dataset_small, tmpdir_factory, num_threads):
         source_folder = toy_dataset_small["folder"]
         os.chdir(source_folder.parent)
         source_folder = source_folder.name
@@ -560,7 +561,8 @@ class TestUnderfolderWriterV2(object):
             folder=writer_folder,
             file_handling=UnderfolderWriterV2.FileHandling.ALWAYS_COPY_FROM_DISK,
             copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
-            reader_template=reader_template
+            reader_template=reader_template,
+            num_workers=num_threads,
         )
         writer(reader)
 
@@ -568,7 +570,7 @@ class TestUnderfolderWriterV2(object):
             for k, v in sample.filesmap.items():
                 path = Path(v)
                 if k in changed_keys:
-                    assert sample.is_cached(k)
+                    assert num_threads == -1 or num_threads > 1 or sample.is_cached(k)
                     assert not path.is_symlink()
                     assert path.is_file()
                     assert path.stat().st_nlink == 1
