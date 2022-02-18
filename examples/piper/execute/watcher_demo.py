@@ -30,6 +30,7 @@ def generate_table(tasks_map: dict) -> Table:
     for task_id in tasks_map.keys():
         progress = [percentage_string(v) for _, v in tasks_map[task_id].items()]
         progress = " ‖ ".join(progress)
+
         filename, method, unique = task_id.split(":")
         table.add_row(
             f"{filename}",
@@ -66,21 +67,29 @@ def piper_watcher(token: str):
     tasks_map = {}
 
     def callback(data: dict):
-        chunk_progress = ChunkProgress(
-            id=data["id"],
-            chunk_index=data["payload"]["_progress"]["chunk_index"],
-            progress=data["payload"]["_progress"]["progress_data"]["advance"]
-            / data["payload"]["_progress"]["progress_data"]["total"],
-        )
+        if "_progress" in data["payload"]:
+            chunk_progress = ChunkProgress(
+                id=data["id"],
+                chunk_index=data["payload"]["_progress"]["chunk_index"],
+                progress=data["payload"]["_progress"]["progress_data"]["advance"]
+                / data["payload"]["_progress"]["progress_data"]["total"],
+            )
 
-        if chunk_progress.id not in tasks_map:
-            tasks_map[chunk_progress.id] = {}
-        if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
-            tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
+            if chunk_progress.id not in tasks_map:
+                tasks_map[chunk_progress.id] = {}
+            if chunk_progress.chunk_index not in tasks_map[chunk_progress.id]:
+                tasks_map[chunk_progress.id][chunk_progress.chunk_index] = 0.0
 
-        tasks_map[chunk_progress.id][
-            chunk_progress.chunk_index
-        ] += chunk_progress.progress
+            tasks_map[chunk_progress.id][
+                chunk_progress.chunk_index
+            ] += chunk_progress.progress
+        elif "event" in data["payload"]:
+            event = data["payload"]["event"]
+
+            if event not in tasks_map:
+                tasks_map[event] = {0: 0.0}
+
+            tasks_map[event][0] += 1
 
     def listener_thread():
         channel = PiperCommunicationChannelFactory.create_channel(token)

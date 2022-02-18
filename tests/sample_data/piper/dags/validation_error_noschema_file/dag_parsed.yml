@@ -1,0 +1,28 @@
+nodes:
+  generator@A:
+    args:
+      size: 10
+      suffix: _A
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: /tmp/pipe/output/A_generated
+    outputs_schema:
+      output_folder: /path/to/validation.schema
+  generator@B:
+    args:
+      size: 10
+      suffix: _B
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: /tmp/pipe/output/B_generated
+    outputs_schema:
+      output_folder: /path/to/validation.schema
+  generator@C:
+    args:
+      size: 10
+      suffix: _C
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: /tmp/pipe/output/C_generated
+    outputs_schema:
+      output_folder: /path/to/validation.schema

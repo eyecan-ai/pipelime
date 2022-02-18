@@ -9,12 +9,12 @@ from pipelime.sequences.samples import SamplesSequence
 class ReaderTemplate(object):
     def __init__(
         self,
-        extensions_map: Dict[str, any],
-        root_files_keys: Sequence[str],
+        extensions_map: Dict[str, any] = None,
+        root_files_keys: Sequence[str] = None,
         idx_length: int = 5,
     ):
-        self.extensions_map = extensions_map
-        self.root_files_keys = root_files_keys
+        self.extensions_map = extensions_map if extensions_map is not None else {}
+        self.root_files_keys = root_files_keys if root_files_keys else []
         self.idx_length = idx_length
 
     def __eq__(self, o: "ReaderTemplate") -> bool:

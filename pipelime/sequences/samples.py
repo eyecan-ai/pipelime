@@ -2,7 +2,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Hashable, Sequence, MutableMapping, Union, Optional
+from typing import Any, Mapping, Hashable, Sequence, MutableMapping, Union
 import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
