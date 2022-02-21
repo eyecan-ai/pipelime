@@ -1,6 +1,8 @@
 import functools
 import hashlib
+from itertools import count
 from typing import Dict, Optional, Sequence
+import uuid
 
 import pydash
 import pytest
@@ -15,9 +17,10 @@ from pipelime.sequences.operations import (
     OperationFilterKeys,
     OperationGroupBy,
     OperationIdentity,
-    OperationMix,
+    # OperationMix,
     OperationOrderBy,
     OperationPort,
+    OperationRemapKeys,
     OperationResetIndices,
     OperationShuffle,
     OperationSplitByQuery,
@@ -78,8 +81,8 @@ class TestOperationSum(object):
                 assert isinstance(out, SamplesSequence)
                 assert N * D == len(out)
             else:
-                with pytest.raises(AssertionError):
-                    out = op(datasets)
+                assert op.input_port().is_valid_data(datasets)
+                out = op(datasets)
 
 
 class TestOperationSubsample(object):
@@ -111,6 +114,71 @@ class TestOperationSubsample(object):
                             assert len(out) < N
 
                         if F == 1.0:
+                            assert len(out) == N
+
+    def test_subsample_start(self, plain_samples_sequence_generator):
+
+        sizes = [32, 10, 128, 16, 1]
+        factors_int = [2, 10, 20, 1]
+        factors_float = [0.1, -0.1, 10.2, 1.0]
+        starts_int = [-1, 0, 1, 2, 10, 0.5]
+        starts_float = [-0.1, 0.0, 0.1, 0.5, 0.9]
+
+        # test with integer inputs
+        for F in factors_int:
+            for N in sizes:
+                for S in starts_int:
+                    dataset = plain_samples_sequence_generator("d0_", N)
+
+                    if S < 0:
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    if isinstance(S, float):
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    op = OperationSubsample(factor=F, start=S)
+                    _plug_test(op)
+
+                    if N > 0:
+                        out = op(dataset)
+
+                        assert isinstance(out, SamplesSequence)
+
+                        if F > 1 and N > 1:
+                            assert len(out) < N
+                        if F == 1 and S == 0:
+                            assert len(out) == N
+
+        # test with float inputs
+        for F in factors_float:
+            for N in sizes:
+                for S in starts_float:
+                    dataset = plain_samples_sequence_generator("d0_", N)
+
+                    if S < 0:
+                        with pytest.raises(Exception):
+                            op = OperationSubsample(factor=F, start=S)
+                        continue
+
+                    op = OperationSubsample(factor=F, start=S)
+                    _plug_test(op)
+
+                    if N > 0:
+                        out = op(dataset)
+
+                        assert isinstance(out, SamplesSequence)
+
+                        op = OperationSubsample(factor=F, start=S)
+                        _plug_test(op)
+
+                        if 0.0 < F < 1.0:
+                            assert len(out) < N
+
+                        if F == 1.0 and S == 0.0:
                             assert len(out) == N
 
 
@@ -167,6 +235,12 @@ class TestOperationResetIndices(object):
         for generator in generators:
             dataset = plain_samples_sequence_generator("d0_", N)
             dataset_clone = plain_samples_sequence_generator("d0_", N)
+
+            # Generate common uuid for samples ensuring they are the same
+            for sample_index, _ in enumerate(dataset):
+                common_id = str(uuid.uuid1())
+                dataset[sample_index].id = common_id
+                dataset_clone[sample_index].id = common_id
 
             op = OperationResetIndices(generator=generator)
             _plug_test(op)
@@ -516,6 +590,13 @@ class TestOperationFilterByScript(object):
 
 
 class TestMappableOperation(object):
+    class CountCallback:
+        def __init__(self):
+            self.counter = 0
+
+        def __call__(self, data: dict) -> None:
+            self.counter += 1
+
     class OperationPlusOne(MappableOperation):
         def __init__(self, key: str, **kwargs) -> None:
             super().__init__(**kwargs)
@@ -543,10 +624,16 @@ class TestMappableOperation(object):
         key = "number"
 
         dataset = plain_samples_sequence_generator("d0_", N)
-        op = self.OperationPlusOne(key, progress_bar=pb, num_workers=workers)
+        callback = self.CountCallback()
+        op = self.OperationPlusOne(
+            key, progress_bar=pb, num_workers=workers, progress_callback=callback
+        )
 
         out = op(dataset)
         _plug_test(op, check_serialization=False)
+
+        # Check callback was called the right number of times
+        assert callback.counter == len(dataset)
 
         expected_numbers = [x[key] + 1 for x in dataset]
         out_numbers = [x[key] for x in out]
@@ -556,10 +643,12 @@ class TestMappableOperation(object):
         for x, y in zip(expected_numbers, out_numbers):
             assert x == y, (expected_numbers, out_numbers)
 
-        op = self.OperationLessThan10(key)
+        callback = self.CountCallback()
+        op = self.OperationLessThan10(key, progress_callback=callback)
         out = op(dataset)
 
         assert len(out) == 10
+        assert callback.counter == len(dataset)
 
 
 class TestOperationStage(object):
@@ -582,3 +671,27 @@ class TestOperationStage(object):
         for x in out:
             assert key_2 in x
             assert key not in x
+
+
+class TestOperationRemapKeys(object):
+    def test_operation_stage(self, plain_samples_sequence_generator):
+        N = 32
+        key = "number"
+        key_2 = "number_2"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        for remove_missing in [True, False]:
+            op = OperationRemapKeys(remap={key: key_2}, remove_missing=remove_missing)
+            _plug_test(op, check_serialization=False)
+            out = op(dataset)
+
+            assert isinstance(out, SamplesSequence)
+            assert N == len(out)
+            for x in out:
+                assert key_2 in x
+                assert key not in x
+                if remove_missing:
+                    assert len(x.keys()) == 1
+                else:
+                    assert len(x.keys()) > 1

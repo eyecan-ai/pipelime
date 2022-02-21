@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Dict, Hashable, Sequence, Union
+from typing import Hashable, Sequence, Union
 
 import h5py
 from schema import Optional
 
 from pipelime.h5.toolkit import H5Database, H5ToolKit
-from pipelime.sequences.readers.base import BaseReader
+from pipelime.sequences.readers.base import BaseReader, ReaderTemplate
 from pipelime.sequences.samples import MemoryItem, MetaItem, Sample
 
 
@@ -18,27 +18,67 @@ class H5Item(MetaItem):
         return self._item
 
 
+class MultiGroup:
+    """Manages H5PY groups fusion, if only one group is present it should behave like
+    a normal H5py group
+    """
+
+    def __init__(self, groups: Sequence[h5py.Group]) -> None:
+        self._groups = groups
+
+    def keys(self) -> Sequence[Hashable]:
+        keys = set()
+        for group in self._groups:
+            keys.update(group.keys())
+        return list(keys)
+
+    def __contains__(self, key: Hashable) -> bool:
+        for group in self._groups:
+            if key in group:
+                return True
+        return False
+
+    def __getitem__(self, key: Hashable) -> h5py.Group:
+        for group in reversed(self._groups):
+            if key in group:
+                return group[key]
+        raise KeyError(key)
+
+    def get(self, key: Hashable, getlink: bool = True) -> Union[h5py.Group, any]:
+        for group in reversed(self._groups):
+            if key in group:
+                return group.get(key, getlink=getlink)
+        raise KeyError(key)
+
+    def merge(self, other: "MultiGroup") -> "MultiGroup":
+        return MultiGroup(self._groups + other._groups)
+
+
 class H5Sample(Sample):
     def __init__(
         self,
-        group: h5py.Group,
+        group: Union[h5py.Group, MultiGroup],
         lazy: bool = True,
         copy_global_items: bool = True,
         id: Hashable = None,
     ):
         """Creates a H5Sample based on a key/filename map
 
-        :param group: h5py Group
-        :type group: h5py.Group
+        :param group: h5py Group or MultiGroup
+        :type group: Union[h5py.Group, MultiGroup]
         :param lazy: FALSE to preload data (slow), defaults to False
         :type lazy: bool, optional
-        :param copy_global_items: TRUE to propagate global item to samples, defaults to True
+        :param copy_global_items: TRUE to propagate global item to samples, defaults to
+            True
         :type copy_global_items: bool, optional
         :param id: hashable value used as id
         :type id: Hashable, optional
         """
         super().__init__(id=id)
-        self._group = group
+        self._group = MultiGroup([group]) if isinstance(group, h5py.Group) else group
+        self._cached = {}
+        self._lazy = lazy
+        self._copy_global_items = copy_global_items
         self._copy_global_items = copy_global_items
         self._keys = set()
         for key in self._group.keys():
@@ -51,7 +91,7 @@ class H5Sample(Sample):
         self._cached = {}
         if not lazy:
             for k in self.keys():
-                d = self[k]
+                self.get(k)
 
     def is_cached(self, key) -> bool:
         return key in self._cached
@@ -85,6 +125,14 @@ class H5Sample(Sample):
     def __len__(self):
         return len(self._keys)
 
+    def merge(self, other: "H5Sample") -> "H5Sample":
+        merged_groups = self._group.merge(other._group)
+        merged_cache = self._cached.copy()
+        merged_cache.update(other._cached)
+        newsample = H5Sample(merged_groups, id=self.id)
+        newsample._cached = merged_cache
+        return newsample
+
     def copy(self):
         newsample = H5Sample(self._group, id=self.id)
         newsample._cached = self._cached.copy()
@@ -109,18 +157,6 @@ class H5Sample(Sample):
             del self._cached[k]
 
 
-class H5ReaderTemplate(object):
-    def __init__(
-        self,
-        extensions_map: Dict[str, any],
-        root_files_keys: Sequence[str],
-        idx_length: int = 5,
-    ):
-        self.extensions_map = extensions_map
-        self.root_files_keys = root_files_keys
-        self.idx_length = idx_length
-
-
 class H5Reader(BaseReader):
     DATA_SUBFOLDER = "data"
 
@@ -132,7 +168,6 @@ class H5Reader(BaseReader):
         self._copy_root_files = copy_root_files
         self._lazy_samples = lazy_samples
 
-        # builds tree from subfolder with underscore notation
         self._h5database = H5Database(filename=self._filename, readonly=True)
         self._h5database.open()
 
@@ -164,13 +199,13 @@ class H5Reader(BaseReader):
     def is_root_key(self, key: str):
         return key in self._root_files_keys
 
-    def get_reader_template(self) -> Union[H5ReaderTemplate, None]:
+    def get_reader_template(self) -> Union[ReaderTemplate, None]:
         """Retrieves the template of the h5 reader, i.e. a mapping
         between sample_key/file_extension and a list of root files keys
 
         :raises TypeError: If first sample is not a H5Sample
-        :return: None if dataset is empty, otherwise an H5ReaderTemplate
-        :rtype: Union[H5ReaderTemplate, None]
+        :return: None if dataset is empty, otherwise a ReaderTemplate
+        :rtype: Union[ReaderTemplate, None]
         """
 
         if len(self) > 0:
@@ -184,7 +219,7 @@ class H5Reader(BaseReader):
                 if sample.get_encoding(key) is not None:
                     extensions_map[key] = sample.get_encoding(key)
 
-            return H5ReaderTemplate(
+            return ReaderTemplate(
                 extensions_map=extensions_map,
                 root_files_keys=list(self._root_files_keys),
                 idx_length=idx_length,

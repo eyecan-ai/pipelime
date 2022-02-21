@@ -1,0 +1,8 @@
+nodes:
+  generator:
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: ['item_1', 'item_2', 'item_3']
+    args:
+      suffix: suffix
+      size: 50

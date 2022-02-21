@@ -2,7 +2,7 @@ import numpy as np
 
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.samples import (
-    FilesystemItem,
+    FileSystemItem,
     FileSystemSample,
     GroupedSample,
     MemoryItem,
@@ -61,7 +61,7 @@ class TestFilesystemSample(object):
         sample = reader[0]
 
         for key in sample.keys():
-            assert isinstance(sample.metaitem(key), FilesystemItem)
+            assert isinstance(sample.metaitem(key), FileSystemItem)
 
         assert len(sample) > 0
         assert isinstance(sample["image"], np.ndarray)
@@ -71,6 +71,22 @@ class TestFilesystemSample(object):
         assert "image" not in sample
 
         del sample["_NEW_IMAGE_"]
+
+    def test_filesystem_sample_copy(self, filesystem_datasets):
+
+        dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
+        reader = UnderfolderReader(folder=dataset_folder)
+
+        sample = reader[0]
+        old_keys = list(sample.keys())
+
+        sample_copy = sample.copy()
+        for key in sample_copy.keys():
+            del sample_copy[key]
+
+        for key in old_keys:
+            assert key not in sample_copy
+            assert key in sample
 
     def test_flush(self, filesystem_datasets, tmp_path_factory):
 
@@ -84,6 +100,7 @@ class TestFilesystemSample(object):
             for key in sample.keys():
                 temp = sample[key]
                 assert sample.is_cached(key)
+                assert temp is not None
 
         reader.flush()
 
@@ -95,7 +112,7 @@ class TestFilesystemSample(object):
     def test_filesystem_sample_nonlazy(self, filesystem_datasets, tmp_path_factory):
 
         dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]
-        reader = UnderfolderReader(folder=dataset_folder, lazy_samples=False)
+        UnderfolderReader(folder=dataset_folder, lazy_samples=False)
 
     def test_update(self, filesystem_datasets, tmp_path_factory):
         dataset_folder = filesystem_datasets["minimnist_underfolder"]["folder"]

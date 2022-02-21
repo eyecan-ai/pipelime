@@ -1,10 +1,6 @@
 from pathlib import Path
-from re import template
-
 import click
 import yaml
-
-from pipelime.cli.workflow.workflow import workflow
 from pipelime.workflow.cwl import (
     CwlNode,
     CwlNodesManager,
@@ -483,7 +479,7 @@ class TestClick2Cwl(object):
         # cwl_filled2 = Click2Cwl.convert_click_to_cwl(cmd, commands, forwards)
         # assert cwl_filled == cwl_filled2
 
-        output_cwl_file = Path(tmpdir_factory.mktemp("cwl")) / f"output.cwl"
+        output_cwl_file = Path(tmpdir_factory.mktemp("cwl")) / "output.cwl"
         cwl_template.dumps(output_cwl_file)
         with open(output_cwl_file, "r") as f:
             lines = f.readlines()
@@ -507,7 +503,7 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
     pass
         """
 
-        output_click_file = Path(tmpdir_factory.mktemp("click")) / f"output.py"
+        output_click_file = Path(tmpdir_factory.mktemp("click")) / "output.py"
         with open(output_click_file, "w") as f:
             f.write(click_command)
         loaded_template = CwlTemplate(output_click_file)
@@ -579,7 +575,7 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         assert "node01_opt02" in cwl_workflow_template.template["inputs"]
         assert "string" in cwl_workflow_template.template["inputs"]["node01_opt02"]
 
-        output_template = Path(tmpdir_factory.mktemp("workflow")) / f"template.cwl"
+        output_template = Path(tmpdir_factory.mktemp("workflow")) / "template.cwl"
         cwl_workflow_template.dumps(output_template)
         loaded_template = CwlWorkflowTemplate.from_file(output_template)
         assert cwl_workflow_template.template == loaded_template.template
@@ -604,14 +600,14 @@ def a_click_command(opt0, opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8):
         nodes = CwlNodesManager.available_nodes(folder=output_folder)
         assert len(nodes) == 0
 
-        click_command1 = f"""
+        click_command1 = """
 import click
 @click.command('command1')
 @click.option('--opt0', required=True, type=int, help='help opt0')
 def command1(opt0):
     pass
         """
-        output_click_file1 = Path(tmpdir_factory.mktemp("click")) / f"command1.py"
+        output_click_file1 = Path(tmpdir_factory.mktemp("click")) / "command1.py"
         with open(output_click_file1, "w") as f:
             f.write(click_command1)
         cwl_template1 = CwlTemplate(
@@ -619,14 +615,14 @@ def command1(opt0):
         )  # , alias=['one', 'two'], forwards=['opt0'])
         CwlNodesManager.create_node("first", cwl_template1, folder=output_folder)
 
-        click_command2 = f"""
+        click_command2 = """
 import click
 @click.command('command2')
 @click.option('--opt0', required=True, type=int, help='help opt0')
 def command2(opt0):
     pass
         """
-        output_click_file2 = Path(tmpdir_factory.mktemp("click")) / f"command2.py"
+        output_click_file2 = Path(tmpdir_factory.mktemp("click")) / "command2.py"
         with open(output_click_file2, "w") as f:
             f.write(click_command2)
         cwl_template2 = CwlTemplate(script=str(output_click_file2))

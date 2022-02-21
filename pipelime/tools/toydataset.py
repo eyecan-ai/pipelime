@@ -1,12 +1,12 @@
 import json
 import uuid
 from pathlib import Path
-from typing import Sequence
-
 import numpy as np
 from PIL import Image, ImageDraw
-
+from typing import Callable, Tuple
 from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.tools.progress import pipelime_track
 
 
 class ToyDatasetGenerator(object):
@@ -105,7 +105,7 @@ class ToyDatasetGenerator(object):
             "instances": np.array(instances),
         }
 
-    def generate_image_sample(self, size, max_label=5, objects_number_range=[1, 5]):
+    def generate_image_sample(self, size, max_label=5, objects_number_range=(1, 5)):
 
         objects = []
         bboxes = []
@@ -121,6 +121,7 @@ class ToyDatasetGenerator(object):
             bboxes.append(box)
             keypoints.extend(kps)
 
+        rnd_bin = int(474)  # written as big-endian binary, equals to an image header
         data = self.generate_2d_objects_images(size, objects)
         data.update(
             {
@@ -128,43 +129,64 @@ class ToyDatasetGenerator(object):
                 "keypoints": keypoints,
                 "label": np.random.randint(max_label + 1),
                 "id": str(uuid.uuid1()),
+                "bin": rnd_bin.to_bytes((rnd_bin.bit_length() + 7) // 8, "big"),
             }
         )
         return data
 
     @classmethod
     def generate_toy_dataset(
-        cls, output_folder: str, size: int, image_size: Sequence[int], zfill: int = 5
+        cls,
+        output_folder: str,
+        size: int,
+        image_size: int = 256,
+        zfill: int = 5,
+        suffix: str = "",
+        as_underfolder: bool = False,
+        max_label: int = 5,
+        objects_number_range: Tuple[int, int] = (1, 5),
+        progress_callback: Callable[[dict], None] = None,
     ):
 
         output_folder = Path(output_folder)
+        if as_underfolder:
+            output_folder = output_folder / UnderfolderReader.DATA_SUBFOLDER
         output_folder.mkdir(parents=True, exist_ok=True)
 
         generator = ToyDatasetGenerator()
 
-        for idx in range(size):
+        for idx in pipelime_track(range(size), track_callback=progress_callback):
 
             # Generate sample
-            sample = generator.generate_image_sample([image_size, image_size])
+            sample = generator.generate_image_sample(
+                [image_size, image_size], max_label, objects_number_range
+            )
 
             # Extracts metadata
             metadata = {
-                "bboxes": sample["bboxes"],
-                "keypoints": sample["keypoints"],
-                "label": sample["label"],
-                "id": sample["id"],
+                f"bboxes{suffix}": sample["bboxes"],
+                f"keypoints{suffix}": sample["keypoints"],
+                f"label{suffix}": sample["label"],
+                f"id{suffix}": sample["id"],
+                f"bin{suffix}": int.from_bytes(sample["bin"], "big"),
+                f"index{suffix}": idx,
+                "suffix": suffix,
             }
 
             metadata = json.loads(json.dumps(metadata))
 
             # Naming
             name = str(idx).zfill(zfill)
-            image_name = f"{name}_image.png"
-            mask_name = f"{name}_mask.png"
-            instances_name = f"{name}_inst.png"
-            metadata_name = f"{name}_metadata.yml"
-            keypoints_name = f"{name}_keypoints.txt"
-            bboxes_name = f"{name}_bboxes.npy"
+            image_name = f"{name}_image{suffix}.png"
+            mask_name = f"{name}_mask{suffix}.png"
+            instances_name = f"{name}_inst{suffix}.png"
+            metadata_name = f"{name}_metadata{suffix}.yml"
+            metadataj_name = f"{name}_metadataj{suffix}.json"
+            # metadatat_name = f"{name}_metadatat{suffix}.toml"
+            keypoints_name = f"{name}_keypoints{suffix}.txt"
+            keypointsp_name = f"{name}_keypointsp{suffix}.pickle"
+            bboxes_name = f"{name}_bboxes{suffix}.npy"
+            bin_name = f"{name}_bin{suffix}.bin"
 
             FSToolkit.store_data(str(output_folder / image_name), sample["rgb"])
             FSToolkit.store_data(str(output_folder / mask_name), sample["mask"])
@@ -174,5 +196,11 @@ class ToyDatasetGenerator(object):
             FSToolkit.store_data(
                 str(output_folder / keypoints_name), sample["keypoints"]
             )
+            FSToolkit.store_data(
+                str(output_folder / keypointsp_name), sample["keypoints"]
+            )
             FSToolkit.store_data(str(output_folder / bboxes_name), sample["bboxes"])
+            FSToolkit.store_data(str(output_folder / bin_name), sample["bin"])
             FSToolkit.store_data(str(output_folder / metadata_name), metadata)
+            FSToolkit.store_data(str(output_folder / metadataj_name), metadata)
+            # FSToolkit.store_data(str(output_folder / metadatat_name), metadata)

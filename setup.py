@@ -4,10 +4,10 @@
 
 from setuptools import setup, find_packages
 
-with open("README.rst") as readme_file:
+with open("README.rst", encoding='UTF-8') as readme_file:
     readme = readme_file.read()
 
-with open("requirements.txt") as requirements_file:
+with open("requirements.txt", encoding='UTF-8') as requirements_file:
     requirements = requirements_file.readlines()
 
 setup_requirements = [
@@ -17,6 +17,10 @@ setup_requirements = [
 test_requirements = [
     "pytest>=3",
 ]
+
+extras_requirements = {
+    'minio': ['minio']
+}
 
 setup(
     author="daniele de gregorio",
@@ -40,6 +44,7 @@ setup(
         ],
     },
     install_requires=requirements,
+    extras_require=extras_requirements,
     license="GNU General Public License v3",
     long_description=readme,
     include_package_data=True,
@@ -50,6 +55,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/eyecan-ai/pipelime",
-    version="0.1.2",
+    version="0.1.3",
     zip_safe=False,
 )

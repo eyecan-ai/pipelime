@@ -1,0 +1,24 @@
+params:
+  filter_keys:
+  - image
+  - inst
+  - metadata
+  flags:
+  - A
+  - B
+  - C
+  custom_command: python fake_detector.py
+  output_folder: /tmp/pipe/output
+  final_folder: /tmp/pipe/final
+  generated_dataset_size: 10
+  splits:
+  - name: train
+    p: 0.8
+  - name: validation
+    p: 0.1
+  - name: test
+    p: 0.1
+  schemas:
+    generated: /path/to/validation.schema
+    remapped: /path/to/validation_remapped.schema
+    detected: /path/to/validation_detected.schema

@@ -1,10 +1,9 @@
 import uuid
 from abc import abstractmethod
-from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Hashable, Sequence
-
+from typing import Any, Mapping, Hashable, Sequence, MutableMapping, Union
+import functools
 from pipelime.filesystem.toolkit import FSToolkit
 
 
@@ -14,7 +13,7 @@ class MetaItem(object):
         pass
 
     @abstractmethod
-    def source(self) -> any:
+    def source(self) -> Any:
         pass
 
 
@@ -22,16 +21,16 @@ class MemoryItem(MetaItem):
     def __init__(self) -> None:
         super().__init__()
 
-    def source(self) -> any:
+    def source(self) -> Any:
         return None
 
 
-class FilesystemItem(MetaItem):
+class FileSystemItem(MetaItem):
     def __init__(self, path: str) -> None:
         super().__init__()
         self._path = Path(path)
 
-    def source(self) -> any:
+    def source(self) -> Path:
         return self._path
 
 
@@ -52,11 +51,15 @@ class Sample(MutableMapping):
         pass
 
     @abstractmethod
-    def copy(self):
+    def copy(self) -> "Sample":
         pass
 
     @abstractmethod
-    def metaitem(self, key: any) -> MetaItem:
+    def metaitem(self, key: Any) -> MetaItem:
+        pass
+
+    @abstractmethod
+    def merge(self, other: "Sample") -> "Sample":
         pass
 
     @property
@@ -115,6 +118,14 @@ class GroupedSample(Sample):
     def __repr__(self) -> str:
         return str(self._samples)
 
+    def merge(self, other: "GroupedSample") -> "GroupedSample":
+        samples = self._samples
+        others_samples = other._samples
+        if len(samples) != len(others_samples):
+            raise ValueError("Cannot merge samples with different lengths")
+        merged_samples = [x.merge(y) for x, y in zip(samples, others_samples)]
+        return GroupedSample(samples=merged_samples)
+
     def copy(self):
         return GroupedSample(samples=self._samples)
 
@@ -122,7 +133,7 @@ class GroupedSample(Sample):
         for x in self._samples:
             x.rename(old_key=old_key, new_key=new_key)
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         for x in self._samples:
             return x.metaitem(key)
         return None
@@ -158,6 +169,11 @@ class PlainSample(Sample):
     def __repr__(self) -> str:
         return str(self._data)
 
+    def merge(self, other: "PlainSample") -> "PlainSample":
+        new_data = self._data.copy()
+        new_data.update(other._data.copy())
+        return PlainSample(data=new_data, id=self.id)
+
     def copy(self):
         return PlainSample(data=self._data.copy(), id=self.id)
 
@@ -166,12 +182,14 @@ class PlainSample(Sample):
             self._data[new_key] = self._data[old_key]
             del self._data[old_key]
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         return MemoryItem()
 
 
 class FileSystemSample(Sample):
-    def __init__(self, data_map: dict, lazy: bool = True, id: Hashable = None):
+    def __init__(
+        self, data_map: MutableMapping[str, str], lazy: bool = True, id: Hashable = None
+    ):
         """Creates a FileSystemSample based on a key/filename map
 
         :param data_map: key/filename map
@@ -182,11 +200,11 @@ class FileSystemSample(Sample):
         :type id: Hashable, optional
         """
         super().__init__(id=id)
-        self._filesmap = data_map
+        self._filesmap: MutableMapping[str, str] = data_map
         self._cached = {}
         if not lazy:
             for k in self.keys():
-                d = self[k]
+                self.get(k)
 
     @property
     def filesmap(self):
@@ -207,19 +225,28 @@ class FileSystemSample(Sample):
         self._cached[key] = value
 
     def __delitem__(self, key):
-        if key in self._cached:
-            del self._cached[key]
-        if key in self._filesmap:
-            del self._filesmap[key]
+        self._cached.pop(key, None)
+        self._filesmap.pop(key, None)
 
     def __iter__(self):
         return iter(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
 
     def __len__(self):
-        return len(self._filesmap)
+        return len(set.union(set(self._filesmap.keys()), set(self._cached.keys())))
+
+    def merge(self, other: "FileSystemSample") -> "FileSystemSample":
+        new_filesmap = self._filesmap.copy()
+        new_cache = self._cached.copy()
+
+        new_filesmap.update(other._filesmap)
+        new_cache.update(other._cached)
+
+        newsample = FileSystemSample(new_filesmap, id=self.id)
+        newsample._cached = new_cache
+        return newsample
 
     def copy(self):
-        newsample = FileSystemSample(self._filesmap, id=self.id)
+        newsample = FileSystemSample(self._filesmap.copy(), id=self.id)
         newsample._cached = self._cached.copy()
         return newsample
 
@@ -228,10 +255,12 @@ class FileSystemSample(Sample):
             self._filesmap[new_key] = self._filesmap.pop(old_key)
             if old_key in self._cached:
                 self._cached[new_key] = self._cached.pop(old_key)
+        if new_key not in self._cached and old_key in self._cached:
+            self._cached[new_key] = self._cached.pop(old_key)
 
-    def metaitem(self, key: any):
+    def metaitem(self, key: Any):
         if key in self._filesmap:
-            return FilesystemItem(self._filesmap[key])
+            return FileSystemItem(self._filesmap[key])
         else:
             return MemoryItem()
 
@@ -245,7 +274,7 @@ class FileSystemSample(Sample):
         for k in keys:
             del self._cached[k]
 
-    def update(self, other: Dict[str, Any]) -> None:
+    def update(self, other: Mapping[str, Any]) -> None:
         if isinstance(other, FileSystemSample):
             self.filesmap.update(other.filesmap)
             for k in other.keys():
@@ -256,21 +285,58 @@ class FileSystemSample(Sample):
 
 
 class SamplesSequence(Sequence):
-    def __init__(self, samples: Sequence[Sample]):
+    # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+    # Removed type hinting for stage argument, which resulted in circular import
+    # between pipelime.sequences.stages and pipelime.sequences.samples modules
+
+    # Refactoring is needed to decouple these classes or to reorganize these modules
+    # to avoid this circular dependency!
+    # ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+
+    def __init__(self, samples: Sequence[Sample], stage=None):
+        """Constructor for `SamplesSequence`
+
+        :param samples: A sequence of samples that this SampleSequence will contain
+        :type samples: Sequence[Sample]
+        :param stage: A stage to apply to each sample of the sequence when the
+        __getitem__ is called, if set to `None` no stage is applied, defaults to None
+        :type stage: Optional[SampleStage], optional
+        """
         self._samples = samples
+
+        # This import here is due to circular dependency 💀💀💀 !!
+        from pipelime.sequences.stages import StageIdentity
+
+        self._stage = StageIdentity() if stage is None else stage
 
     @property
     def samples(self):
         return self._samples
 
+    @property
+    def stage(self):
+        return self._stage
+
+    @stage.setter
+    def stage(self, stage):
+        # This import here is due to circular dependency 💀💀💀 !!
+        from pipelime.sequences.stages import SampleStage
+
+        assert isinstance(stage, SampleStage)
+        self._stage = stage
+
+    @samples.setter
+    def samples(self, samples: Sequence[Sample]):
+        self._samples = samples
+
     def __len__(self) -> int:
         return len(self._samples)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> Sample:
         if idx >= len(self):
             raise IndexError
 
-        return self._samples[idx]
+        return self._stage(self._samples[idx])
 
     def is_normalized(self) -> bool:
         """Checks for normalization i.e. each sample has to contain same keys.
@@ -297,3 +363,27 @@ class SamplesSequence(Sequence):
         :rtype: int
         """
         return len(str(len(self)))
+
+    @classmethod
+    def purge_id(cls, id: Hashable) -> Union[int, str]:
+        try:
+            return int(id)  # type: ignore
+        except Exception:
+            return str(id)
+
+    def merge(self, other: "SamplesSequence") -> "SamplesSequence":
+        new_samples = [x.merge(y) for x, y in zip(self, other)]
+        return SamplesSequence(samples=new_samples)
+
+    @classmethod
+    def merge_sequences(
+        cls, sequences: Sequence["SamplesSequence"]
+    ) -> "SamplesSequence":
+        """Merges multiple sequences into one
+
+        :param sequences: sequences to merge
+        :type sequences: SamplesSequence
+        :return: merged sequence
+        :rtype: SamplesSequence
+        """
+        return functools.reduce(lambda x, y: x.merge(y), sequences)

@@ -83,7 +83,7 @@ class SummaryPrinter:
             str_ = "based on first sample"
         else:
             str_ = "based on all samples"
-        console.print(f"[{style}]Contents[/{style}] \[{str_}]:")
+        console.print(f"[{style}]Contents[/{style}] \\[{str_}]:")
 
         table = Table(header_style=self.TITLE_STYLE)
         table.add_column("Item Name")

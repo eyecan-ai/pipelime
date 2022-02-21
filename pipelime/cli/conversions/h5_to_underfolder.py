@@ -1,7 +1,7 @@
 import click
 
 
-@click.command("h5_to_underfolder", help="Sum input underfolders")
+@click.command("h5_to_underfolder", help="Converts H5 dataset to Underfolder")
 @click.option(
     "-i", "--input_filename", required=True, type=str, help="Input H5 Filename"
 )

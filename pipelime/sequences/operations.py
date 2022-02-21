@@ -4,7 +4,7 @@ import copy
 import multiprocessing
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
 
 import dictquery as dq
 import numpy as np
@@ -12,11 +12,11 @@ import pydash as py_
 import rich
 from choixe.spooks import Spook
 from loguru import logger
-from rich.progress import track
+from pipelime.tools.progress import pipelime_track
 from schema import Or, Schema
 
 from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
-from pipelime.sequences.stages import SampleStage
+from pipelime.sequences.stages import SampleStage, StageRemap
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
 
 
@@ -54,7 +54,7 @@ class OperationPort(object):
         :return: True if the object matches the schema
         :rtype: bool
         """
-        return self._schema.validate(o)
+        return self._schema.is_valid(o)
 
     def __repr__(self) -> str:
         return str(self._schema)
@@ -138,7 +138,12 @@ class MappableOperation(SequenceOperation):
     kind of operation.
     """
 
-    def __init__(self, num_workers: int = 0, progress_bar: bool = False) -> None:
+    def __init__(
+        self,
+        num_workers: int = 0,
+        progress_bar: bool = False,
+        progress_callback: Optional[Callable[[dict], None]] = None,
+    ) -> None:
         """Constructor for `MappableOperation` subclasses
 
         :param num_workers: the number of multiprocessing workers, set to -1 to spawn as
@@ -146,10 +151,14 @@ class MappableOperation(SequenceOperation):
         :type num_workers: int, optional
         :param progress_bar: Enable/disable rich progress bar printing on stdout, defaults to False
         :type progress_bar: bool, optional
+        :param progress_callback: callback function to call with progress information,
+        defaults to None
+        :type progress_callback: Optional[Callable[[dict], None]], optional
         """
         super().__init__()
         self._num_workers = num_workers
         self._progress_bar = progress_bar
+        self._progress_callback = progress_callback
         self.pbar_desc = f"{self.__class__.__name__}..."
 
     def input_port(self) -> OperationPort:
@@ -179,12 +188,19 @@ class MappableOperation(SequenceOperation):
             pool = multiprocessing.Pool(processes=num_workers)
             new_sequence = pool.imap(self.apply_to_sample, x)
 
-            if self._progress_bar:
-                new_sequence = track(new_sequence, total=total)
+            new_sequence = pipelime_track(
+                new_sequence,
+                total=total,
+                track_callback=self._progress_callback,
+                disable=not self._progress_bar,
+            )
 
         else:
-            if self._progress_bar:
-                x = track(x)
+            x = pipelime_track(
+                x,
+                track_callback=self._progress_callback,
+                disable=not self._progress_bar,
+            )
 
             for sample in x:
                 new_sample = self.apply_to_sample(sample)
@@ -282,9 +298,10 @@ class OperationResetIndices(SequenceOperation, Spook):  # TODO: unit test!
 
 
 class OperationSubsample(SequenceOperation, Spook):
-    """Subsamples an input sequence picking one element every K."""
+    """Subsamples an input sequence picking one element every K
+    or a percentage of all the elements."""
 
-    def __init__(self, factor: Union[int, float]) -> None:
+    def __init__(self, factor: Union[int, float], start: Union[int, float] = 0) -> None:
         """Instantiates an `OperationSubsample` with a given factor.
 
         :param factor: Set to:
@@ -293,9 +310,21 @@ class OperationSubsample(SequenceOperation, Spook):
         - a `float` to specify a percentage of input elements to preserve
 
         :type factor: Union[int, float]
+        :param start: defaults to 0, set to:
+
+        - an `int` (when `factor` is int) to specify a starting index for the subsampling factor
+        - a `float` (when `factor` is float) to specify a percentage to discard before the elements to preserve
+
+        :type start: Union[int, float], optional
         """
         super().__init__()
         self._factor = factor
+        self._start = start
+
+        assert self._start >= 0
+
+        if isinstance(self._factor, int):
+            assert isinstance(self._start, int)
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
@@ -308,21 +337,21 @@ class OperationSubsample(SequenceOperation, Spook):
 
         new_samples = x.samples.copy()
         if isinstance(self._factor, int):
-            new_samples = new_samples[
-                :: self._factor
-            ]  # Pick an element each `self._factor` elements
+            # Pick an element each `self._factor` elements
+            new_samples = new_samples[self._start :: self._factor]
         elif isinstance(self._factor, float):
+            new_start = int(len(new_samples) * min(max(self._start, 0), 1.0))
             new_size = int(len(new_samples) * min(max(self._factor, 0), 1.0))
-            new_samples = new_samples[:new_size]
+            new_samples = new_samples[new_start : new_start + new_size]
 
         return SamplesSequence(samples=new_samples)
 
     @classmethod
     def spook_schema(cls) -> dict:
-        return {"factor": Or(float, int)}
+        return {"factor": Or(float, int), "start": Or(float, int)}
 
     def to_dict(self):
-        return {"factor": self._factor}
+        return {"factor": self._factor, "start": self._start}
 
 
 class OperationShuffle(SequenceOperation, Spook):
@@ -753,7 +782,7 @@ class OperationFilterByScript(SequenceOperation, Spook):
                 assert self._check_sample is not None
             else:
                 logger.warning(
-                    f"The input script function is empty! Operation performs no checks!"
+                    "The input script function is empty! Operation performs no checks!"
                 )
 
             self._serializable = True
@@ -762,7 +791,7 @@ class OperationFilterByScript(SequenceOperation, Spook):
             self._check_sample = path_or_func
             self._serializable = False
         else:
-            raise NotImplementedError(f"Only str|Callable are allowed as input script ")
+            raise NotImplementedError("Only str|Callable are allowed as input script ")
 
     def input_port(self):
         return OperationPort(SamplesSequence)
@@ -858,3 +887,17 @@ class OperationStage(MappableOperation, Spook):
     def from_dict(cls, d: dict) -> OperationStage:
         stage = Spook.create(d.pop("stage"))
         return cls(stage, **d)
+
+
+class OperationRemapKeys(OperationStage):
+    def __init__(
+        self, remap: Mapping[str, str], remove_missing: bool = True, **kwargs
+    ) -> None:
+        """Creates an `OperationRemapKeys` from keys str:str map .
+
+        :param remap: mapping from old keys to new keys
+        :type remap: Mapping[str, str]
+        :param remove_missing: if True, missing keys will be removed from the sample
+        :type remove_missing: bool
+        """
+        super().__init__(stage=StageRemap(remap, remove_missing), **kwargs)

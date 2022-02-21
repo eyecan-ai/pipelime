@@ -1,16 +1,14 @@
-from pipelime.sequences.writers.h5 import H5Writer
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.readers.h5 import H5Reader
-import tempfile
-import rich
-from pathlib import Path
 import time
 
 
 # ➡️➡️➡️ Reader
 readers = {
-    'underfolder': UnderfolderReader(folder='/tmp/whilly', copy_root_files=True, lazy_samples=True),
-    'h5': H5Reader(filename='/tmp/dataset.h5', copy_root_files=True, lazy_samples=True)
+    "underfolder": UnderfolderReader(
+        folder="/tmp/whilly", copy_root_files=True, lazy_samples=True
+    ),
+    "h5": H5Reader(filename="/tmp/dataset.h5", copy_root_files=True, lazy_samples=True),
 }
 
 for name, reader in readers.items():

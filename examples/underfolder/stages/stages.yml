@@ -1,0 +1,17 @@
+__spook__: pipelime.sequences.stages.StageCompose
+args:
+  stages:
+  - __spook__: pipelime.sequences.stages.StageIdentity
+    args: {}
+  - __spook__: pipelime.sequences.stages.StageKeysFilter
+    args:
+      key_list:
+      - value
+      negate: false
+  - __spook__: pipelime.sequences.stages.StageRemap
+    args:
+      remap:
+        value: result
+      remove_missing: true
+  - __spook__: pipelime.sequences.stages.StageIdentity
+    args: {}
