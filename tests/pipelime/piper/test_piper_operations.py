@@ -101,3 +101,30 @@ class TestCLIUnderfolderOperationSumPiper:
         output_reader = UnderfolderReader(folder=output_folder, lazy_samples=True)
         print("OUTPUT", output_folder)
         assert len(output_reader) == len(input_dataset) * N
+
+
+class TestPiperMultiprocessing:
+    @pytest.mark.parametrize("workers", (0, 1, 2, 4, -1))
+    def test_multiprocessing(self, tmp_path, sample_underfolder_minimnist, workers):
+        from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+        from pipelime.pipes.piper import PiperCommand
+
+        output_folder = tmp_path / "output"
+        output_folder.mkdir(parents=True)
+        output_folder = str(output_folder)
+
+        input_folder = sample_underfolder_minimnist["folder"]
+        input_dataset = UnderfolderReader(folder=input_folder)
+
+        writer = UnderfolderWriterV2(
+            folder=output_folder,
+            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
+            reader_template=input_dataset.get_reader_template(),
+            num_workers=workers,
+            progress_callback=PiperCommand.instance.generate_progress_callback(),
+        )
+        writer(input_dataset)
+
+        output_reader = UnderfolderReader(folder=output_folder)
+        print("OUTPUT", output_folder)
+        assert len(output_reader) == len(input_dataset)
