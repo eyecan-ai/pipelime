@@ -1,6 +1,10 @@
 from pipelime.pipes.piper import Piper
 import pytest
+from pathlib import Path
 from pipelime.sequences.readers.filesystem import UnderfolderReader
+from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+from pipelime.pipes.piper import Piper, PiperCommand
+import click
 from click.testing import CliRunner
 
 
@@ -41,10 +45,7 @@ class TestPiperOperations:
 
 class TestCLIUnderfolderOperationSplitPiper:
     def test_split(self, tmpdir, sample_underfolder_minimnist):
-
         import uuid
-        from pathlib import Path
-
         from pipelime.cli.underfolder.operations import operation_split
 
         input_folder = sample_underfolder_minimnist["folder"]
@@ -77,9 +78,6 @@ class TestCLIUnderfolderOperationSplitPiper:
 
 class TestCLIUnderfolderOperationSumPiper:
     def test_sum(self, tmpdir, sample_underfolder_minimnist):
-
-        from pathlib import Path
-
         from pipelime.cli.underfolder.operations import operation_sum
 
         input_folder = sample_underfolder_minimnist["folder"]
@@ -102,29 +100,42 @@ class TestCLIUnderfolderOperationSumPiper:
         print("OUTPUT", output_folder)
         assert len(output_reader) == len(input_dataset) * N
 
+# Simple piper command to test multiprocessing
+@click.command("piper_cmd_test")
+@click.option("-i", "--input_folder", type=Path, required=True)
+@click.option("-o", "--output_folder", type=Path, required=True)
+@click.option("-w", "--workers", default=0, type=int)
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def piper_cmd_test(input_folder: Path, output_folder: Path, workers: int):
+    # Read a dataset
+    dataset = UnderfolderReader(str(input_folder))
+
+    # Write the same dataset elsewhere
+    UnderfolderWriterV2(
+        str(output_folder),
+        reader_template=dataset.get_reader_template(),
+        num_workers=workers,
+        progress_callback=PiperCommand.instance.generate_progress_callback(0, 1),
+    )(dataset)
+
 
 class TestPiperMultiprocessing:
     @pytest.mark.parametrize("workers", (0, 1, 2, 4, -1))
     def test_multiprocessing(self, tmp_path, sample_underfolder_minimnist, workers):
-        from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
-        from pipelime.pipes.piper import PiperCommand
-
         output_folder = tmp_path / "output"
         output_folder.mkdir(parents=True)
         output_folder = str(output_folder)
 
-        input_folder = sample_underfolder_minimnist["folder"]
-        input_dataset = UnderfolderReader(folder=input_folder)
+        options = [
+            "-i", sample_underfolder_minimnist["folder"],
+            "-o", output_folder,
+            "-w", workers,
+            Piper.piper_token_argument(), "token"
+        ]
+        runner = CliRunner()
+        result = runner.invoke(piper_cmd_test, options)
+        assert result.exit_code == 0
 
-        writer = UnderfolderWriterV2(
-            folder=output_folder,
-            copy_mode=UnderfolderWriterV2.CopyMode.HARD_LINK,
-            reader_template=input_dataset.get_reader_template(),
-            num_workers=workers,
-            progress_callback=PiperCommand.instance.generate_progress_callback(),
-        )
-        writer(input_dataset)
-
+        input_dataset = UnderfolderReader(folder=sample_underfolder_minimnist["folder"])
         output_reader = UnderfolderReader(folder=output_folder)
-        print("OUTPUT", output_folder)
         assert len(output_reader) == len(input_dataset)
