@@ -40,6 +40,42 @@ class PiperNamespace:
     ARGUMENT_NAME_INFO = f"{PRIVATE_ARGUMENT_PREFIX}{PIPER_PREFIX}{NAME_INFO}"
 
 
+class _ProgressCallback:
+    def __init__(self, id, log_header, channel, chunk_index: int, total_chunks: int):
+        self._id = id
+        self._log_header = log_header
+        self._channel = channel
+        self._chunk_index = chunk_index
+        self._total_chunks = total_chunks
+
+    def __call__(self, payload: dict):
+        """Logs a key/value pair into the communication channel.
+
+        Args:
+            key (str): The key to log.
+            value (any): The value to log. Can be any picklable object.
+        """
+        self.log(
+            "_progress",
+            {
+                "chunk_index": self._chunk_index,
+                "total_chunks": self._total_chunks,
+                "progress_data": payload,
+            },
+        )
+
+    def log(self, key: str, value: Any):
+        """Logs a key/value pair into the communication channel.
+
+        Args:
+            key (str): The key to log.
+            value (any): The value to log. Can be any picklable object.
+        """
+        if self._channel is not None:
+            logger.debug(f"{self._log_header}Logging {key}={value}")
+            self._channel.send(self._id, {key: value})
+
+
 class PiperCommand:
     instance: PiperCommand = None
 
@@ -59,16 +95,6 @@ class PiperCommand:
         # progress callbacks list
         self._progress_callbacks = []
 
-    def _progress_callback(self, chunk_index: int, total_chunks: int, payload: dict):
-        self.log(
-            "_progress",
-            {
-                "chunk_index": chunk_index,
-                "total_chunks": total_chunks,
-                "progress_data": payload,
-            },
-        )
-
     def generate_progress_callback(
         self,
         chunk_index: int = 0,
@@ -85,7 +111,13 @@ class PiperCommand:
         Returns:
             Callable[[dict], None]: the callback function
         """
-        callback = functools.partial(self._progress_callback, chunk_index, total_chunks)
+        callback = _ProgressCallback(
+            self._id if self.active else None,
+            self._log_header if self.active else None,
+            self._channel if self.active else None,
+            chunk_index,
+            total_chunks,
+        )
         self._progress_callbacks.append(callback)
         return callback
 
@@ -99,17 +131,6 @@ class PiperCommand:
     @property
     def _log_header(self) -> str:
         return f"{self._id}|"
-
-    def log(self, key: str, value: any):
-        """Logs a key/value pair into the communication channel.
-
-        Args:
-            key (str): The key to log.
-            value (any): The value to log. Can be any picklable object.
-        """
-        if self.active:
-            logger.debug(f"{self._log_header}Logging {key}={value}")
-            self._channel.send(self._id, {key: value})
 
     def _init_state(self, token: str) -> None:
         self.__class__.instance = self

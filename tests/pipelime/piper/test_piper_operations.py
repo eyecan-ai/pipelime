@@ -130,7 +130,7 @@ class TestPiperMultiprocessing:
             "-i", sample_underfolder_minimnist["folder"],
             "-o", output_folder,
             "-w", workers,
-            Piper.piper_token_argument(), "token"
+            # Piper.piper_token_argument(), "token"
         ]
         runner = CliRunner()
         result = runner.invoke(piper_cmd_test, options)
