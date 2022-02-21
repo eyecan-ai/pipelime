@@ -483,12 +483,18 @@ class DAGSimpleParser(DAGConfigParser):
 
         # Parse foreach nodes. Each configuration node could contain a foreach node. This
         # means that the node generates multiple nodes based on a list of values.
-        parsed["nodes"] = self._expand_nodes(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._expand_nodes(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         # Parse the branches. AKA foreach nodes inside nodes inputs/outputs values.
-        parsed["nodes"] = self._expand_nodes_arguments(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._expand_nodes_arguments(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         # Merge multiple arguments as tuples
-        parsed["nodes"] = self._merge_multiple_arguments(parsed["nodes"])
+        parsed[DAGConfigParser.NODES_NAMESPACE] = self._merge_multiple_arguments(
+            parsed[DAGConfigParser.NODES_NAMESPACE]
+        )
 
         return DAGModel(**parsed)

@@ -4,7 +4,7 @@ dictquery
 schema
 numpy
 albumentations>=0.5.2
-choixe
+choixe>=0.1.11
 imageio<=2.10.5
 pydash
 Pillow>=8.0.0
@@ -17,3 +17,4 @@ requests
 joblib
 deepdiff
 networkx
+redis

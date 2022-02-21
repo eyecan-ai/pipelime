@@ -48,3 +48,12 @@ pipelime piper execute -i dag.yml -p params.yml -t token_eyecan
 ```
 
 The Token **token_eyecan** can be any string you want.
+
+### Choosing the channel implementation 
+You can specify the type of backend to use (Choixe BulletinBoard by default) by setting the environment variable:
+
+```bash
+export PIPELIME_PIPER_CHANNEL_TYPE=$CH_TYPE
+```
+
+Where `$CH_TYPE` can be one of `"BULLETIN"` or `"REDIS"`.
