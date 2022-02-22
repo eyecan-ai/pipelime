@@ -262,9 +262,9 @@ class UnderfolderWriterV2(UnderfolderWriter):
         COPY_IF_NOT_CACHED = 2
 
     class CopyMode(Enum):
-        DEEP_COPY = 0
-        SYM_LINK = 1
-        HARD_LINK = 2
+        DEEP_COPY = "deepcopy"
+        SYM_LINK = "symlink"
+        HARD_LINK = "hardlink"
 
     def __init__(
         self,

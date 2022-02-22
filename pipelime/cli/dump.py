@@ -1,11 +1,10 @@
 from pipelime.sequences.samples import Sample, FileSystemItem
 from pipelime.filesystem.toolkit import FSToolkit
+from pipelime.pipes.piper import PiperCommand
+from pipelime.tools.progress import pipelime_track
 
 import numpy as np
 import imageio
-from rich.progress import Progress
-from rich.console import Console
-from sys import stderr
 
 import shutil
 from enum import Enum
@@ -13,7 +12,7 @@ from pathlib import Path
 from itertools import islice
 
 from abc import ABC, abstractmethod
-from typing import Union, Optional, Any, Sequence, Mapping, Collection, Tuple
+from typing import Union, Optional, Any, Sequence, Mapping, Collection, Tuple, Callable
 
 
 class DataWriter(ABC):
@@ -80,11 +79,7 @@ class HeaderDataTypeWriter(DataWriter):
     def dump_leaf(self, elem) -> str:
         type_str = self._type_map.get(self._node_name)
         if type_str is None:
-            type_str = (
-                "s"
-                if isinstance(elem, (str, bytes))
-                else "c"
-            )
+            type_str = "s" if isinstance(elem, (str, bytes)) else "c"
         return self._sep + type_str
 
 
@@ -179,13 +174,9 @@ def _dump_collection(x: Any, writer: DataWriter) -> str:
 
 
 class LinkType(Enum):
-    DEEP_COPY = 0
-    SYM_LINK = 1
-    HARD_LINK = 2
-    # alias to ease cli creation
-    copy = DEEP_COPY
-    soft = SYM_LINK
-    hard = HARD_LINK
+    DEEP_COPY = "deepcopy"
+    SYM_LINK = "symlink"
+    HARD_LINK = "hardlink"
 
 
 def _make_sample_iterator(
@@ -294,6 +285,18 @@ def _maybe_write_data(
     return data
 
 
+def _make_track(
+    progress_callback: Optional[Callable[[dict], None]] = None, *args, **kwargs
+):
+    return (
+        pipelime_track(*args, track_callback=progress_callback, **kwargs)
+        if progress_callback is None
+        else pipelime_track(
+            *args, track_callback=progress_callback, disable=True, **kwargs
+        )
+    )
+
+
 def _extract_samples(
     assets_path: Optional[Path],
     link_type: LinkType,
@@ -301,20 +304,20 @@ def _extract_samples(
     start: Optional[int],
     stop: Optional[int],
     step: Optional[int],
-    progress: Progress,
+    progress_callback: Optional[Callable[[dict], None]],
 ) -> Sequence[Tuple[int, Mapping[str, Any]]]:
     filtered_samples: Sequence[Tuple[int, Mapping[str, Any]]] = []
     sample_it, size = _make_sample_iterator(samples, start, stop, step)
 
-    task = progress.add_task("Reading samples...", total=size)
-    for index, src in sample_it:
+    for index, src in _make_track(
+        progress_callback, sample_it, total=size, description="Reading samples..."
+    ):
         dst: dict[str, Any] = {}
         for k in src:
             dst_data = _link_or_load(src, k, assets_path, link_type)
             dst[k] = _maybe_write_data(dst_data, len(filtered_samples), k, assets_path)
 
         filtered_samples.append((index, dst))
-        progress.update(task, advance=1)
 
     return filtered_samples
 
@@ -333,6 +336,7 @@ def dump_data(
     format: str = "orange",
     link_type: LinkType = LinkType.HARD_LINK,
     file: Optional[Any] = None,
+    piper_command: Optional[PiperCommand] = None,
 ) -> None:
     """Sample data dumping to console or file.
 
@@ -348,81 +352,87 @@ def dump_data(
             possible when writing assets. Defaults to LinkType.HARD_LINK.
         file (Optional[Any], optional): an optional opened file stream, if None it
             prints to stdout. Defaults to None.
+        piper_command (Optional[PiperCommand], optional): the parent piper command, if
+            any. Defaults to None.
     """
     if output_assets_path is not None:
         output_assets_path = Path(output_assets_path).resolve()
         output_assets_path.mkdir(parents=True, exist_ok=True)
 
-    with Progress(console=Console(file=stderr)) as progress:
-        filtered_samples = _extract_samples(
-            output_assets_path,
-            link_type,
-            samples,
-            start,
-            stop,
-            step,
-            progress,
+    filtered_samples = _extract_samples(
+        output_assets_path,
+        link_type,
+        samples,
+        start,
+        stop,
+        step,
+        None
+        if piper_command is None
+        else piper_command.generate_progress_callback(0, 2),
+    )
+
+    tracked_data = iter(
+        _make_track(
+            None
+            if piper_command is None
+            else piper_command.generate_progress_callback(0, 2),
+            filtered_samples,
+            total=len(filtered_samples),
+            description="Writing data...",
         )
+    )
 
-        format = format.lower()
-        separator = "\t" if format == "orange" else ","
-        samples_it = iter(filtered_samples)
+    # write header from a prototype
+    format = format.lower()
+    separator = "\t" if format == "orange" else ","
 
-        # write header from a prototype
-        first_idx, first_sample = next(samples_it)
+    first_idx, first_sample = next(tracked_data)
 
-        task = progress.add_task("Writing data...", total=len(filtered_samples) + 1)
+    _print_line(
+        "$index",
+        _dump_collection(first_sample, HeaderDataWriter(prefix="", sep=separator)),
+        file,
+    )
 
+    if format == "orange":
         _print_line(
-            "$index",
-            _dump_collection(first_sample, HeaderDataWriter(prefix="", sep=separator)),
-            file,
-        )
-
-        if format == "orange":
-            _print_line(
-                "c",
-                _dump_collection(
-                    first_sample,
-                    HeaderDataTypeWriter(node_name="", sep=separator, type_map={}),
-                ),
-                file,
-            )
-            _print_line(
-                "meta",
-                _dump_collection(
-                    first_sample,
-                    HeaderDataRoleWriter(
-                        node_name="",
-                        sep=separator,
-                        output_path=output_assets_path,
-                        role_map={},
-                    ),
-                ),
-                file,
-            )
-
-        progress.update(task, advance=1)
-
-        # write values
-        _print_line(
-            first_idx,
+            "c",
             _dump_collection(
                 first_sample,
-                ValueDataWriter(sep=separator, output_path=output_assets_path),
+                HeaderDataTypeWriter(node_name="", sep=separator, type_map={}),
+            ),
+            file,
+        )
+        _print_line(
+            "meta",
+            _dump_collection(
+                first_sample,
+                HeaderDataRoleWriter(
+                    node_name="",
+                    sep=separator,
+                    output_path=output_assets_path,
+                    role_map={},
+                ),
             ),
             file,
         )
 
-        progress.update(task, advance=1)
+    # write values
+    _print_line(
+        first_idx,
+        _dump_collection(
+            first_sample,
+            ValueDataWriter(sep=separator, output_path=output_assets_path),
+        ),
+        file,
+    )
 
-        for sample_idx, sample_data in samples_it:
-            _print_line(
-                sample_idx,
-                _dump_collection(
-                    sample_data,
-                    ValueDataWriter(sep=separator, output_path=output_assets_path),
-                ),
-                file,
-            )
-            progress.update(task, advance=1)
+    for sample_idx, sample_data in tracked_data:
+        _print_line(
+            sample_idx,
+            _dump_collection(
+                sample_data,
+                ValueDataWriter(sep=separator, output_path=output_assets_path),
+            ),
+            file,
+        )
