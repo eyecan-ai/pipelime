@@ -1,4 +1,3 @@
-import functools
 import multiprocessing
 import re
 import shutil
@@ -17,6 +16,10 @@ from pipelime.sequences.samples import (
 )
 from pipelime.sequences.writers.base import BaseWriter
 from pipelime.tools.progress import pipelime_track
+
+
+def disabled_pipelime_track(*args, **kwargs):
+    return pipelime_track(*args, disable=True, **kwargs)
 
 
 class UnderfolderWriter(BaseWriter):
@@ -86,9 +89,7 @@ class UnderfolderWriter(BaseWriter):
         self._num_workers = num_workers
         self._progress_callback = progress_callback
         self._track = (
-            pipelime_track
-            if progress_callback is None
-            else functools.partial(pipelime_track, disable=True)
+            pipelime_track if progress_callback is None else disabled_pipelime_track
         )
         self._datafolder = self._folder / self.DATA_SUBFOLDER
         self._datafolder.mkdir(parents=True, exist_ok=True)

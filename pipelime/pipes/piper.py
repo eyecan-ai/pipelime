@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import io
 import subprocess
 import uuid
