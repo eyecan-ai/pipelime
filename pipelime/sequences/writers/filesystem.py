@@ -36,6 +36,7 @@ class UnderfolderWriter(BaseWriter):
         remove_duplicates: bool = False,
         num_workers: int = 0,  # typing is here because 'schema.Optional' conflicts
         progress_callback: Optional[Callable[[dict], None]] = None,
+        flush_on_write: bool = False,
     ) -> None:
         """UnderfolderWriter for an input SamplesSequence
 
@@ -74,6 +75,9 @@ class UnderfolderWriter(BaseWriter):
         :param progress_callback: callback function to call with progress information,
         defaults to None
         :type progress_callback: Optional[Callable[[dict], None]], optional
+        :param flush_on_write: True to flush every sample after writing to filesystem,
+        defaults to False
+        :type flush_on_write: bool
         """
         self._folder = Path(folder)
 
@@ -96,6 +100,7 @@ class UnderfolderWriter(BaseWriter):
 
         # multiprocessing attrs
         self._saved_root_keys = {}
+        self._flush_on_write = flush_on_write
 
         if self._use_symlinks:
             import platform
@@ -145,6 +150,9 @@ class UnderfolderWriter(BaseWriter):
                 output_file = Path(self._datafolder) / itemname
 
                 self._write_sample_item(output_file, sample, key)
+
+        if self._flush_on_write:
+            sample.flush()
 
     def __call__(self, x: SamplesSequence) -> None:
         if len(x) == 0:
@@ -268,6 +276,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
         remove_duplicates: bool = False,
         num_workers: int = 0,
         progress_callback: Optional[Callable[[dict], None]] = None,
+        flush_on_write: bool = False,
     ):
         root_file_keys, extensions_map, zfill = (
             (
@@ -288,10 +297,12 @@ class UnderfolderWriterV2(UnderfolderWriter):
             remove_duplicates=remove_duplicates,
             num_workers=num_workers,
             progress_callback=progress_callback,
+            flush_on_write=flush_on_write,
         )
 
         self._file_handling = file_handling
         self._copy_mode = copy_mode
+        self._flush_on_write = flush_on_write
 
         if self._copy_mode is UnderfolderWriterV2.CopyMode.SYM_LINK:
             import platform
