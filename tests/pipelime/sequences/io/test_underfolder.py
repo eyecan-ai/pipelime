@@ -347,6 +347,31 @@ class TestUnderfolderWriterSymlinks(object):
                 assert path.is_file()
 
 
+class TestUnderfolderWriterFlushOnWrite(object):
+    def test_flush_on_write(self, toy_dataset_small, tmpdir_factory):
+        folder = toy_dataset_small["folder"]
+
+        os.chdir(folder.parent)
+        folder = folder.name
+
+        reader = UnderfolderReader(folder=folder)
+        writer_folder = Path(tmpdir_factory.mktemp(str(uuid.uuid1())))
+        writer = UnderfolderWriter(
+            folder=writer_folder, flush_on_write=True, num_workers=8
+        )
+        writer(reader)
+
+        re_reader = UnderfolderReader(folder=writer_folder, copy_root_files=True)
+        for sample, re_sample in zip(reader, re_reader):
+            for k in sample:
+                assert not sample.is_cached(k)
+                assert not re_sample.is_cached(k)
+                if isinstance(sample[k], np.ndarray):
+                    assert np.allclose(sample[k], re_sample[k])
+                else:
+                    assert sample[k] == re_sample[k]
+
+
 class TestUnderfolderLinkPlugin:
     def test_linking(self, tmpdir, plain_samples_sequence_generator):
 
