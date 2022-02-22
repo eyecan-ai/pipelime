@@ -17,7 +17,7 @@ nodes:
       - /tmp/pipe/output/C_detected
     outputs_schema:
       output_folders: /path/to/validation_detected.schema
-  filter_keys@A:
+  filter_keys@0:
     args:
       keys:
       - image_A
@@ -28,7 +28,7 @@ nodes:
       input_folder: /tmp/pipe/output/A_generated
     outputs:
       output_folder: /tmp/pipe/output/A_filtered
-  filter_keys@B:
+  filter_keys@1:
     args:
       keys:
       - image_B
@@ -39,7 +39,7 @@ nodes:
       input_folder: /tmp/pipe/output/B_generated
     outputs:
       output_folder: /tmp/pipe/output/B_filtered
-  filter_keys@C:
+  filter_keys@2:
     args:
       keys:
       - image_C
@@ -50,7 +50,7 @@ nodes:
       input_folder: /tmp/pipe/output/C_generated
     outputs:
       output_folder: /tmp/pipe/output/C_filtered
-  generator@A:
+  generator@0:
     args:
       size: 10
       suffix: _A
@@ -59,7 +59,7 @@ nodes:
       output_folder: /tmp/pipe/output/A_generated
     outputs_schema:
       output_folder: /path/to/validation.schema
-  generator@B:
+  generator@1:
     args:
       size: 10
       suffix: _B
@@ -68,7 +68,7 @@ nodes:
       output_folder: /tmp/pipe/output/B_generated
     outputs_schema:
       output_folder: /path/to/validation.schema
-  generator@C:
+  generator@2:
     args:
       size: 10
       suffix: _C
@@ -77,7 +77,7 @@ nodes:
       output_folder: /tmp/pipe/output/C_generated
     outputs_schema:
       output_folder: /path/to/validation.schema
-  remap_keys@A:
+  remap_keys@0:
     args:
       keys:
       - - image_A
@@ -94,7 +94,7 @@ nodes:
       input_folder: /path/to/validation.schema
     outputs:
       output_folder: /tmp/pipe/output/A_remapped
-  remap_keys@B:
+  remap_keys@1:
     args:
       keys:
       - - image_B
@@ -111,7 +111,7 @@ nodes:
       input_folder: /path/to/validation.schema
     outputs:
       output_folder: /tmp/pipe/output/B_remapped
-  remap_keys@C:
+  remap_keys@2:
     args:
       keys:
       - - image_C
@@ -166,7 +166,7 @@ nodes:
       - /tmp/pipe/output/split_train
       - /tmp/pipe/output/split_validation
       - /tmp/pipe/output/split_test
-  subsample@A:
+  subsample@0:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
@@ -174,7 +174,7 @@ nodes:
       input_folder: /tmp/pipe/output/A_filtered
     outputs:
       output_folder: /tmp/pipe/output/A_subsampled
-  subsample@B:
+  subsample@1:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
@@ -182,7 +182,7 @@ nodes:
       input_folder: /tmp/pipe/output/B_filtered
     outputs:
       output_folder: /tmp/pipe/output/B_subsampled
-  subsample@C:
+  subsample@2:
     args:
       factor: 0.5
     command: pipelime underfolder subsample
