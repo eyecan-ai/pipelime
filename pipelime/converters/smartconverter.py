@@ -1,23 +1,25 @@
-import os
-from typing import Callable, Dict, Optional, Sequence
+from typing import Callable, Optional
 from pathlib import Path
 from pipelime.converters.base import UnderfolderConverter
+from pipelime.sequences.operations import OperationResetIndices
 from pipelime.sequences.readers.base import ReaderTemplate
-from pipelime.sequences.samples import FileSystemSample, SamplesSequence
+from pipelime.sequences.samples import FileSystemSample, PlainSample, SamplesSequence
 from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
-import re
 
 
-class Subfolders2Underfolder(UnderfolderConverter):
+class SmartConverter(UnderfolderConverter):
+    CONVERTED_METADATA_KEY = "conversion_metadata"
+
     def __init__(
         self,
         folder: str,
-        images_extension: str = "png",
+        extensions_map: dict,
+        root_files_map: Optional[dict] = None,
         use_symlinks: bool = False,
         num_workers: int = 0,
         progress_callback: Optional[Callable[[dict], None]] = None,
     ) -> None:
-        """Converts a subfolder tree structure, containing images, to a single Underfolder.
+        """Converts a subfolder tree structure, containing images (and metadata), to a single Underfolder.
         Subfolder structure should be like
 
         root
@@ -25,7 +27,9 @@ class Subfolders2Underfolder(UnderfolderConverter):
             - subfolder2
                 - subfolder3
                     - image1.png
+                    - image1.txt
                     - image2.png
+                    - image2.txt
                 - image3.png
             - image4.png
 
@@ -46,17 +50,42 @@ class Subfolders2Underfolder(UnderfolderConverter):
         self._use_symlinks = use_symlinks
         self._num_workers = num_workers
         self._progress_callback = progress_callback
-        self._images_extension = images_extension
+        self._extensions_map = extensions_map
+        self._root_files_map = root_files_map or {}
+        self._items_map = {v: k for k, v in self._extensions_map.items()}
+        self._root_items_map = {v: k for k, v in self._root_files_map.items()}
+
+        ic = self.extract_items_and_classmap(self._folder)
+
+        merged = self._extract_samples_map(ic["items"])
+
+        samples = []
+
+        for key, m in merged.items():
+            extensions = list(m.keys())
+            root_file = not all([x in self._items_map for x in extensions])
+            if root_file:
+                pass  # TODO: auto manage root files? is total madness!!
+            else:
+                sample = FileSystemSample(data_map={})
+                for ex in extensions:
+                    item_name = self._items_map[ex]
+                    sample.filesmap[item_name] = m[ex]["filepath"]
+
+                sample[SmartConverter.CONVERTED_METADATA_KEY] = m[ex]
+                del sample[SmartConverter.CONVERTED_METADATA_KEY]["filepath"]
+
+                samples.append(sample)
+
+        self._samples = samples
 
     def extensions_map(self) -> dict:
-        return {
-            "image": self._images_extension,
-            "metadata": "yml",
-            "classmap": "yml",
-        }
+        extensions_map = dict(**(self._extensions_map))
+        extensions_map.update({SmartConverter.CONVERTED_METADATA_KEY: "yml"})
+        return extensions_map
 
     def root_files_keys(self) -> dict:
-        return ["classmap"]
+        return []
 
     def convert(self, output_folder: str):
         """
@@ -69,19 +98,6 @@ class Subfolders2Underfolder(UnderfolderConverter):
         if not output_folder.exists():
             output_folder.mkdir(parents=True, exist_ok=False)
 
-        ic = self.extract_items_and_classmap(self._folder)
-
-        samples = []
-        for index, item in enumerate(ic["items"]):
-            sample = FileSystemSample(data_map={}, id=index)
-            sample.filesmap["image"] = item["filepath"]
-            sample["metadata"] = {
-                "category": item["category"],
-                "filename": item["filename"],
-            }
-            sample["classmap"] = ic["classmap"]
-            samples.append(sample)
-
         writer = UnderfolderWriterV2(
             folder=output_folder,
             file_handling=UnderfolderWriterV2.FileHandling.COPY_IF_NOT_CACHED,
@@ -93,4 +109,7 @@ class Subfolders2Underfolder(UnderfolderConverter):
             num_workers=self._num_workers,
             progress_callback=self._progress_callback,
         )
-        writer(SamplesSequence(samples=samples))
+
+        sequence = SamplesSequence(samples=self._samples)
+        sequence = OperationResetIndices()(sequence)
+        writer(sequence)
