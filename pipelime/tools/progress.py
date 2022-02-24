@@ -1,4 +1,5 @@
 from typing import Callable, Iterable, List, Sequence, Optional, Any, Sized, Union
+import warnings
 from rich.console import Console
 from rich.progress import (
     Progress,
@@ -17,7 +18,7 @@ class PipelimeProgress(Progress):
         self,
         *columns: Union[str, ProgressColumn],
         console: Optional[Console] = None,
-        auto_refresh: bool = True,
+        auto_refresh: bool = False,
         refresh_per_second: float = 10,
         speed_estimate_period: float = 30,
         transient: bool = False,
@@ -35,6 +36,12 @@ class PipelimeProgress(Progress):
         """Simple wrapper for rich progress bar. It adds a user callback to track progress."""
 
         self._track_callback = track_callback
+
+        if auto_refresh:
+            msg = """Using auto_refresh = True can result in deadlock if an exception 
+            is raised while tracking progress, you should consider disabling 
+            uto_refresh"""
+            warnings.warn(msg)
 
         super().__init__(
             *columns,
@@ -118,7 +125,7 @@ def pipelime_track(
     sequence: Union[Sequence[ProgressType], Iterable[ProgressType]],
     description: str = "Working...",
     total: Optional[float] = None,
-    auto_refresh: bool = True,
+    auto_refresh: bool = False,  # Passing auto_refresh=True may results in deadlock
     console: Optional[Console] = None,
     transient: bool = False,
     get_time: Optional[Callable[[], float]] = None,
