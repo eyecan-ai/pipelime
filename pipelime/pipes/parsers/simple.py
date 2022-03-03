@@ -354,9 +354,9 @@ class DAGSimpleParser(DAGConfigParser):
                         new_node_key = data
 
                     # Create a new node with a name based on original name and the index
-                    to_add_nodes[
-                        f"{node_name}@{new_node_key}"
-                    ] = self._parse_foreach_node(pseudo_node, data, index)
+                    to_add_nodes[f"{node_name}@{index}"] = self._parse_foreach_node(
+                        pseudo_node, data, index
+                    )
 
                 # forwards the node to be deleted
                 to_delete_nodes.add(node_name)

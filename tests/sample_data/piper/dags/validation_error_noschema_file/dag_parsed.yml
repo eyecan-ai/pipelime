@@ -1,5 +1,5 @@
 nodes:
-  generator@A:
+  generator@0:
     args:
       size: 10
       suffix: _A
@@ -8,7 +8,7 @@ nodes:
       output_folder: /tmp/pipe/output/A_generated
     outputs_schema:
       output_folder: /path/to/validation.schema
-  generator@B:
+  generator@1:
     args:
       size: 10
       suffix: _B
@@ -17,7 +17,7 @@ nodes:
       output_folder: /tmp/pipe/output/B_generated
     outputs_schema:
       output_folder: /path/to/validation.schema
-  generator@C:
+  generator@2:
     args:
       size: 10
       suffix: _C
