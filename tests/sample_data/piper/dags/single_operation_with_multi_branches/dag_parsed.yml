@@ -1,0 +1,21 @@
+nodes:
+  gen1:
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: /tmp/dataset1
+    args:
+      size: 10
+  subsample1:
+    command: pipelime underfolder subsample
+    inputs:
+      input_folder: /tmp/dataset1
+    outputs:
+      output_folder: /tmp/dataset1_sub
+    args:
+      factor: 2
+  gen2:
+    command: pipelime datasets generate_toy_dataset
+    outputs:
+      output_folder: /tmp/dataset2
+    args:
+      size: 10

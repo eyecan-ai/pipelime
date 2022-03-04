@@ -151,4 +151,19 @@ def piper_dags(data_folder, piper_commands, tmp_path_factory: pytest.TempPathFac
             "exception": TypeError,
             "graph": False,
         },
+        "single_operation_with_multi_branches": {
+            "folder": base_path / "single_operation_with_multi_branches",
+            "valid": True,
+            "exception": None,
+            "graph": True,
+            "executable": {
+                # If success is TRUE a "final_validation.py" file is needed in the
+                # dag folder
+                "success": True,
+                "executable_placeholders": {
+                    "OUTPUT_FOLDER": tmp_path_factory.mktemp("output_folder"),
+                },
+                "exception": None,
+            },
+        },
     }
