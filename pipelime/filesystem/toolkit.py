@@ -301,6 +301,10 @@ class FSToolkit(object):
 
             switches = (
                 (
+                    lambda: extension in cls.TIFF_EXT,
+                    lambda: tifffile.imwrite(data_stream, data, **(cls.TIFF_SAVE_OPTS)),
+                ),
+                (
                     lambda: DataCoding.is_image_extension(extension),
                     lambda: imageio.imwrite(
                         data_stream,
@@ -336,10 +340,6 @@ class FSToolkit(object):
                 (
                     lambda: extension in cls.BINARY_EXT,
                     lambda: data_stream.write(data),
-                ),
-                (
-                    lambda: extension in cls.TIFF_EXT,
-                    lambda: tifffile.imwrite(data_stream, data, **(cls.TIFF_SAVE_OPTS)),
                 ),
                 (
                     lambda: extension in cls.REMOTE_EXT,
