@@ -2,7 +2,7 @@
 
 __author__ = "eyecan"
 __email__ = "daniele.degregorio@eyecan.ai"
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 
 from pathlib import Path
