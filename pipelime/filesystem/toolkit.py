@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Union, Iterable, Sequence, BinaryIO, TextIO, Tuple, List
 
 import imageio
+import tifffile
 import numpy as np
 import yaml
 import toml
@@ -22,6 +23,10 @@ class FSToolkit(object):
 
     # Default imageio options for each image format
     IMG_SAVE_OPTIONS = {"png": {"compress_level": 4}}
+
+    TIFF_SAVE_OPTS = {"compression": "zlib"}
+
+    TIFF_EXT = ("tiff", "tif")
 
     YAML_EXT = ("yaml", "yml")
     JSON_EXT = ("json",)
@@ -102,6 +107,11 @@ class FSToolkit(object):
     @classmethod
     def is_image_file(cls, filename: Union[str, BinaryIO]) -> bool:
         return imghdr.what(filename) is not None  # type: ignore
+
+    @classmethod
+    def is_tiff_file(cls, filename: str) -> bool:
+        ext = cls.get_file_extension(filename)
+        return ext in cls.TIFF_EXT
 
     @classmethod
     def _numpy_load_txt(cls, filename: Union[str, TextIO, BinaryIO]) -> np.ndarray:
@@ -215,6 +225,7 @@ class FSToolkit(object):
                 lambda: extension in cls.BINARY_EXT,
                 lambda: data_stream.read(),
             ),
+            (lambda: extension in cls.TIFF_EXT, lambda: tifffile.imread(data_stream)),
             (
                 lambda: extension in cls.NUMPY_TXT_EXT,
                 lambda: np.atleast_2d(cls._numpy_load_txt(data_stream)),
@@ -289,6 +300,10 @@ class FSToolkit(object):
             extension = extension.lstrip(".")
 
             switches = (
+                (
+                    lambda: extension in cls.TIFF_EXT,
+                    lambda: tifffile.imwrite(data_stream, data, **(cls.TIFF_SAVE_OPTS)),
+                ),
                 (
                     lambda: DataCoding.is_image_extension(extension),
                     lambda: imageio.imwrite(
