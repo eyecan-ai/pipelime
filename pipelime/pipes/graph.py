@@ -289,12 +289,11 @@ class DAGNodesGraph:
                 for pair in pairs:
                     filtered_graph.add_edge(pair[0], pair[1])
 
-        # If filtered graph is empty could be a single layer graph without connections
-        # in this case all nodes are kept
-        if len(filtered_graph.nodes()) == 0:
-            for node in full_graph.nodes:
-                if node.type in types:
-                    filtered_graph.add_node(node)
+        # There could be single layers graph without connections, all nodes have to be kept
+        # and are therefore added to the graph
+        for node in full_graph.nodes:
+            if node.type in types:
+                filtered_graph.add_node(node)
 
         return filtered_graph
 
