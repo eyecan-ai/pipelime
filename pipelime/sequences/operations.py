@@ -12,12 +12,12 @@ import pydash as py_
 import rich
 from choixe.spooks import Spook
 from loguru import logger
-from pipelime.tools.progress import pipelime_track
 from schema import Or, Schema
 
 from pipelime.sequences.samples import GroupedSample, Sample, SamplesSequence
 from pipelime.sequences.stages import SampleStage, StageRemap
 from pipelime.tools.idgenerators import IdGenerator, IdGeneratorInteger
+from pipelime.tools.progress import pipelime_track
 
 
 class OperationPort(object):
@@ -901,3 +901,88 @@ class OperationRemapKeys(OperationStage):
         :type remove_missing: bool
         """
         super().__init__(stage=StageRemap(remap, remove_missing), **kwargs)
+
+
+class OperationFlatten(SequenceOperation, Spook):
+    """For each sample in a SamplesSequence, for each element of a list with variable
+    length N, creates N copies of the sample replacing the list with the current element.
+
+    Example:
+        input:
+        SamplesSequence [
+            Sample0 [ image: image0.png, metadata.my_key: [1, 32, 62] ]
+            Sample1 [ image: image1.png, metadata.my_key: [55, 4] ]
+        ]
+
+        output (flattening over 'metadata.my_key'):
+        SamplesSequence [
+            Sample0 [ image: image0.png, metadata.my_key: 1 ]
+            Sample1 [ image: image0.png, metadata.my_key: 32 ]
+            Sample2 [ image: image0.png, metadata.my_key: 62 ]
+            Sample3 [ image: image1.png, metadata.my_key: 55 ]
+            Sample4 [ image: image1.png, metadata.my_key: 4 ]
+        ]
+    """
+
+    def __init__(
+        self,
+        key: str,
+        progress_bar: bool = False,
+        callback: Optional[Callable[[Dict], None]] = None,
+    ) -> None:
+        """Constructor for `OperationFlatten`
+
+        :param key: The key over which to flatten
+        :type key: str
+        :param progress_bar: True to enable the progress bar, defaults to False
+        :type progress_bar: bool, optional
+        :param callback: Callback for tracking progress, defaults to None
+        :type callback: Optional[Callable[[Dict], None]], optional
+        """
+        super().__init__()
+        self._key = key
+        self._progress_bar = progress_bar
+        self._callback = callback
+
+    def input_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def output_port(self) -> OperationPort:
+        return OperationPort(SamplesSequence)
+
+    def _flatten_sample(self, sample: Sample) -> Sequence[Sample]:
+        new_samples = []
+        to_flatten = py_.get(sample, self._key, [])
+
+        for x in to_flatten:
+            new_sample = copy.deepcopy(sample)
+            new_sample = py_.set_(new_sample, self._key, x)
+            new_samples.append(new_sample)
+
+        return new_samples
+
+    def __call__(self, seq: SamplesSequence) -> Any:
+        seq = pipelime_track(
+            seq, track_callback=self._callback, disable=not self._progress_bar
+        )
+
+        flattened = []
+
+        for sample in seq:
+            flattened.extend(self._flatten_sample(sample))
+
+        op = OperationResetIndices()
+        flattened = op(SamplesSequence(flattened))
+
+        return flattened
+
+    @classmethod
+    def spook_schema(cls) -> Union[None, dict]:
+        return {"key": str, "progress_bar": bool}
+
+    def to_dict(self) -> dict:
+        return {"key": self._key, "progress_bar": self._progress_bar}
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        return cls(d["key"], progress_bar=d["progress_bar"])

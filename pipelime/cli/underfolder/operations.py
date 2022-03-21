@@ -906,6 +906,91 @@ def operation_remap_keys(
     writer(output_dataset)
 
 
+@click.command("flatten", help="Flatten a dataset over a speficied key")
+@click.option(
+    "-i",
+    "--input_folder",
+    required=True,
+    type=click.Path(exists=True),
+    help="Input Underfolder",
+)
+@click.option("-k", "--key", required=True, type=str, help="Key over which to flatten")
+@click.option(
+    "-o", "--output_folder", required=True, type=click.Path(), help="Output Underfolder"
+)
+@writer_options
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def operation_flatten(
+    input_folder: str, key: str, output_folder: str, copy_mode: str, workers: int
+):
+
+    from pipelime.sequences.operations import OperationFlatten
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+
+    n = 2
+    cb_flatten, cb_writer = [
+        PiperCommand.instance.generate_progress_callback(x, n) for x in range(n)
+    ]
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+    op = OperationFlatten(key=key, progress_bar=True, callback=cb_flatten)
+    output_dataset = op(dataset)
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode(copy_mode),
+        reader_template=template,
+        num_workers=workers,
+        progress_callback=cb_writer,
+    )
+    writer(output_dataset)
+
+
+@click.command("repeat", help="Repeat a dataset n times")
+@click.option(
+    "-i",
+    "--input_folder",
+    required=True,
+    type=click.Path(exists=True),
+    help="Input Underfolder",
+)
+@click.option(
+    "-r", "--repetitions", required=True, type=int, help="Number of repetitions"
+)
+@click.option(
+    "-o", "--output_folder", required=True, type=click.Path(), help="Output Underfolder"
+)
+@writer_options
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def operation_repeat(
+    input_folder: str,
+    repetitions: int,
+    output_folder: str,
+    copy_mode: str,
+    workers: int,
+):
+
+    from pipelime.sequences.proxies import RepeatedSamplesSequence
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+
+    output_dataset = RepeatedSamplesSequence(dataset, repetitions)
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode(copy_mode),
+        reader_template=template,
+        num_workers=workers,
+        progress_callback=PiperCommand.instance.generate_progress_callback(),
+    )
+    writer(output_dataset)
+
+
 @click.command("remote_add", help="Upload underfolder data to remote")
 @click.option("-i", "--input_folder", required=True, type=str, help="Input Underfolder")
 @click.option(

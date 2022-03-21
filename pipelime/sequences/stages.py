@@ -87,7 +87,7 @@ class StageRemap(SampleStage):
 
 
 class StageKeysFilter(SampleStage):
-    def __init__(self, key_list: Collection[str], negate: bool = False):
+    def __init__(self, key_list: List[str], negate: bool = False):
         """Filter sample keys
 
         :param key_list: list of keys to preserve

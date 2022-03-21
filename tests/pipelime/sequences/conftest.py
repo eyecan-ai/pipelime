@@ -29,6 +29,9 @@ def plain_samples_generator():
                     "name": f"{namespace}{i}",
                     "N": i,
                     "deep": {"super_deep": 0, "groupby_field": int(i / group_each)},
+                    "list": np.random.randint(
+                        0, 10, (np.random.randint(0, 10),)
+                    ).tolist(),
                 },
             }
             samples.append(PlainSample(data=data, id=i))

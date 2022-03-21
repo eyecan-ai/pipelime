@@ -3,6 +3,7 @@ import hashlib
 from itertools import count
 from typing import Dict, Optional, Sequence
 import uuid
+import numpy as np
 
 import pydash
 import pytest
@@ -15,6 +16,7 @@ from pipelime.sequences.operations import (
     OperationFilterByQuery,
     OperationFilterByScript,
     OperationFilterKeys,
+    OperationFlatten,
     OperationGroupBy,
     OperationIdentity,
     # OperationMix,
@@ -663,7 +665,7 @@ class TestOperationStage(object):
         dataset = plain_samples_sequence_generator("d0_", N)
         stage = StageRemap({key: key_2})
         op = OperationStage(stage, progress_bar=pb, num_workers=workers)
-        _plug_test(op, check_serialization=False)
+        _plug_test(op, check_serialization=True)
         out = op(dataset)
 
         assert isinstance(out, SamplesSequence)
@@ -695,3 +697,37 @@ class TestOperationRemapKeys(object):
                     assert len(x.keys()) == 1
                 else:
                     assert len(x.keys()) > 1
+
+
+class TestOperationFlatten:
+    def test_operation_flatten(self, plain_samples_sequence_generator):
+        N = 10
+        key = "metadata.list"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        op = OperationFlatten(key)
+        _plug_test(op)
+        out = op(dataset)
+
+        assert op.input_port().is_valid_data(dataset)
+        assert op.output_port().is_valid_data(out)
+
+        expected = []
+        expected_flattened = []
+        for i, x in enumerate(dataset):
+            to_flatten = pydash.get(x, key)
+            expected.extend([i] * len(to_flatten))
+            expected_flattened.extend(to_flatten)
+
+        assert len(out) == len(expected)
+
+        k = count()
+        for i, x in enumerate(out):
+            for k in set(x.keys()).difference(["metadata"]):
+                eq = x[k] == dataset[expected[i]][k]
+                if isinstance(eq, np.ndarray):
+                    eq = eq.all()
+                assert eq
+
+            assert pydash.get(x, key) == expected_flattened[i]

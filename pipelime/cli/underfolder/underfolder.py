@@ -1,23 +1,25 @@
 import click
 
 from pipelime.cli.underfolder.operations import (
+    dump,
     operation_filterbyquery,
     operation_filterbyscript,
     operation_filterkeys,
+    operation_flatten,
     operation_groupby,
     operation_mix,
     operation_orderby,
     operation_remap_keys,
+    operation_repeat,
     operation_shuffle,
     operation_split,
     operation_split_by_value,
     operation_splitbyquery,
     operation_subsample,
     operation_sum,
+    remove_remote,
     summary,
     upload_to_remote,
-    remove_remote,
-    dump,
 )
 
 
@@ -39,6 +41,8 @@ underfolder.add_command(operation_split_by_value)
 underfolder.add_command(operation_groupby)
 underfolder.add_command(operation_mix)
 underfolder.add_command(operation_remap_keys)
+underfolder.add_command(operation_flatten)
+underfolder.add_command(operation_repeat)
 underfolder.add_command(summary)
 underfolder.add_command(upload_to_remote)
 underfolder.add_command(remove_remote)
