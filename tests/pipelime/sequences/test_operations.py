@@ -703,29 +703,45 @@ class TestOperationFlatten:
     def test_operation_flatten(self, plain_samples_sequence_generator):
         N = 10
         key = "metadata.list"
+        dest_key = key
+        sample_idx_key = "metadata.flatten.sample_idx"
+        list_idx_key = "metadata.flatten.list_idx"
 
         dataset = plain_samples_sequence_generator("d0_", N)
 
-        op = OperationFlatten(key)
+        op = OperationFlatten(
+            key,
+            dest_key=dest_key,
+            sample_idx_key=sample_idx_key,
+            list_idx_key=list_idx_key,
+        )
         _plug_test(op)
         out = op(dataset)
 
         assert op.input_port().is_valid_data(dataset)
         assert op.output_port().is_valid_data(out)
 
-        expected = []
+        expected_sample_idx = []
+        expected_list_idx = []
         expected_flattened = []
         for i, x in enumerate(dataset):
             to_flatten = pydash.get(x, key)
-            expected.extend([i] * len(to_flatten))
+            expected_sample_idx.extend([i] * len(to_flatten))
+            expected_list_idx.extend(list(range(len(to_flatten))))
             expected_flattened.extend(to_flatten)
 
-        assert len(out) == len(expected)
+        assert len(out) == len(expected_sample_idx)
 
         k = count()
         for i, x in enumerate(out):
+            if sample_idx_key is not None:
+                assert pydash.get(x, sample_idx_key) == expected_sample_idx[i]
+
+            if list_idx_key is not None:
+                assert pydash.get(x, list_idx_key) == expected_list_idx[i]
+
             for k in set(x.keys()).difference(["metadata"]):
-                eq = x[k] == dataset[expected[i]][k]
+                eq = x[k] == dataset[expected_sample_idx[i]][k]
                 if isinstance(eq, np.ndarray):
                     eq = eq.all()
                 assert eq

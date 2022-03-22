@@ -927,6 +927,9 @@ class OperationFlatten(SequenceOperation, Spook):
     def __init__(
         self,
         key: str,
+        dest_key: Optional[str] = None,
+        sample_idx_key: Optional[str] = None,
+        list_idx_key: Optional[str] = None,
         progress_bar: bool = False,
         callback: Optional[Callable[[Dict], None]] = None,
     ) -> None:
@@ -934,6 +937,15 @@ class OperationFlatten(SequenceOperation, Spook):
 
         :param key: The key over which to flatten
         :type key: str
+        :param dest_key: Optional destination key, if set to None, it will take the
+        same value of `key`. Defaults to None.
+        :type dest_key: Optional[str]
+        :param sample_idx_key: An optional key in which to save the original sample index,
+        If not specified, nothing will be saved. Defaults to None.
+        :type sample_idx_key: Optional[str]
+        :param list_idx_key: An optional key in which to save the original lsit index,
+        If not specified, nothing will be saved. Defaults to None.
+        :type list_idx_key: Optional[str]
         :param progress_bar: True to enable the progress bar, defaults to False
         :type progress_bar: bool, optional
         :param callback: Callback for tracking progress, defaults to None
@@ -941,6 +953,9 @@ class OperationFlatten(SequenceOperation, Spook):
         """
         super().__init__()
         self._key = key
+        self._dest_key = self._key if dest_key is None else dest_key
+        self._sample_idx_key = sample_idx_key
+        self._list_idx_key = list_idx_key
         self._progress_bar = progress_bar
         self._callback = callback
 
@@ -950,13 +965,22 @@ class OperationFlatten(SequenceOperation, Spook):
     def output_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)
 
-    def _flatten_sample(self, sample: Sample) -> Sequence[Sample]:
+    def _flatten_sample(self, idx: int, sample: Sample) -> Sequence[Sample]:
         new_samples = []
         to_flatten = py_.get(sample, self._key, [])
 
-        for x in to_flatten:
+        for j, x in enumerate(to_flatten):
             new_sample = copy.deepcopy(sample)
-            new_sample = py_.set_(new_sample, self._key, x)
+            py_.unset(new_sample, self._key)
+            flattened = py_.set_({}, self._dest_key, x)
+            new_sample = py_.merge(new_sample, flattened)
+
+            if self._sample_idx_key is not None:
+                new_sample = py_.set_(new_sample, self._sample_idx_key, idx)
+
+            if self._list_idx_key is not None:
+                new_sample = py_.set_(new_sample, self._list_idx_key, j)
+
             new_samples.append(new_sample)
 
         return new_samples
@@ -968,8 +992,8 @@ class OperationFlatten(SequenceOperation, Spook):
 
         flattened = []
 
-        for sample in seq:
-            flattened.extend(self._flatten_sample(sample))
+        for i, sample in enumerate(seq):
+            flattened.extend(self._flatten_sample(i, sample))
 
         op = OperationResetIndices()
         flattened = op(SamplesSequence(flattened))

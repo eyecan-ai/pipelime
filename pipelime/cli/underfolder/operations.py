@@ -915,13 +915,23 @@ def operation_remap_keys(
     help="Input Underfolder",
 )
 @click.option("-k", "--key", required=True, type=str, help="Key over which to flatten")
+@click.option("-d", "--dest_key", help="Optional destination key")
+@click.option("--sample_idx_key", help="Optional original sample index key")
+@click.option("--list_idx_key", help="Optional original list index key")
 @click.option(
     "-o", "--output_folder", required=True, type=click.Path(), help="Output Underfolder"
 )
 @writer_options
 @Piper.command(inputs=["input_folder"], outputs=["output_folder"])
 def operation_flatten(
-    input_folder: str, key: str, output_folder: str, copy_mode: str, workers: int
+    input_folder: str,
+    key: str,
+    dest_key: str,
+    sample_idx_key: str,
+    list_idx_key: str,
+    output_folder: str,
+    copy_mode: str,
+    workers: int,
 ):
 
     from pipelime.sequences.operations import OperationFlatten
@@ -935,7 +945,14 @@ def operation_flatten(
 
     dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
     template = dataset.get_reader_template()
-    op = OperationFlatten(key=key, progress_bar=True, callback=cb_flatten)
+    op = OperationFlatten(
+        key,
+        dest_key=dest_key,
+        sample_idx_key=sample_idx_key,
+        list_idx_key=list_idx_key,
+        progress_bar=True,
+        callback=cb_flatten,
+    )
     output_dataset = op(dataset)
 
     writer = UnderfolderWriterV2(
