@@ -457,6 +457,52 @@ class TestCLIUnderfolderOperationRemapKeys:
                     assert len(sample.keys()) > len(keys)
 
 
+class TestCLIUnderfolderOperationFlatten:
+    def test_flatten(self, tmpdir, sample_underfolder_minimnist_queries):
+        from pipelime.cli.underfolder.operations import operation_flatten
+        import pydash as py_
+
+        input_folder = str(sample_underfolder_minimnist_queries["folder"])
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+        key = "categories.others"
+
+        runner = CliRunner()
+        res = runner.invoke(
+            operation_flatten, f'-i "{input_folder}" -o "{output_folder}" -k {key}'
+        )
+        assert res.exit_code == 0, res.stdout
+
+        input_reader = UnderfolderReader(input_folder)
+        output_reader = UnderfolderReader(output_folder)
+
+        N = sum([len(py_.get(x, key)) for x in input_reader])
+        assert len(output_reader) == N
+
+
+class TestCLIUnderfolderOperationRepeat:
+    def test_repeat(self, tmpdir, sample_underfolder_minimnist):
+        from pipelime.cli.underfolder.operations import operation_repeat
+
+        input_folder = str(sample_underfolder_minimnist["folder"])
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+
+        repetitions = 3
+
+        runner = CliRunner()
+        res = runner.invoke(
+            operation_repeat,
+            f'-i "{input_folder}" -o "{output_folder}" -r {repetitions}',
+        )
+        print(res.stdout)
+        print(res.exc_info)
+        assert res.exit_code == 0
+
+        input_reader = UnderfolderReader(input_folder)
+        output_reader = UnderfolderReader(output_folder)
+
+        assert len(output_reader) == repetitions * len(input_reader)
+
+
 class TestCLIUnderfolderOperationUpload:
     def _recursive_folder_diff(self, folder_a, folder_b):
         import filecmp
@@ -739,18 +785,15 @@ class TestCLIUnderfolderOperationUpload:
         )
 
         # remove remote_root_a
-        options = (
-            [
-                "-i",
-                output_folder_a,
-                "-o",
-                output_folder_b,
-                "--hardlink",
-                "-r",
-                remote_urls[0],
-            ]
-            + [a for k in uploaded_keys for a in ["-k", k]]
-        )
+        options = [
+            "-i",
+            output_folder_a,
+            "-o",
+            output_folder_b,
+            "--hardlink",
+            "-r",
+            remote_urls[0],
+        ] + [a for k in uploaded_keys for a in ["-k", k]]
 
         runner = CliRunner()
         result = runner.invoke(remove_remote, options)

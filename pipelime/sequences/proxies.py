@@ -2,6 +2,7 @@ from pipelime.sequences.samples import Sample, SamplesSequence
 from pipelime.sequences.stages import SampleStage, StageCompose
 from collections import OrderedDict
 from bisect import bisect_right
+from itertools import repeat
 
 from typing import (
     Optional,
@@ -188,6 +189,34 @@ class ConcatSamplesSequence(SamplesSequence):
         seq_id = bisect_right(self._seq_length, idx) - 1
 
         return self._stage(self._src_stages[seq_id](sample))
+
+
+class RepeatedSamplesSequence(SamplesSequence):
+    def __init__(
+        self,
+        source: SamplesSequence,
+        repetitions: int,
+    ) -> None:
+        """Repeat a samples sequence a given number of times.
+
+        Args:
+            source (SamplesSequence): The samples sequence to repeat.
+            repetitions (int): The number of repetitions.
+        """
+        self._source = source
+        self._repetitions = repetitions
+        super().__init__(source.samples, source.stage)
+
+    def __len__(self) -> int:
+        return len(self._source) * self._repetitions
+
+    def __getitem__(self, idx: int) -> Sample:
+        if idx >= len(self):
+            raise IndexError
+
+        sample = self._source[idx % len(self._source)].copy()
+        sample.id = idx
+        return sample
 
 
 class FilteredSamplesSequence(SamplesSequence):
