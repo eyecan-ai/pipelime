@@ -193,7 +193,7 @@ def execute(
 ):
 
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
-    from pipelime.pipes.executors.naive import NaiveGraphExecutor
+    from pipelime.pipes.executors.naive import NaiveGraphExecutorAndWatcher
     from pipelime.pipes.graph import DAGNodesGraph
     from pipelime.tools.click import ClickTools
 
@@ -208,7 +208,7 @@ def execute(
     graph = DAGNodesGraph.build_nodes_graph(dag)
 
     if execution_backend == "naive":
-        executor = NaiveGraphExecutor()
+        executor = NaiveGraphExecutorAndWatcher()
         executor.exec(graph, token=token)
     else:
         raise NotImplementedError(

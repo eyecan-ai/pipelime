@@ -44,6 +44,11 @@ class PiperCommunicationChannel(ABC):
         """Wait for new messages"""
         raise NotImplementedError()
 
+    @abstractmethod
+    def close(self) -> None:
+        """Stop waiting for new messages"""
+        raise NotImplementedError()
+
 
 class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
     def __init__(self, token: str) -> None:
@@ -103,7 +108,14 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
         return False
 
     def listen(self) -> None:
-        self._client.wait_for_bulletins()
+        # BUG how do you gracefully stop a BulletinBoard?
+        try:
+            self._client.wait_for_bulletins()
+        except:
+            pass
+
+    def close(self) -> None:
+        self._client.close()
 
 
 class PiperCommunicationChannelRedis(PiperCommunicationChannel):
@@ -123,6 +135,7 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         super().__init__(token)
 
         self._db = None
+        self._thread = None
 
         try:
             self._db = redis.Redis()
@@ -143,8 +156,10 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         return False
 
     def listen(self) -> None:
-        for _ in self._pubsub.listen():
-            pass
+        self._thread = self._pubsub.run_in_thread()
+
+    def close(self) -> None:
+        self._thread.stop()
 
     def register_callback(self, callback: Callable[[dict], None]) -> bool:
 
