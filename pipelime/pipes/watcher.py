@@ -98,7 +98,6 @@ class Watcher:
             self._tasks_map[event][0] += 1
 
     def _listener_thread(self):
-        rich.print(f"Channel class: {self._channel.__class__}")
         self._channel.register_callback(self._callback)
         self._channel.listen()
 

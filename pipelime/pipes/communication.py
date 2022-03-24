@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -200,8 +201,6 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
         self._file.parent.mkdir(parents=True, exist_ok=True)
 
         self._rfd = None
-        with open(self._file, "ab"):
-            pass
 
         self._cbs = []
         self._stop_flag = False
@@ -244,6 +243,11 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
         return True
 
     def listen(self) -> None:
+        self._file.parent.mkdir(parents=True, exist_ok=True)
+        self._file.unlink(missing_ok=True)
+        with open(self._file, "ab"):
+            pass
+
         while not self._stop_flag:
             data = self._try_read()
 

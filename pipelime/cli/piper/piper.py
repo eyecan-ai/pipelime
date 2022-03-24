@@ -180,6 +180,7 @@ def execute(
 
     from pipelime.pipes.executors.base import WatcherNodesGraphExecutor
     from pipelime.pipes.executors.naive import NaiveGraphExecutor
+    from pipelime.pipes.communication import PiperCommunicationChannelFactory
     from pipelime.pipes.graph import DAGNodesGraph
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.tools.click import ClickTools
@@ -205,6 +206,8 @@ def execute(
     # Graph
     graph = DAGNodesGraph.build_nodes_graph(dag)
     executor.exec(graph, token=token)
+
+    PiperCommunicationChannelFactory.create_channel(token).close()
 
 
 if __name__ == "__main__":
