@@ -1,17 +1,15 @@
-from multiprocessing import Process
-import os
-from pathlib import Path
 import subprocess
-from threading import Thread
+from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
+
+from loguru import logger
+
 from pipelime.pipes.executors.base import NodeModelExecutionParser, NodesGraphExecutor
-from pipelime.pipes.graph import GraphNodeOperation, DAGNodesGraph
+from pipelime.pipes.graph import DAGNodesGraph, GraphNodeOperation
 from pipelime.pipes.model import NodeModel
 from pipelime.pipes.piper import PiperNamespace
-from pipelime.pipes.watcher import Watcher
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.validation import OperationValidate, SampleSchema, SchemaLoader
-from loguru import logger
 
 
 class NaiveNodeModelExecutionParser(NodeModelExecutionParser):
@@ -256,16 +254,3 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                 else:
                     logger.error(f"Node {str(node)} failed -> {stderr}")
                     raise RuntimeError(f"{stderr}")
-
-
-class NaiveGraphExecutorAndWatcher(NaiveGraphExecutor):
-    def exec(self, graph: DAGNodesGraph, token: str = "") -> bool:
-        logger.remove()
-        watcher = Watcher(token)
-        watcher.watch()
-        res = False
-        try:
-            res = super().exec(graph, token)
-        finally:
-            watcher.stop()
-        return res

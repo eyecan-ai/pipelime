@@ -1,5 +1,6 @@
 from calendar import c
 from typing import Optional
+
 import click
 
 
@@ -42,10 +43,10 @@ def compile(
 ):
 
     import rich
-    from pipelime.tools.click import ClickTools
     from choixe.configurations import XConfig
-    import rich
+
     from pipelime.pipes.parsers.factory import DAGConfigParserFactory
+    from pipelime.tools.click import ClickTools
 
     # DAG Model (abstraction layer to allow several parsing methods)
     try:
@@ -114,14 +115,15 @@ def draw(
     open: bool,
 ):
 
-    from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
-    from pipelime.pipes.parsers.factory import DAGConfigParserFactory
-    from pipelime.filesystem.toolkit import FSToolkit
-    from pipelime.pipes.graph import DAGNodesGraph
-    from pipelime.tools.click import ClickTools
+    import cv2
     import numpy as np
     import rich
-    import cv2
+
+    from pipelime.filesystem.toolkit import FSToolkit
+    from pipelime.pipes.drawing.factory import NodesGraphDrawerFactory
+    from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.pipes.parsers.factory import DAGConfigParserFactory
+    from pipelime.tools.click import ClickTools
 
     # DAG Model (abstraction layer to allow several parsing methods)
     dag = DAGConfigParserFactory.parse_file(
@@ -159,30 +161,13 @@ def draw(
         allow_extra_args=True,
     ),
 )
+@click.option("-i", "--piper_file", type=click.Path(exists=True), default="dag.yml")
+@click.option("-p", "--piper_params_file", type=click.Path(), default="params.yml")
 @click.option(
-    "-i",
-    "--piper_file",
-    type=click.Path(exists=True),
-    default="dag.yml",
+    "-b", "--execution_backend", type=click.Choice(["naive"]), default="naive"
 )
-@click.option(
-    "-p",
-    "--piper_params_file",
-    type=click.Path(),
-    default="params.yml",
-)
-@click.option(
-    "-b",
-    "--execution_backend",
-    type=click.Choice(["naive"]),
-    default="naive",
-)
-@click.option(
-    "-t",
-    "--token",
-    type=str,
-    default="",
-)
+@click.option("-t", "--token", type=str, default="")
+@click.option("--watch", is_flag=True, help="Live printing of tasks progress.")
 @click.pass_context
 def execute(
     ctx: click.Context,
@@ -190,12 +175,26 @@ def execute(
     piper_params_file: str,
     execution_backend: str,
     token: str,
+    watch: bool,
 ):
 
-    from pipelime.pipes.parsers.factory import DAGConfigParserFactory
-    from pipelime.pipes.executors.naive import NaiveGraphExecutorAndWatcher
+    from pipelime.pipes.executors.base import WatcherNodesGraphExecutor
+    from pipelime.pipes.executors.naive import NaiveGraphExecutor
     from pipelime.pipes.graph import DAGNodesGraph
+    from pipelime.pipes.parsers.factory import DAGConfigParserFactory
     from pipelime.tools.click import ClickTools
+
+    # Backend selection
+    if execution_backend == "naive":
+        executor = NaiveGraphExecutor()
+    else:
+        raise NotImplementedError(
+            f"Execution backend {execution_backend} not implemented"
+        )
+
+    # Decorators
+    if watch:
+        executor = WatcherNodesGraphExecutor(executor)
 
     # DAG Model (abstraction layer to allow several parsing methods)
     dag = DAGConfigParserFactory.parse_file(
@@ -203,17 +202,9 @@ def execute(
         params_file=piper_params_file,
         additional_args=ClickTools.parse_additional_args(ctx),  # additional args
     )
-
     # Graph
     graph = DAGNodesGraph.build_nodes_graph(dag)
-
-    if execution_backend == "naive":
-        executor = NaiveGraphExecutorAndWatcher()
-        executor.exec(graph, token=token)
-    else:
-        raise NotImplementedError(
-            f"Execution backend {execution_backend} not implemented"
-        )
+    executor.exec(graph, token=token)
 
 
 if __name__ == "__main__":

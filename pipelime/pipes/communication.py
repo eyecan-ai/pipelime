@@ -1,8 +1,11 @@
 import json
-from abc import ABC, abstractmethod
 import os
-from typing import Callable
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Callable, Optional
 
+import appdirs
 import redis
 from choixe.bulletins import Bulletin, BulletinBoard
 from loguru import logger
@@ -115,7 +118,11 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
             pass
 
     def close(self) -> None:
-        self._client.close()
+        # BUG how do you gracefully stop a BulletinBoard?
+        try:
+            self._client.close()
+        except:
+            pass
 
 
 class PiperCommunicationChannelRedis(PiperCommunicationChannel):
@@ -175,22 +182,107 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         return False
 
 
+class PiperCommunicationChannelFS(PiperCommunicationChannel):
+    """`PiperCommunicationChannel` implementation for Filesystem FIFO backend.
+
+    It uses a Filesystem FIFO to send/receive messages. Only works with one producer
+    and one consumer active at a time.
+    """
+
+    def __init__(self, token: str) -> None:
+        """Constructor for `PiperCommunicationChannelFS`
+
+        Args:
+            token (str): The token to use for the communication.
+        """
+        super().__init__(token)
+        self._file = Path(appdirs.user_state_dir("pipelime")) / f"{token}_fifo"
+        self._file.parent.mkdir(parents=True, exist_ok=True)
+
+        self._rfd = None
+        with open(self._file, "ab"):
+            pass
+
+        self._cbs = []
+        self._stop_flag = False
+
+    def _try_write(self, data: Optional[dict]) -> bool:
+        res = True
+        try:
+            with open(self._file, "ab") as fp:
+                if data is not None:
+                    bytes_ = json.dumps(data).encode("utf8")
+                    fp.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
+                    fp.write(bytes_)
+                else:
+                    fp.write(int(-1).to_bytes(4, byteorder="big", signed=True))
+        except:
+            res = False
+        return res
+
+    def _try_read(self) -> Optional[dict]:
+        if self._rfd is None:
+            self._rfd = open(self._file, "rb")
+
+        data = None
+        try:
+            n = int.from_bytes(self._rfd.read(4), byteorder="big", signed=True)
+            if n >= 0:
+                data = json.loads(self._rfd.read(n).decode("utf8"))
+            if n < 0:
+                self._rfd.close()
+        except:
+            data = None
+        return data
+
+    def send(self, id: str, payload: any) -> bool:
+        data = {"id": id, "token": self._token, "payload": payload}
+        return self._try_write(data)
+
+    def register_callback(self, callback: Callable[[dict], None]) -> bool:
+        self._cbs.append(callback)
+        return True
+
+    def listen(self) -> None:
+        while not self._stop_flag:
+            data = self._try_read()
+
+            if data is not None:
+                for cb in self._cbs:
+                    cb(data)
+
+            time.sleep(0.001)
+
+    def close(self) -> None:
+        self._stop_flag = True
+        self._try_write(None)
+
+        while self._file.exists():
+            self._file.unlink(missing_ok=True)
+            time.sleep(0.5)
+
+
 class PiperCommunicationChannelFactory:
     """Factory for `PiperCommunicationChannel` objects"""
 
-    CHANNEL_TYPE_VARNAME = "PIPELINE_PIPER_CHANNEL_TYPE"
+    CHANNEL_TYPE_VARNAME = "PIPELIME_PIPER_CHANNEL_TYPE"
     """Name of the environment variable with the channel type"""
 
     BULLETIN_BOARD = "BULLETIN"
     """Channel type env value for Choixe BulletinBoard"""
+
     REDIS = "REDIS"
     """Channel type env value for Redis"""
 
-    _default_channel_cls = PiperCommunicationChannelBulletinBoard
+    FILESYSTEM = "FILESYSTEM"
+    """Channel type env value for FileSystem FIFO"""
+
+    _default_channel_cls = PiperCommunicationChannelFS
 
     _cls_map = {
         BULLETIN_BOARD: PiperCommunicationChannelBulletinBoard,
         REDIS: PiperCommunicationChannelRedis,
+        FILESYSTEM: PiperCommunicationChannelFS,
     }
 
     @classmethod
