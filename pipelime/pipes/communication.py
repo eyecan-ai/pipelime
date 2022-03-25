@@ -1,6 +1,6 @@
 import json
 import os
-import fcntl
+import errno
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -183,6 +183,73 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         return False
 
 
+class Lockfile:
+    """A file locking mechanism that has context-manager support so
+    you can use it in a with statement. This should be relatively cross
+    compatible as it doesn't rely on msvcrt or fcntl for the locking.
+    """
+
+    def __init__(self, lockfile, timeout=-1, delay=0.05):
+        """Prepare the file locker. Specify the file to lock and optionally
+        the maximum timeout and the delay between each attempt to lock.
+        """
+        self._is_locked = False
+        self._lockfile = lockfile
+        self._timeout = timeout
+        self._delay = delay
+
+    def acquire(self):
+        """Acquire the lock, if possible. If the lock is in use, it check again
+        every `wait` seconds. It does this until it either gets the lock or
+        exceeds `timeout` number of seconds, in which case it throws
+        an exception.
+        """
+        start_time = time.time()
+        while not self._is_locked:
+            try:
+                # Open file exclusively
+                self._fd = os.open(self._lockfile, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                self._is_locked = True
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+                if self._timeout > 0 and (time.time() - start_time) >= self._timeout:
+                    raise IOError("Timeout occured.")
+                time.sleep(self._delay)
+
+    def release(self):
+        """Get rid of the lock by deleting the lockfile.
+        When working in a `with` statement, this gets automatically
+        called at the end.
+        """
+        # Close files, delete files
+        if self._is_locked:
+            os.close(self._fd)
+            os.unlink(self._lockfile)
+            self._is_locked = False
+
+    def __enter__(self):
+        """Activated when used in the with statement.
+        Should automatically acquire a lock to be used in the with block.
+        """
+        if not self._is_locked:
+            self.acquire()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """Activated at the end of the with statement.
+        It automatically releases the lock if it isn't locked.
+        """
+        if self._is_locked:
+            self.release()
+
+    def __del__(self):
+        """Make sure that the FileLock instance doesn't leave a lockfile
+        lying around.
+        """
+        self.release()
+
+
 class PiperCommunicationChannelFS(PiperCommunicationChannel):
     """`PiperCommunicationChannel` implementation for Filesystem FIFO backend.
 
@@ -197,7 +264,8 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
             token (str): The token to use for the communication.
         """
         super().__init__(token)
-        self._file = Path(appdirs.user_state_dir("pipelime")) / f"{token}_fifo"
+        self._file = Path(appdirs.user_state_dir("pipelime")) / f".{token}.fifo"
+        self._lockfile = self._file.parent / f".{token}.lock"
         self._file.parent.mkdir(parents=True, exist_ok=True)
 
         self._cbs = []
@@ -205,37 +273,35 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
 
     def _try_write(self, data: Optional[dict]) -> bool:
         res = True
-        with open(self._file, "wb") as fd:
-            try:
-                fcntl.lockf(fd, fcntl.LOCK_EX)
-                if data is not None:
-                    bytes_ = json.dumps(data).encode("utf8")
-                    fd.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
-                    fd.write(bytes_)
-                else:
-                    fd.write(int(-1).to_bytes(4, byteorder="big", signed=True))
-                fcntl.lockf()
-            except:
-                res = False
-            finally:
-                fcntl.lockf(fd, fcntl.LOCK_UN)
+        with Lockfile(self._lockfile):
+            with open(self._file, "ab") as fd:
+                try:
+                    if data is not None:
+                        bytes_ = json.dumps(data).encode("utf8")
+                        fd.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
+                        fd.write(bytes_)
+                    else:
+                        fd.write(int(-1).to_bytes(4, byteorder="big", signed=True))
+                except:
+                    res = False
         return res
 
     def _try_read(self) -> Sequence[dict]:
         data = []
-        with open(self._file, "r+b") as fd:
-            try:
-                fcntl.lockf(fd, fcntl.LOCK_EX)
-                while True:
-                    n = int.from_bytes(fd.read(4), byteorder="big", signed=True)
-                    if n >= 0:
-                        data.append(json.loads(fd.read(n).decode("utf8")))
-            except:
-                pass
-            finally:
-                fd.seek(0)
-                fd.truncate()
-                fcntl.lockf(fd, fcntl.LOCK_UN)
+        with Lockfile(self._lockfile):
+            if not self._file.exists():
+                return data
+            with open(self._file, "r+b") as fd:
+                try:
+                    while True:
+                        n = int.from_bytes(fd.read(4), byteorder="big", signed=True)
+                        if n >= 0:
+                            data.append(json.loads(fd.read(n).decode("utf8")))
+                except:
+                    pass
+                finally:
+                    fd.seek(0)
+                    fd.truncate()
         return data
 
     def send(self, id: str, payload: any) -> bool:
@@ -253,13 +319,13 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
             pass
 
         while not self._stop_flag:
+            time.sleep(0.001)
+
             data = self._try_read()
 
             for x in data:
                 for cb in self._cbs:
                     cb(x)
-
-            time.sleep(0.001)
 
     def close(self) -> None:
         self._stop_flag = True
