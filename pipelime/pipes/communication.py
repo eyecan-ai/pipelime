@@ -1,10 +1,10 @@
 import json
 import os
-import shutil
+import fcntl
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import appdirs
 import redis
@@ -200,38 +200,42 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
         self._file = Path(appdirs.user_state_dir("pipelime")) / f"{token}_fifo"
         self._file.parent.mkdir(parents=True, exist_ok=True)
 
-        self._rfd = None
-
         self._cbs = []
         self._stop_flag = False
 
     def _try_write(self, data: Optional[dict]) -> bool:
         res = True
-        try:
-            with open(self._file, "ab") as fp:
+        with open(self._file, "wb") as fd:
+            try:
+                fcntl.lockf(fd, fcntl.LOCK_EX)
                 if data is not None:
                     bytes_ = json.dumps(data).encode("utf8")
-                    fp.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
-                    fp.write(bytes_)
+                    fd.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
+                    fd.write(bytes_)
                 else:
-                    fp.write(int(-1).to_bytes(4, byteorder="big", signed=True))
-        except:
-            res = False
+                    fd.write(int(-1).to_bytes(4, byteorder="big", signed=True))
+                fcntl.lockf()
+            except:
+                res = False
+            finally:
+                fcntl.lockf(fd, fcntl.LOCK_UN)
         return res
 
-    def _try_read(self) -> Optional[dict]:
-        if self._rfd is None:
-            self._rfd = open(self._file, "rb")
-
-        data = None
-        try:
-            n = int.from_bytes(self._rfd.read(4), byteorder="big", signed=True)
-            if n >= 0:
-                data = json.loads(self._rfd.read(n).decode("utf8"))
-            if n < 0:
-                self._rfd.close()
-        except:
-            data = None
+    def _try_read(self) -> Sequence[dict]:
+        data = []
+        with open(self._file, "r+b") as fd:
+            try:
+                fcntl.lockf(fd, fcntl.LOCK_EX)
+                while True:
+                    n = int.from_bytes(fd.read(4), byteorder="big", signed=True)
+                    if n >= 0:
+                        data.append(json.loads(fd.read(n).decode("utf8")))
+            except:
+                pass
+            finally:
+                fd.seek(0)
+                fd.truncate()
+                fcntl.lockf(fd, fcntl.LOCK_UN)
         return data
 
     def send(self, id: str, payload: any) -> bool:
@@ -251,9 +255,9 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
         while not self._stop_flag:
             data = self._try_read()
 
-            if data is not None:
+            for x in data:
                 for cb in self._cbs:
-                    cb(data)
+                    cb(x)
 
             time.sleep(0.001)
 
