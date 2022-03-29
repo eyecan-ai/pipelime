@@ -252,5 +252,5 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                         raise SampleSchema.ValidationError
 
                 else:
-                    logger.error(f"Node {str(node)} failed -> {stderr}")
-                    raise RuntimeError(f"{stderr}")
+                    logger.error(f"Node {str(node)} failed -> {stderr.decode()}")
+                    raise RuntimeError(f"{stderr.decode()}")
