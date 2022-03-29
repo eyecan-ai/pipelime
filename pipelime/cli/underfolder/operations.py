@@ -1264,3 +1264,60 @@ def dump(
             link_type=LinkType(copy_mode),
             file=outfile,
         )
+
+
+@click.command("remove_duplicates", help="Removes duplicated samples")
+@click.option(
+    "-i",
+    "--input_folder",
+    required=True,
+    type=click.Path(exists=True),
+    help="Input Underfolder",
+)
+@click.option(
+    "-o", "--output_folder", required=True, type=click.Path(), help="Output Underfolder"
+)
+@click.option(
+    "-k",
+    "--keys",
+    required=True,
+    multiple=True,
+    type=str,
+    help="Keys to compare samples",
+)
+@writer_options
+@Piper.command(inputs=["input_folder"], outputs=["output_folder"])
+def operation_remove_duplicates(
+    input_folder: str,
+    output_folder: str,
+    keys: Sequence[str],
+    copy_mode: str,
+    workers: int,
+):
+
+    from pipelime.sequences.operations import OperationRemoveDuplicates
+    from pipelime.sequences.readers.filesystem import UnderfolderReader
+    from pipelime.sequences.writers.filesystem import UnderfolderWriterV2
+
+    n = 2
+    cb_flatten, cb_writer = [
+        PiperCommand.instance.generate_progress_callback(x, n) for x in range(n)
+    ]
+
+    dataset = UnderfolderReader(folder=input_folder, lazy_samples=True)
+    template = dataset.get_reader_template()
+    op = OperationRemoveDuplicates(
+        keys,
+        progress_bar=True,
+        callback=cb_flatten,
+    )
+    output_dataset = op(dataset)
+
+    writer = UnderfolderWriterV2(
+        folder=output_folder,
+        copy_mode=UnderfolderWriterV2.CopyMode(copy_mode),
+        reader_template=template,
+        num_workers=workers,
+        progress_callback=cb_writer,
+    )
+    writer(output_dataset)
