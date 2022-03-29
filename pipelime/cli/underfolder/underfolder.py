@@ -20,6 +20,7 @@ from pipelime.cli.underfolder.operations import (
     remove_remote,
     summary,
     upload_to_remote,
+    operation_remove_duplicates,
 )
 
 
@@ -47,3 +48,4 @@ underfolder.add_command(summary)
 underfolder.add_command(upload_to_remote)
 underfolder.add_command(remove_remote)
 underfolder.add_command(dump)
+underfolder.add_command(operation_remove_duplicates)

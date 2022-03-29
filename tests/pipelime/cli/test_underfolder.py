@@ -503,6 +503,28 @@ class TestCLIUnderfolderOperationRepeat:
         assert len(output_reader) == repetitions * len(input_reader)
 
 
+class TestCLIUnderfolderOperationRemoveDuplicates:
+    def test_flatten(self, tmpdir, sample_underfolder_minimnist):  # _queries):
+        from pipelime.cli.underfolder.operations import operation_remove_duplicates
+
+        input_folder = str(sample_underfolder_minimnist["folder"])
+        output_folder = str(Path(tmpdir.mkdir(str(uuid.uuid1()))))
+
+        k = list(UnderfolderReader(input_folder)[0].keys())[0]
+
+        runner = CliRunner()
+        res = runner.invoke(
+            operation_remove_duplicates,
+            f'-i "{input_folder}" -o "{output_folder}" -k {k}',
+        )
+        assert res.exit_code == 0
+
+        input_reader = UnderfolderReader(input_folder)
+        output_reader = UnderfolderReader(output_folder)
+
+        assert len(output_reader) <= len(input_reader)
+
+
 class TestCLIUnderfolderOperationUpload:
     def _recursive_folder_diff(self, folder_a, folder_b):
         import filecmp
