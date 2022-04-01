@@ -32,6 +32,7 @@ from pipelime.sequences.operations import (
     OperationSubsample,
     OperationSum,
     SequenceOperation,
+    OperationRemoveDuplicates,
 )
 from pipelime.sequences.samples import Sample, SamplesSequence
 from pipelime.sequences.stages import StageRemap
@@ -751,3 +752,24 @@ class TestOperationFlatten:
     def test_operation_flatten_warning(self):
         with pytest.warns(UserWarning):
             OperationFlatten("my.key", "destkey")
+
+
+class TestOperationRemoveDuplicates:
+    def test_operation_remove_duplicates(self, plain_samples_sequence_generator):
+        N = 20
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        for k in dataset[0].keys():
+            op = OperationRemoveDuplicates([k])
+            _plug_test(op)
+            out = op(dataset)
+
+            assert op.input_port().is_valid_data(dataset)
+            assert op.output_port().is_valid_data(out)
+            assert len(out) <= len(dataset)
+
+            duplicated_dataset = OperationSum()([dataset, dataset])
+            out_duplicated = op(duplicated_dataset)
+
+            assert len(out_duplicated) == len(out)
