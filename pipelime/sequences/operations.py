@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import copy
 import multiprocessing
-import random
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
-from hashlib import sha256
 import pickle
+import random
+import warnings
+from abc import ABC, abstractmethod
+from hashlib import sha256
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
 
 import dictquery as dq
 import numpy as np
@@ -960,6 +961,11 @@ class OperationFlatten(SequenceOperation, Spook):
         self._list_idx_key = list_idx_key
         self._progress_bar = progress_bar
         self._callback = callback
+
+        if self._dest_key.count(".") < 1:
+            warnings.warn(
+                "The inserted destination key has depth=0, this will result in the creation of a new item."
+            )
 
     def input_port(self) -> OperationPort:
         return OperationPort(SamplesSequence)

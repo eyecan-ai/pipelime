@@ -749,6 +749,10 @@ class TestOperationFlatten:
 
             assert pydash.get(x, key) == expected_flattened[i]
 
+    def test_operation_flatten_warning(self):
+        with pytest.warns(UserWarning):
+            OperationFlatten("my.key", "destkey")
+
 
 class TestOperationRemoveDuplicates:
     def test_operation_remove_duplicates(self, plain_samples_sequence_generator):
