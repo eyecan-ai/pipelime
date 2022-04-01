@@ -1,8 +1,12 @@
 import json
-from abc import ABC, abstractmethod
 import os
-from typing import Callable
+import errno
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Callable, Optional, Sequence
 
+import appdirs
 import redis
 from choixe.bulletins import Bulletin, BulletinBoard
 from loguru import logger
@@ -42,6 +46,11 @@ class PiperCommunicationChannel(ABC):
     @abstractmethod
     def listen(self) -> None:
         """Wait for new messages"""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def close(self) -> None:
+        """Stop waiting for new messages"""
         raise NotImplementedError()
 
 
@@ -103,7 +112,18 @@ class PiperCommunicationChannelBulletinBoard(PiperCommunicationChannel):
         return False
 
     def listen(self) -> None:
-        self._client.wait_for_bulletins()
+        # BUG how do you gracefully stop a BulletinBoard?
+        try:
+            self._client.wait_for_bulletins()
+        except:
+            pass
+
+    def close(self) -> None:
+        # BUG how do you gracefully stop a BulletinBoard?
+        try:
+            self._client.close()
+        except:
+            pass
 
 
 class PiperCommunicationChannelRedis(PiperCommunicationChannel):
@@ -123,6 +143,7 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         super().__init__(token)
 
         self._db = None
+        self._thread = None
 
         try:
             self._db = redis.Redis()
@@ -143,8 +164,10 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         return False
 
     def listen(self) -> None:
-        for _ in self._pubsub.listen():
-            pass
+        self._thread = self._pubsub.run_in_thread()
+
+    def close(self) -> None:
+        self._thread.stop()
 
     def register_callback(self, callback: Callable[[dict], None]) -> bool:
 
@@ -160,22 +183,180 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         return False
 
 
+class Lockfile:
+    """A file locking mechanism that has context-manager support so
+    you can use it in a with statement. This should be relatively cross
+    compatible as it doesn't rely on msvcrt or fcntl for the locking.
+    """
+
+    def __init__(self, lockfile, timeout=-1, delay=0.05):
+        """Prepare the file locker. Specify the file to lock and optionally
+        the maximum timeout and the delay between each attempt to lock.
+        """
+        self._is_locked = False
+        self._lockfile = lockfile
+        self._timeout = timeout
+        self._delay = delay
+
+    def acquire(self):
+        """Acquire the lock, if possible. If the lock is in use, it check again
+        every `wait` seconds. It does this until it either gets the lock or
+        exceeds `timeout` number of seconds, in which case it throws
+        an exception.
+        """
+        start_time = time.time()
+        while not self._is_locked:
+            try:
+                # Open file exclusively
+                self._fd = os.open(self._lockfile, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                self._is_locked = True
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+                if self._timeout > 0 and (time.time() - start_time) >= self._timeout:
+                    raise IOError("Timeout occured.")
+                time.sleep(self._delay)
+
+    def release(self):
+        """Get rid of the lock by deleting the lockfile.
+        When working in a `with` statement, this gets automatically
+        called at the end.
+        """
+        # Close files, delete files
+        if self._is_locked:
+            os.close(self._fd)
+            os.unlink(self._lockfile)
+            self._is_locked = False
+
+    def __enter__(self):
+        """Activated when used in the with statement.
+        Should automatically acquire a lock to be used in the with block.
+        """
+        if not self._is_locked:
+            self.acquire()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """Activated at the end of the with statement.
+        It automatically releases the lock if it isn't locked.
+        """
+        if self._is_locked:
+            self.release()
+
+    def __del__(self):
+        """Make sure that the FileLock instance doesn't leave a lockfile
+        lying around.
+        """
+        self.release()
+
+
+class PiperCommunicationChannelFS(PiperCommunicationChannel):
+    """`PiperCommunicationChannel` implementation for Filesystem FIFO backend.
+
+    It uses a Filesystem FIFO to send/receive messages. Only works with one producer
+    and one consumer active at a time.
+    """
+
+    def __init__(self, token: str) -> None:
+        """Constructor for `PiperCommunicationChannelFS`
+
+        Args:
+            token (str): The token to use for the communication.
+        """
+        super().__init__(token)
+        self._file = Path(appdirs.user_state_dir("pipelime")) / f".{token}.fifo"
+        self._lockfile = self._file.parent / f".{token}.lock"
+        self._file.parent.mkdir(parents=True, exist_ok=True)
+
+        self._cbs = []
+        self._stop_flag = False
+
+    def _try_write(self, data: Optional[dict]) -> bool:
+        res = True
+        with Lockfile(self._lockfile):
+            with open(self._file, "ab") as fd:
+                try:
+                    if data is not None:
+                        bytes_ = json.dumps(data).encode("utf8")
+                        fd.write(len(bytes_).to_bytes(4, byteorder="big", signed=True))
+                        fd.write(bytes_)
+                    else:
+                        fd.write(int(-1).to_bytes(4, byteorder="big", signed=True))
+                except:
+                    res = False
+        return res
+
+    def _try_read(self) -> Sequence[dict]:
+        data = []
+        with Lockfile(self._lockfile):
+            if not self._file.exists():
+                return data
+            with open(self._file, "r+b") as fd:
+                try:
+                    while True:
+                        n = int.from_bytes(fd.read(4), byteorder="big", signed=True)
+                        if n >= 0:
+                            data.append(json.loads(fd.read(n).decode("utf8")))
+                except:
+                    pass
+                finally:
+                    fd.seek(0)
+                    fd.truncate()
+        return data
+
+    def send(self, id: str, payload: any) -> bool:
+        data = {"id": id, "token": self._token, "payload": payload}
+        return self._try_write(data)
+
+    def register_callback(self, callback: Callable[[dict], None]) -> bool:
+        self._cbs.append(callback)
+        return True
+
+    def listen(self) -> None:
+        self._file.parent.mkdir(parents=True, exist_ok=True)
+        self._file.unlink(missing_ok=True)
+        with open(self._file, "ab"):
+            pass
+
+        while not self._stop_flag:
+            time.sleep(0.001)
+
+            data = self._try_read()
+
+            for x in data:
+                for cb in self._cbs:
+                    cb(x)
+
+    def close(self) -> None:
+        self._stop_flag = True
+        self._try_write(None)
+
+        while self._file.exists():
+            self._file.unlink(missing_ok=True)
+            time.sleep(0.5)
+
+
 class PiperCommunicationChannelFactory:
     """Factory for `PiperCommunicationChannel` objects"""
 
-    CHANNEL_TYPE_VARNAME = "PIPELINE_PIPER_CHANNEL_TYPE"
+    CHANNEL_TYPE_VARNAME = "PIPELIME_PIPER_CHANNEL_TYPE"
     """Name of the environment variable with the channel type"""
 
     BULLETIN_BOARD = "BULLETIN"
     """Channel type env value for Choixe BulletinBoard"""
+
     REDIS = "REDIS"
     """Channel type env value for Redis"""
 
-    _default_channel_cls = PiperCommunicationChannelBulletinBoard
+    FILESYSTEM = "FILESYSTEM"
+    """Channel type env value for FileSystem FIFO"""
+
+    _default_channel_cls = PiperCommunicationChannelFS
 
     _cls_map = {
         BULLETIN_BOARD: PiperCommunicationChannelBulletinBoard,
         REDIS: PiperCommunicationChannelRedis,
+        FILESYSTEM: PiperCommunicationChannelFS,
     }
 
     @classmethod

@@ -219,6 +219,20 @@ class TestSequenceProxy:
                     assert k in item
                     assert v == item[k]
 
+    def test_repeated_seq_proxy(self):
+        n_items = 10
+        repeats = 4
+        src = self._make_random_source(n_items)
+        repeated = sp.RepeatedSamplesSequence(src, repeats)
+
+        assert len(repeated) == repeats * n_items
+        assert len(list(repeated)) == len(repeated)
+
+        for i, x in enumerate(repeated):
+            assert x.id == i
+            for k, v in x.items():
+                assert src[i % len(src)][k] == v
+
     def test_filtered_seq_proxy(self):
         n_items = 5
         src = self._make_random_source(n_items)
@@ -260,9 +274,7 @@ class TestSequenceProxy:
         n_items = 10
         src = self._make_random_source(n_items)
 
-        slc_sseq = sp.SlicedSamplesSequence(
-            src, 2, 9, 3
-        )
+        slc_sseq = sp.SlicedSamplesSequence(src, 2, 9, 3)
 
         sliced_src = src.samples[2:9:3]
         assert len(slc_sseq) == len(sliced_src)

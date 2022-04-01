@@ -1,13 +1,15 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
+
+from loguru import logger
+
 from pipelime.pipes.executors.base import NodeModelExecutionParser, NodesGraphExecutor
-from pipelime.pipes.graph import GraphNodeOperation, DAGNodesGraph
+from pipelime.pipes.graph import DAGNodesGraph, GraphNodeOperation
 from pipelime.pipes.model import NodeModel
 from pipelime.pipes.piper import PiperNamespace
 from pipelime.sequences.readers.filesystem import UnderfolderReader
 from pipelime.sequences.validation import OperationValidate, SampleSchema, SchemaLoader
-from loguru import logger
 
 
 class NaiveNodeModelExecutionParser(NodeModelExecutionParser):
@@ -250,5 +252,5 @@ class NaiveGraphExecutor(NodesGraphExecutor):
                         raise SampleSchema.ValidationError
 
                 else:
-                    logger.error(f"Node {str(node)} failed -> {stderr}")
-                    raise RuntimeError(f"{stderr}")
+                    logger.error(f"Node {str(node)} failed -> {stderr.decode()}")
+                    raise RuntimeError(f"{stderr.decode()}")

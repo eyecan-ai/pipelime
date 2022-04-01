@@ -281,7 +281,7 @@ class FSToolkit(object):
             if data is not None:
                 return data
         except Exception as e:
-            raise Exception(f"Loading data error: {e}") from e
+            raise Exception(f'Failed to read "{filename}": {e}') from e
         finally:
             if data_stream is not None:
                 data_stream.close()
@@ -352,7 +352,7 @@ class FSToolkit(object):
                     fn()
                     return
         except Exception as e:
-            raise Exception(f"Loading data error: {e}") from e
+            raise Exception(f"Failed to store data: {e}") from e
 
         # extension not found in switches
         raise NotImplementedError(f"Unknown file extension: {extension}")
@@ -364,7 +364,7 @@ class FSToolkit(object):
             extension = cls.get_file_extension(filename)
             data_stream = open(filename, "wb")
         except Exception as e:
-            raise Exception(f"Loading data error: {e}") from e
+            raise Exception(f'Failed to write "{filename}": {e}') from e
         else:
             return cls.store_data_to_stream(data_stream, extension, data)
         finally:

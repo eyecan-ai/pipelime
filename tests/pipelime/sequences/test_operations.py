@@ -3,6 +3,7 @@ import hashlib
 from itertools import count
 from typing import Dict, Optional, Sequence
 import uuid
+import numpy as np
 
 import pydash
 import pytest
@@ -15,6 +16,7 @@ from pipelime.sequences.operations import (
     OperationFilterByQuery,
     OperationFilterByScript,
     OperationFilterKeys,
+    OperationFlatten,
     OperationGroupBy,
     OperationIdentity,
     # OperationMix,
@@ -30,6 +32,7 @@ from pipelime.sequences.operations import (
     OperationSubsample,
     OperationSum,
     SequenceOperation,
+    OperationRemoveDuplicates,
 )
 from pipelime.sequences.samples import Sample, SamplesSequence
 from pipelime.sequences.stages import StageRemap
@@ -663,7 +666,7 @@ class TestOperationStage(object):
         dataset = plain_samples_sequence_generator("d0_", N)
         stage = StageRemap({key: key_2})
         op = OperationStage(stage, progress_bar=pb, num_workers=workers)
-        _plug_test(op, check_serialization=False)
+        _plug_test(op, check_serialization=True)
         out = op(dataset)
 
         assert isinstance(out, SamplesSequence)
@@ -695,3 +698,78 @@ class TestOperationRemapKeys(object):
                     assert len(x.keys()) == 1
                 else:
                     assert len(x.keys()) > 1
+
+
+class TestOperationFlatten:
+    def test_operation_flatten(self, plain_samples_sequence_generator):
+        N = 10
+        key = "metadata.list"
+        dest_key = key
+        sample_idx_key = "metadata.flatten.sample_idx"
+        list_idx_key = "metadata.flatten.list_idx"
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        op = OperationFlatten(
+            key,
+            dest_key=dest_key,
+            sample_idx_key=sample_idx_key,
+            list_idx_key=list_idx_key,
+        )
+        _plug_test(op)
+        out = op(dataset)
+
+        assert op.input_port().is_valid_data(dataset)
+        assert op.output_port().is_valid_data(out)
+
+        expected_sample_idx = []
+        expected_list_idx = []
+        expected_flattened = []
+        for i, x in enumerate(dataset):
+            to_flatten = pydash.get(x, key)
+            expected_sample_idx.extend([i] * len(to_flatten))
+            expected_list_idx.extend(list(range(len(to_flatten))))
+            expected_flattened.extend(to_flatten)
+
+        assert len(out) == len(expected_sample_idx)
+
+        k = count()
+        for i, x in enumerate(out):
+            if sample_idx_key is not None:
+                assert pydash.get(x, sample_idx_key) == expected_sample_idx[i]
+
+            if list_idx_key is not None:
+                assert pydash.get(x, list_idx_key) == expected_list_idx[i]
+
+            for k in set(x.keys()).difference(["metadata"]):
+                eq = x[k] == dataset[expected_sample_idx[i]][k]
+                if isinstance(eq, np.ndarray):
+                    eq = eq.all()
+                assert eq
+
+            assert pydash.get(x, key) == expected_flattened[i]
+
+    def test_operation_flatten_warning(self):
+        with pytest.warns(UserWarning):
+            OperationFlatten("my.key", "destkey")
+
+
+class TestOperationRemoveDuplicates:
+    def test_operation_remove_duplicates(self, plain_samples_sequence_generator):
+        N = 20
+
+        dataset = plain_samples_sequence_generator("d0_", N)
+
+        for k in dataset[0].keys():
+            op = OperationRemoveDuplicates([k])
+            _plug_test(op)
+            out = op(dataset)
+
+            assert op.input_port().is_valid_data(dataset)
+            assert op.output_port().is_valid_data(out)
+            assert len(out) <= len(dataset)
+
+            duplicated_dataset = OperationSum()([dataset, dataset])
+            out_duplicated = op(duplicated_dataset)
+
+            assert len(out_duplicated) == len(out)

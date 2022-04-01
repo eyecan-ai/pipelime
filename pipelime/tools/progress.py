@@ -1,15 +1,17 @@
-from typing import Callable, Iterable, List, Sequence, Optional, Any, Sized, Union
+import os
 import warnings
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Sized, Union
+
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
     Progress,
     ProgressColumn,
-    TextColumn,
-    BarColumn,
-    TimeRemainingColumn,
     ProgressType,
-    _TrackThread,
     TaskID,
+    TextColumn,
+    TimeRemainingColumn,
+    _TrackThread,
 )
 
 
@@ -159,11 +161,11 @@ def pipelime_track(
         Iterable[ProgressType]: An iterable of the values in the sequence.
 
     """
-
+    logo = " " if os.name == "nt" else "🍋"
     columns: List["ProgressColumn"] = (
-        [TextColumn("🍋|[progress.description]{task.description}")]
+        [TextColumn(logo + "|[progress.description]{task.description}")]
         if description
-        else [TextColumn("🍋|")]
+        else [TextColumn(logo + "|")]
     )
     columns.extend(
         (
