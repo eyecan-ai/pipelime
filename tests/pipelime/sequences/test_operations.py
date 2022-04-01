@@ -747,3 +747,7 @@ class TestOperationFlatten:
                 assert eq
 
             assert pydash.get(x, key) == expected_flattened[i]
+
+    def test_operation_flatten_warning(self):
+        with pytest.warns(UserWarning):
+            OperationFlatten("my.key", "destkey")
