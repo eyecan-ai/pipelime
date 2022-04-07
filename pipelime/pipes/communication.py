@@ -10,6 +10,7 @@ import appdirs
 import redis
 from choixe.bulletins import Bulletin, BulletinBoard
 from loguru import logger
+from filelock import FileLock
 
 
 class PiperCommunicationChannel(ABC):
@@ -167,7 +168,11 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
         self._thread = self._pubsub.run_in_thread()
 
     def close(self) -> None:
-        self._thread.stop()
+        if self._thread is not None:
+            self._thread.stop()
+            self._thread = None
+        self._db.close()
+        self._db = None
 
     def register_callback(self, callback: Callable[[dict], None]) -> bool:
 
@@ -181,73 +186,6 @@ class PiperCommunicationChannelRedis(PiperCommunicationChannel):
             self._pubsub.subscribe(**{self._token: redis_helper})
             return True
         return False
-
-
-class Lockfile:
-    """A file locking mechanism that has context-manager support so
-    you can use it in a with statement. This should be relatively cross
-    compatible as it doesn't rely on msvcrt or fcntl for the locking.
-    """
-
-    def __init__(self, lockfile, timeout=-1, delay=0.05):
-        """Prepare the file locker. Specify the file to lock and optionally
-        the maximum timeout and the delay between each attempt to lock.
-        """
-        self._is_locked = False
-        self._lockfile = lockfile
-        self._timeout = timeout
-        self._delay = delay
-
-    def acquire(self):
-        """Acquire the lock, if possible. If the lock is in use, it check again
-        every `wait` seconds. It does this until it either gets the lock or
-        exceeds `timeout` number of seconds, in which case it throws
-        an exception.
-        """
-        start_time = time.time()
-        while not self._is_locked:
-            try:
-                # Open file exclusively
-                self._fd = os.open(self._lockfile, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-                self._is_locked = True
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise
-                if self._timeout > 0 and (time.time() - start_time) >= self._timeout:
-                    raise IOError("Timeout occured.")
-                time.sleep(self._delay)
-
-    def release(self):
-        """Get rid of the lock by deleting the lockfile.
-        When working in a `with` statement, this gets automatically
-        called at the end.
-        """
-        # Close files, delete files
-        if self._is_locked:
-            os.close(self._fd)
-            os.unlink(self._lockfile)
-            self._is_locked = False
-
-    def __enter__(self):
-        """Activated when used in the with statement.
-        Should automatically acquire a lock to be used in the with block.
-        """
-        if not self._is_locked:
-            self.acquire()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        """Activated at the end of the with statement.
-        It automatically releases the lock if it isn't locked.
-        """
-        if self._is_locked:
-            self.release()
-
-    def __del__(self):
-        """Make sure that the FileLock instance doesn't leave a lockfile
-        lying around.
-        """
-        self.release()
 
 
 class PiperCommunicationChannelFS(PiperCommunicationChannel):
@@ -265,7 +203,7 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
         """
         super().__init__(token)
         self._file = Path(appdirs.user_state_dir("pipelime")) / f".{token}.fifo"
-        self._lockfile = self._file.parent / f".{token}.lock"
+        self._lockfile = FileLock(self._file.parent / f".{token}.lock")
         self._file.parent.mkdir(parents=True, exist_ok=True)
 
         self._cbs = []
@@ -273,7 +211,7 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
 
     def _try_write(self, data: Optional[dict]) -> bool:
         res = True
-        with Lockfile(self._lockfile):
+        with self._lockfile:
             with open(self._file, "ab") as fd:
                 try:
                     if data is not None:
@@ -288,7 +226,7 @@ class PiperCommunicationChannelFS(PiperCommunicationChannel):
 
     def _try_read(self) -> Sequence[dict]:
         data = []
-        with Lockfile(self._lockfile):
+        with self._lockfile:
             if not self._file.exists():
                 return data
             with open(self._file, "r+b") as fd:
