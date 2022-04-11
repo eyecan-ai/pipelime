@@ -18,3 +18,4 @@ joblib
 deepdiff
 networkx
 redis
+filelock
