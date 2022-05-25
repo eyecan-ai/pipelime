@@ -327,11 +327,7 @@ class UnderfolderWriterV2(UnderfolderWriter):
                 # and the root_files_keys are the same, the hard link will throw an error
                 # because the file already exists. This is a workaround for now.
                 if not output_file.exists():
-                    try:
-                        # (new in version 3.10)
-                        output_file.hardlink_to(path)  # type: ignore
-                    except AttributeError:
-                        import os
+                    import os
 
                     os.link(path, output_file)
 
