@@ -471,7 +471,7 @@ def operation_splitbyquery(
 
     # operations
     op_splitbyquery = OperationSplitByQuery(query=query)
-    op_reindex = OperationResetIndices()
+
     output_datasets = op_splitbyquery(dataset)
 
     output_folders = [output_folder_1, output_folder_2]
@@ -479,6 +479,7 @@ def operation_splitbyquery(
     for index, (output_folder, output_dataset) in enumerate(
         zip(output_folders, output_datasets)
     ):
+        op_reindex = OperationResetIndices()
         writer = UnderfolderWriterV2(
             folder=output_folder,
             copy_mode=UnderfolderWriterV2.CopyMode(copy_mode),
